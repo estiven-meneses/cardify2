@@ -233,6 +233,8 @@ const DOM = {
     btnCropAspectCr80: document.getElementById('btn-crop-aspect-cr80'),
     btnCropAutoDetect: document.getElementById('btn-crop-auto-detect'),
     btnCropQuadAuto: document.getElementById('btn-crop-quad-auto'),
+    btnCropQuadRotLeft: document.getElementById('btn-crop-quad-rot-left'),
+    btnCropQuadRotRight: document.getElementById('btn-crop-quad-rot-right'),
     btnCropQuadReset: document.getElementById('btn-crop-quad-reset'),
     btnCropRotateLeft: document.getElementById('btn-crop-rotate-left'),
     btnCropRotateRight: document.getElementById('btn-crop-rotate-right'),
@@ -240,6 +242,11 @@ const DOM = {
     cropAngleLabel: document.getElementById('crop-angle-label'),
     btnCropAngleReset: document.getElementById('btn-crop-angle-reset'),
     btnCropToggleGrid: document.getElementById('btn-crop-toggle-grid'),
+    btnLoupeZoom1: document.getElementById('btn-loupe-zoom-1'),
+    btnLoupeZoom15: document.getElementById('btn-loupe-zoom-15'),
+    btnLoupeZoom2: document.getElementById('btn-loupe-zoom-2'),
+    btnLoupeZoom3: document.getElementById('btn-loupe-zoom-3'),
+    cropLoupeBadge: document.getElementById('crop-loupe-badge'),
     cameraModal: document.getElementById('camera-modal'),
     cameraVideo: document.getElementById('camera-video'),
     cameraGuideBox: document.getElementById('camera-guide-box'),
@@ -2511,10 +2518,11 @@ let cropState = {
     cardId: 'frente',
     sourceImg: null,
     cachedRotatedImg: null,
-    mode: 'box', // 'box' | 'quad' | 'straighten'
+    mode: 'quad', // 'quad' (Perspectiva por defecto) | 'straighten' | 'box'
     aspect: 'cr80', // 'cr80' | 'free'
     fineAngle: 0, // Inclinación fina en grados (-45 a +45)
     rotation90: 0, // Rotación de 90° acumulada (0, 90, 180, 270)
+    loupeZoom: 1.0, // Zoom de lupa por defecto 1X (resolución nativa 1:1)
     showGrid: false,
     cropBox: { x: 20, y: 20, w: 200, h: 140 },
     quadPoints: {
@@ -2529,7 +2537,39 @@ let cropState = {
     startQuad: null
 };
 
-function openCropModal(cardId) {
+function setLoupeZoom(zoom) {
+    cropState.loupeZoom = zoom;
+    const badge = DOM.cropLoupeBadge || document.getElementById('crop-loupe-badge');
+    if (badge) badge.textContent = `${zoom}X`;
+
+    const zBtns = [
+        { el: DOM.btnLoupeZoom1, val: 1.0 },
+        { el: DOM.btnLoupeZoom15, val: 1.5 },
+        { el: DOM.btnLoupeZoom2, val: 2.0 },
+        { el: DOM.btnLoupeZoom3, val: 3.0 }
+    ];
+    zBtns.forEach(b => {
+        if (!b.el) return;
+        if (Math.abs(b.val - zoom) < 0.05) {
+            b.el.className = 'min-w-[34px] min-h-[34px] px-2 py-1 text-xs font-black rounded-xl bg-blue-600 text-white shadow-sm transition-all';
+        } else {
+            b.el.className = 'min-w-[34px] min-h-[34px] px-2 py-1 text-xs font-bold rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 transition-all';
+        }
+    });
+}
+
+function cycleLoupeZoom() {
+    const cur = cropState.loupeZoom || 1.0;
+    let next = 1.0;
+    if (cur < 1.2) next = 1.5;
+    else if (cur < 1.8) next = 2.0;
+    else if (cur < 2.5) next = 3.0;
+    else next = 1.0;
+    setLoupeZoom(next);
+    showToast(`🔍 Lupa: aumento ${next}X`, 'info');
+}
+
+function openCropModal(cardId, options = {}) {
     const card = STATE.cards[cardId];
     if (!card || (!card.rawImage && !card.croppedCanvas)) {
         showToast('Carga o escanea una imagen primero para recortarla.', 'warning');
@@ -2538,12 +2578,13 @@ function openCropModal(cardId) {
 
     cropState.cardId = cardId;
     cropState.sourceImg = card.rawImage || card.croppedCanvas;
-    cropState.fineAngle = 0;
-    cropState.rotation90 = 0;
+    cropState.fineAngle = card.cropFineAngle || 0;
+    cropState.rotation90 = card.cropRotation90 || 0;
     cropState.showGrid = false;
+    setLoupeZoom(1.0); // 1X POR DEFECTO
 
-    if (DOM.cropAngleSlider) DOM.cropAngleSlider.value = 0;
-    if (DOM.cropAngleLabel) DOM.cropAngleLabel.textContent = '0.0°';
+    if (DOM.cropAngleSlider) DOM.cropAngleSlider.value = cropState.fineAngle;
+    if (DOM.cropAngleLabel) DOM.cropAngleLabel.textContent = `${cropState.fineAngle >= 0 ? '+' : ''}${cropState.fineAngle.toFixed(1)}°`;
 
     updateRotatedCropCanvas();
     DOM.cropModal.classList.remove('hidden');
@@ -2552,47 +2593,36 @@ function openCropModal(cardId) {
     canvas.width = cropState.cachedRotatedImg.width;
     canvas.height = cropState.cachedRotatedImg.height;
 
-    // Encuadre estándar CR80 centrado
-    const ratio = 85.6 / 53.98;
-    let w = canvas.width * 0.84;
-    let h = w / ratio;
-    if (h > canvas.height * 0.88) {
-        h = canvas.height * 0.84;
-        w = h * ratio;
-    }
-    const bx = (canvas.width - w) / 2;
-    const by = (canvas.height - h) / 2;
-
-    if (card.cropRect && card.cropRect.w > 20 && card.cropRect.h > 20 &&
-        card.cropRect.x + card.cropRect.w <= canvas.width &&
-        card.cropRect.y + card.cropRect.h <= canvas.height) {
-        cropState.cropBox = { ...card.cropRect };
+    if (card.cropQuad && !options.autoDetect) {
+        cropState.quadPoints = {
+            tl: { ...card.cropQuad.tl },
+            tr: { ...card.cropQuad.tr },
+            br: { ...card.cropQuad.br },
+            bl: { ...card.cropQuad.bl }
+        };
+        if (card.cropRect) cropState.cropBox = { ...card.cropRect };
     } else {
-        cropState.cropBox = { x: bx, y: by, w, h };
+        resetBoxAndQuadBounds();
+        // Detección de esquinas automática
+        detectDocumentQuad(false);
     }
 
-    cropState.quadPoints = {
-        tl: { x: cropState.cropBox.x, y: cropState.cropBox.y },
-        tr: { x: cropState.cropBox.x + cropState.cropBox.w, y: cropState.cropBox.y },
-        br: { x: cropState.cropBox.x + cropState.cropBox.w, y: cropState.cropBox.y + cropState.cropBox.h },
-        bl: { x: cropState.cropBox.x, y: cropState.cropBox.y + cropState.cropBox.h }
-    };
-
-    setCropMode('box');
+    const startMode = options.defaultMode || 'quad';
+    setCropMode(startMode);
 }
 
 function setCropMode(mode) {
     cropState.mode = mode;
-    const activeTabClass = 'px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white transition-all shadow-sm';
-    const inactiveTabClass = 'px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition-all';
+    const activeTabClass = 'px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-black rounded-xl bg-blue-600 text-white transition-all shadow-sm flex items-center gap-1';
+    const inactiveTabClass = 'px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-bold rounded-xl text-slate-400 hover:text-white transition-all flex items-center gap-1';
 
-    if (DOM.btnCropTabBox) DOM.btnCropTabBox.className = (mode === 'box') ? activeTabClass : inactiveTabClass;
     if (DOM.btnCropTabQuad) DOM.btnCropTabQuad.className = (mode === 'quad') ? activeTabClass : inactiveTabClass;
     if (DOM.btnCropTabRotate) DOM.btnCropTabRotate.className = (mode === 'straighten') ? activeTabClass : inactiveTabClass;
+    if (DOM.btnCropTabBox) DOM.btnCropTabBox.className = (mode === 'box') ? activeTabClass : inactiveTabClass;
 
-    if (DOM.cropBoxControls) DOM.cropBoxControls.classList.toggle('hidden', mode !== 'box');
     if (DOM.cropQuadControls) DOM.cropQuadControls.classList.toggle('hidden', mode !== 'quad');
     if (DOM.cropRotateControls) DOM.cropRotateControls.classList.toggle('hidden', mode !== 'straighten');
+    if (DOM.cropBoxControls) DOM.cropBoxControls.classList.toggle('hidden', mode !== 'box');
 
     if (mode === 'straighten') {
         cropState.showGrid = true;
@@ -2626,6 +2656,8 @@ function updateRotatedCropCanvas() {
     rotCanvas.width = newW;
     rotCanvas.height = newH;
     const rCtx = rotCanvas.getContext('2d');
+    rCtx.imageSmoothingEnabled = true;
+    rCtx.imageSmoothingQuality = 'high';
     rCtx.translate(newW / 2, newH / 2);
     rCtx.rotate(rad);
     rCtx.drawImage(cropState.sourceImg, -srcW / 2, -srcH / 2);
@@ -2636,10 +2668,33 @@ function updateRotatedCropCanvas() {
 }
 
 function rotateCrop90(angleDelta = 90) {
+    const oldW = DOM.cropCanvas.width;
+    const oldH = DOM.cropCanvas.height;
+
     cropState.rotation90 = (cropState.rotation90 + angleDelta) % 360;
     if (cropState.rotation90 < 0) cropState.rotation90 += 360;
     updateRotatedCropCanvas();
-    resetBoxAndQuadBounds();
+
+    // Transformar los 4 puntos de perspectiva para que acompañen el giro de 90° sin perderse
+    const qp = cropState.quadPoints;
+    if (angleDelta === 90 || angleDelta === -270) {
+        // Giro 90° Horario: (x, y) -> (oldH - y, x)
+        const ntl = { x: oldH - qp.bl.y, y: qp.bl.x };
+        const ntr = { x: oldH - qp.tl.y, y: qp.tl.x };
+        const nbr = { x: oldH - qp.tr.y, y: qp.tr.x };
+        const nbl = { x: oldH - qp.br.y, y: qp.br.x };
+        cropState.quadPoints = { tl: ntl, tr: ntr, br: nbr, bl: nbl };
+    } else if (angleDelta === -90 || angleDelta === 270) {
+        // Giro 90° Antihorario: (x, y) -> (y, oldW - x)
+        const ntl = { x: qp.tr.y, y: oldW - qp.tr.x };
+        const ntr = { x: qp.br.y, y: oldW - qp.br.x };
+        const nbr = { x: qp.bl.y, y: oldW - qp.bl.x };
+        const nbl = { x: qp.tl.y, y: oldW - qp.tl.x };
+        cropState.quadPoints = { tl: ntl, tr: ntr, br: nbr, bl: nbl };
+    } else {
+        resetBoxAndQuadBounds();
+    }
+
     drawCropCanvas();
     showToast(`Giro de 90° aplicado (${cropState.rotation90}°)`, 'info');
 }
@@ -2679,18 +2734,18 @@ function updateCropLoupe(pxX, pxY, clientX, clientY) {
     const loupe = DOM.cropLoupe;
     const lCanvas = DOM.cropLoupeCanvas;
     const lCtx = lCanvas.getContext('2d');
-    const zoom = 3.0;
+    const zoom = cropState.loupeZoom || 1.0;
     const lW = lCanvas.width;
     const lH = lCanvas.height;
 
-    // Posicionar la lupa flotante ~140px por encima del dedo (para no tapar con el pulgar)
-    const loupeSize = 116;
-    let top = clientY - 145;
+    // Posicionar la lupa flotante ~150px por encima del dedo para no tapar con el pulgar
+    const loupeSize = 136;
+    let top = clientY - 155;
     let left = clientX - (loupeSize / 2);
 
-    // Si el dedo está cerca del borde superior, ubicar la lupa debajo
+    // Si el dedo está cerca del borde superior, ubicar la lupa por debajo
     if (top < 15) {
-        top = clientY + 45;
+        top = clientY + 50;
     }
     if (left < 10) left = 10;
     if (left + loupeSize > window.innerWidth - 10) {
@@ -2704,6 +2759,9 @@ function updateCropLoupe(pxX, pxY, clientX, clientY) {
     lCtx.clearRect(0, 0, lW, lH);
     lCtx.fillStyle = '#020617';
     lCtx.fillRect(0, 0, lW, lH);
+
+    lCtx.imageSmoothingEnabled = true;
+    lCtx.imageSmoothingQuality = 'high';
 
     const srcSize = lW / zoom;
     const srcX = pxX - srcSize / 2;
@@ -3315,13 +3373,13 @@ function detectDocumentBounds() {
     drawCropCanvas();
 }
 
-function detectDocumentQuad() {
+function detectDocumentQuad(showNotification = true) {
     if (!cropState.cachedRotatedImg) return;
-    const canvas = DOM.cropCanvas;
-    const cw = canvas.width;
-    const ch = canvas.height;
+    const cw = DOM.cropCanvas.width;
+    const ch = DOM.cropCanvas.height;
 
-    const sw = 240;
+    // Muestreo rápido a resolución reducida para análisis de bordes
+    const sw = 280;
     const sh = Math.round(sw * (ch / cw));
     const sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = sw;
@@ -3331,32 +3389,46 @@ function detectDocumentQuad() {
 
     const imgData = sCtx.getImageData(0, 0, sw, sh);
     const data = imgData.data;
+    const lum = new Float32Array(sw * sh);
 
-    const lum = new Uint8Array(sw * sh);
     for (let i = 0; i < data.length; i += 4) {
-        lum[i / 4] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
+        lum[i / 4] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
     }
 
-    let borderSum = 0, borderCount = 0;
+    // Muestreo perimetral del color de fondo (8% exterior)
+    const marginX = Math.max(2, Math.round(sw * 0.08));
+    const marginY = Math.max(2, Math.round(sh * 0.08));
+    let borderLumSum = 0, borderCount = 0;
+
     for (let y = 0; y < sh; y++) {
         for (let x = 0; x < sw; x++) {
-            if (x < 6 || x >= sw - 6 || y < 6 || y >= sh - 6) {
-                borderSum += lum[y * sw + x];
+            if (x < marginX || x >= sw - marginX || y < marginY || y >= sh - marginY) {
+                borderLumSum += lum[y * sw + x];
                 borderCount++;
             }
         }
     }
-    const borderAvg = borderSum / Math.max(1, borderCount);
-    const threshold = 18;
+    const bgLum = borderLumSum / Math.max(1, borderCount);
 
-    let minX = sw, maxX = 0, minY = sh, maxY = 0;
-    for (let y = 6; y < sh - 6; y++) {
-        for (let x = 6; x < sw - 6; x++) {
-            if (Math.abs(lum[y * sw + x] - borderAvg) > threshold) {
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
+    // Muestreo del área central
+    let centerLumSum = 0, centerCount = 0;
+    for (let y = marginY * 2; y < sh - marginY * 2; y++) {
+        for (let x = marginX * 2; x < sw - marginX * 2; x++) {
+            centerLumSum += lum[y * sw + x];
+            centerCount++;
+        }
+    }
+    const centerLum = centerLumSum / Math.max(1, centerCount);
+    const docIsBrighter = centerLum >= bgLum;
+    const diffThreshold = Math.max(12, Math.abs(centerLum - bgLum) * 0.32);
+
+    const points = [];
+    for (let y = marginY; y < sh - marginY; y++) {
+        for (let x = marginX; x < sw - marginX; x++) {
+            const val = lum[y * sw + x];
+            const isDoc = docIsBrighter ? (val - bgLum > diffThreshold) : (bgLum - val > diffThreshold);
+            if (isDoc) {
+                points.push({ x, y });
             }
         }
     }
@@ -3364,19 +3436,42 @@ function detectDocumentQuad() {
     const scaleX = cw / sw;
     const scaleY = ch / sh;
 
-    if (maxX > minX + 20 && maxY > minY + 20) {
-        cropState.quadPoints = {
-            tl: { x: Math.max(0, minX * scaleX), y: Math.max(0, minY * scaleY) },
-            tr: { x: Math.min(cw, maxX * scaleX), y: Math.max(0, minY * scaleY) },
-            br: { x: Math.min(cw, maxX * scaleX), y: Math.min(ch, maxY * scaleY) },
-            bl: { x: Math.max(0, minX * scaleX), y: Math.min(ch, maxY * scaleY) }
-        };
-        showToast('🎯 Esquinas detectadas automáticamente', 'success');
-    } else {
-        resetQuadPoints();
-        showToast('Esquinas centradas estándar', 'info');
+    // Encontrar 4 esquinas extremas (min(x+y), max(x-y), max(x+y), min(x-y))
+    if (points.length > (sw * sh * 0.08)) {
+        let bestTL = points[0], minTL = Infinity;
+        let bestTR = points[0], maxTR = -Infinity;
+        let bestBR = points[0], maxBR = -Infinity;
+        let bestBL = points[0], minBL = Infinity;
+
+        for (let i = 0; i < points.length; i++) {
+            const p = points[i];
+            const sum = p.x + p.y;
+            const diff = p.x - p.y;
+
+            if (sum < minTL) { minTL = sum; bestTL = p; }
+            if (diff > maxTR) { maxTR = diff; bestTR = p; }
+            if (sum > maxBR) { maxBR = sum; bestBR = p; }
+            if (diff < minBL) { minBL = diff; bestBL = p; }
+        }
+
+        const wTop = bestTR.x - bestTL.x;
+        const hLeft = bestBL.y - bestTL.y;
+
+        if (wTop > sw * 0.22 && hLeft > sh * 0.22) {
+            cropState.quadPoints = {
+                tl: { x: Math.max(0, Math.min(cw, bestTL.x * scaleX)), y: Math.max(0, Math.min(ch, bestTL.y * scaleY)) },
+                tr: { x: Math.max(0, Math.min(cw, bestTR.x * scaleX)), y: Math.max(0, Math.min(ch, bestTR.y * scaleY)) },
+                br: { x: Math.max(0, Math.min(cw, bestBR.x * scaleX)), y: Math.max(0, Math.min(ch, bestBR.y * scaleY)) },
+                bl: { x: Math.max(0, Math.min(cw, bestBL.x * scaleX)), y: Math.max(0, Math.min(ch, bestBL.y * scaleY)) }
+            };
+            if (showNotification) showToast('🎯 Esquinas de carnet detectadas automáticamente', 'success');
+            drawCropCanvas();
+            return;
+        }
     }
 
+    resetQuadPoints();
+    if (showNotification) showToast('📐 Esquinas centradas estándar CR80', 'info');
     drawCropCanvas();
 }
 
@@ -3385,14 +3480,16 @@ function resetQuadPoints() {
     drawCropCanvas();
 }
 
-// Transformación de perspectiva exacta (Homografía bilineal en malla triangular)
+// Transformación de perspectiva exacta (Homografía bilineal en malla triangular acelerada)
 function warpQuadToRectangle(sourceImg, qp, outW, outH) {
     const outCanvas = document.createElement('canvas');
     outCanvas.width = outW;
     outCanvas.height = outH;
     const ctx = outCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
-    const steps = 16;
+    const steps = 24; // Malla de 24x24 (1152 triángulos) para nitidez fotográfica
     const p0 = qp.tl, p1 = qp.tr, p2 = qp.br, p3 = qp.bl;
 
     function getQuadPoint(u, v) {
@@ -3470,8 +3567,24 @@ function applyCroppedResult() {
         const qp = cropState.quadPoints;
         const wTop = Math.hypot(qp.tr.x - qp.tl.x, qp.tr.y - qp.tl.y);
         const wBot = Math.hypot(qp.br.x - qp.bl.x, qp.br.y - qp.bl.y);
-        const outW = Math.max(100, Math.round(Math.max(wTop, wBot)));
-        const outH = Math.max(60, Math.round(outW / (85.6 / 53.98)));
+        const hLeft = Math.hypot(qp.bl.x - qp.tl.x, qp.bl.y - qp.tl.y);
+        const hRight = Math.hypot(qp.br.x - qp.tr.x, qp.br.y - qp.tr.y);
+
+        const avgW = Math.max(120, Math.round((wTop + wBot) / 2));
+        const avgH = Math.max(80, Math.round((hLeft + hRight) / 2));
+
+        const cr80Ratio = 85.6 / 53.98;
+        const isHorizontal = avgW >= avgH;
+
+        let outW, outH;
+        if (isHorizontal) {
+            outW = Math.max(500, avgW);
+            outH = Math.round(outW / cr80Ratio);
+        } else {
+            outH = Math.max(500, avgH);
+            outW = Math.round(outH / cr80Ratio);
+        }
+
         croppedCanvas = warpQuadToRectangle(cropState.cachedRotatedImg, qp, outW, outH);
     } else {
         const box = cropState.cropBox;
@@ -3491,34 +3604,43 @@ function applyCroppedResult() {
     card.croppedCanvas = croppedCanvas;
     card.rawImage = cropState.sourceImg;
     card.cropRect = { ...cropState.cropBox };
+    card.cropQuad = {
+        tl: { ...cropState.quadPoints.tl },
+        tr: { ...cropState.quadPoints.tr },
+        br: { ...cropState.quadPoints.br },
+        bl: { ...cropState.quadPoints.bl }
+    };
+    card.cropRotation90 = cropState.rotation90;
+    card.cropFineAngle = cropState.fineAngle;
+    card.rotation = 0; // Se reinicia rotación en la hoja para garantizar perpendicularidad sin doble giro
     card.cachedCanvas = null;
     card.dirty = true;
 
-    // Proporción estándar de carnet
+    // Proporción estándar de carnet perpendicular
     card.widthMm = 85.6;
     card.heightMm = 85.6 * (croppedCanvas.height / croppedCanvas.width);
 
     DOM.cropModal.classList.add('hidden');
     hideCropLoupe();
-    updateDropzoneUI(cropState.cardId, croppedCanvas.toDataURL('image/jpeg', 0.92));
+    updateDropzoneUI(cropState.cardId, croppedCanvas.toDataURL('image/jpeg', 0.94));
     saveHistoryState(`Recortar & Enderezar ${card.name}`);
     scheduleRender();
-    showToast(`Recorte y enderezado aplicados a ${card.name}`, 'success');
+    showToast(`✅ ${card.name} enderezado y perpendicular guardado`, 'success');
 }
 
 // Eventos del modal de recorte interactivo
 DOM.btnCloseCrop.addEventListener('click', () => { DOM.cropModal.classList.add('hidden'); hideCropLoupe(); });
 DOM.btnCancelCrop.addEventListener('click', () => { DOM.cropModal.classList.add('hidden'); hideCropLoupe(); });
 
-if (DOM.btnCropTabBox) DOM.btnCropTabBox.addEventListener('click', () => setCropMode('box'));
 if (DOM.btnCropTabQuad) DOM.btnCropTabQuad.addEventListener('click', () => setCropMode('quad'));
 if (DOM.btnCropTabRotate) DOM.btnCropTabRotate.addEventListener('click', () => setCropMode('straighten'));
+if (DOM.btnCropTabBox) DOM.btnCropTabBox.addEventListener('click', () => setCropMode('box'));
 
 if (DOM.btnCropAspectCr80) {
     DOM.btnCropAspectCr80.addEventListener('click', () => {
         cropState.aspect = 'cr80';
-        DOM.btnCropAspectCr80.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
-        DOM.btnCropAspectFree.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700';
+        DOM.btnCropAspectCr80.className = 'min-h-[42px] px-3.5 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
+        DOM.btnCropAspectFree.className = 'min-h-[42px] px-3.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700';
         const box = cropState.cropBox;
         const ratio = 85.6 / 53.98;
         box.h = box.w / ratio;
@@ -3532,15 +3654,17 @@ if (DOM.btnCropAspectCr80) {
 if (DOM.btnCropAspectFree) {
     DOM.btnCropAspectFree.addEventListener('click', () => {
         cropState.aspect = 'free';
-        DOM.btnCropAspectFree.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
-        DOM.btnCropAspectCr80.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700';
+        DOM.btnCropAspectFree.className = 'min-h-[42px] px-3.5 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
+        DOM.btnCropAspectCr80.className = 'min-h-[42px] px-3.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700';
         drawCropCanvas();
     });
 }
 
 if (DOM.btnCropAutoDetect) DOM.btnCropAutoDetect.addEventListener('click', detectDocumentBounds);
-if (DOM.btnCropQuadAuto) DOM.btnCropQuadAuto.addEventListener('click', detectDocumentQuad);
+if (DOM.btnCropQuadAuto) DOM.btnCropQuadAuto.addEventListener('click', () => detectDocumentQuad(true));
 if (DOM.btnCropQuadReset) DOM.btnCropQuadReset.addEventListener('click', resetQuadPoints);
+if (DOM.btnCropQuadRotLeft) DOM.btnCropQuadRotLeft.addEventListener('click', () => rotateCrop90(-90));
+if (DOM.btnCropQuadRotRight) DOM.btnCropQuadRotRight.addEventListener('click', () => rotateCrop90(90));
 
 if (DOM.btnCropRotateLeft) DOM.btnCropRotateLeft.addEventListener('click', () => rotateCrop90(-90));
 if (DOM.btnCropRotateRight) DOM.btnCropRotateRight.addEventListener('click', () => rotateCrop90(90));
@@ -3557,11 +3681,21 @@ if (DOM.btnCropToggleGrid) {
     DOM.btnCropToggleGrid.addEventListener('click', () => {
         cropState.showGrid = !cropState.showGrid;
         DOM.btnCropToggleGrid.className = cropState.showGrid
-            ? 'px-2 py-1 bg-blue-600 text-white rounded-lg font-bold text-[11px]'
-            : 'px-2 py-1 bg-slate-800 text-slate-400 hover:text-white rounded-lg font-bold text-[11px]';
+            ? 'min-h-[38px] px-2.5 py-1 bg-blue-600 text-white rounded-xl font-bold text-xs'
+            : 'min-h-[38px] px-2.5 py-1 bg-slate-800 text-slate-400 hover:text-white rounded-xl font-bold text-xs';
         drawCropCanvas();
     });
 }
+
+// Selector de Zoom de Lupa (1X, 1.5X, 2X, 3X)
+if (DOM.btnLoupeZoom1) DOM.btnLoupeZoom1.addEventListener('click', () => setLoupeZoom(1.0));
+if (DOM.btnLoupeZoom15) DOM.btnLoupeZoom15.addEventListener('click', () => setLoupeZoom(1.5));
+if (DOM.btnLoupeZoom2) DOM.btnLoupeZoom2.addEventListener('click', () => setLoupeZoom(2.0));
+if (DOM.btnLoupeZoom3) DOM.btnLoupeZoom3.addEventListener('click', () => setLoupeZoom(3.0));
+if (DOM.cropLoupeBadge) DOM.cropLoupeBadge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cycleLoupeZoom();
+});
 
 DOM.cropCanvas.addEventListener('pointerdown', onCropPointerDown);
 DOM.cropCanvas.addEventListener('pointermove', onCropPointerMove);
@@ -3631,100 +3765,27 @@ function captureCameraPhoto() {
     fullCanvas.width = vw;
     fullCanvas.height = vh;
     const fullCtx = fullCanvas.getContext('2d');
+    fullCtx.imageSmoothingEnabled = true;
+    fullCtx.imageSmoothingQuality = 'high';
     fullCtx.drawImage(video, 0, 0, vw, vh);
 
-    // 2. Mapeo matemático exacto de la guía verde en pantalla a los píxeles reales del sensor de video
-    let cropX = 0, cropY = 0, cropW = vw, cropH = vh;
-    const guideBox = DOM.cameraGuideBox || document.getElementById('camera-guide-box');
-
-    if (guideBox) {
-        const vRect = video.getBoundingClientRect();
-        const gRect = guideBox.getBoundingClientRect();
-
-        // El video usa CSS object-cover (escala preservando proporción y centrando)
-        const scale = Math.max(vRect.width / vw, vRect.height / vh);
-        const renderedW = vw * scale;
-        const renderedH = vh * scale;
-        const offsetX = (vRect.width - renderedW) / 2;
-        const offsetY = (vRect.height - renderedH) / 2;
-
-        const guideLeftInRendered = (gRect.left - vRect.left) - offsetX;
-        const guideTopInRendered = (gRect.top - vRect.top) - offsetY;
-
-        cropX = guideLeftInRendered / scale;
-        cropY = guideTopInRendered / scale;
-        cropW = gRect.width / scale;
-        cropH = gRect.height / scale;
-
-        // Margen de seguridad del 2% para evitar cortar bordes finos o texto
-        const padW = cropW * 0.02;
-        const padH = cropH * 0.02;
-        cropX = Math.max(0, cropX - padW);
-        cropY = Math.max(0, cropY - padH);
-        cropW = Math.min(vw - cropX, cropW + padW * 2);
-        cropH = Math.min(vh - cropY, cropH + padH * 2);
-    } else {
-        // Fallback: centrar relación CR80
-        const ratio = 85.6 / 53.98;
-        cropW = vw * 0.82;
-        cropH = cropW / ratio;
-        cropX = (vw - cropW) / 2;
-        cropY = (vh - cropH) / 2;
-    }
-
-    // 3. Crear canvas recortado con precisión
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = Math.round(cropW);
-    croppedCanvas.height = Math.round(cropH);
-    const cropCtx = croppedCanvas.getContext('2d');
-    cropCtx.drawImage(
-        fullCanvas,
-        cropX, cropY, cropW, cropH,
-        0, 0, croppedCanvas.width, croppedCanvas.height
-    );
-
-    // 4. Asignar al estado con los parámetros predeterminados solicitados por el usuario
     const fullImg = new Image();
     fullImg.onload = () => {
         const card = STATE.cards[targetCameraCard];
         card.rawImage = fullImg;
-        card.croppedCanvas = croppedCanvas;
-        card.cropRect = { x: cropX, y: cropY, w: cropW, h: cropH };
         card.cachedCanvas = null;
         card.dirty = true;
 
-        // Dimensiones estándar CR80 proporcionales
-        card.widthMm = 85.6;
-        card.heightMm = 85.6 * (cropH / cropW);
-
-        // Parámetros por defecto preferidos: Escala 150%, Radio 6mm, Centrado en X e Y
-        card.scale = FACTORY_DEFAULTS.cards[targetCameraCard].scale; // 150%
-        card.borderRadiusMm = FACTORY_DEFAULTS.cards[targetCameraCard].borderRadiusMm; // 6mm
-        card.xMm = 0;
-        card.yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[targetCameraCard].yMm);
-
-        if (STATE.syncCards) {
-            const otherId = targetCameraCard === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].scale = card.scale;
-            STATE.cards[otherId].borderRadiusMm = card.borderRadiusMm;
-            STATE.cards[otherId].xMm = 0;
-        }
-
-        updateDropzoneUI(targetCameraCard, croppedCanvas.toDataURL('image/jpeg', 0.92));
-        setActiveTab(targetCameraCard);
-        STATE.selectedCardId = targetCameraCard;
-        updateSelectedCardUI();
-
+        // Cerrar cámara y abrir AUTOMÁTICAMENTE el estudio de perspectiva con esquinas detectadas
         closeCameraModal();
-        saveHistoryState(`Foto escaneada ${card.name}`);
-        scheduleRender();
-        showToast(`Documento escaneado y centrado para ${card.name}`, 'success');
+        openCropModal(targetCameraCard, { autoDetect: true, defaultMode: 'quad' });
+        showToast('📸 Foto capturada: ajusta las 4 esquinas si lo deseas y confirma.', 'info');
 
         if (window.innerWidth < 1024) {
             setMobileView('canvas');
         }
     };
-    fullImg.src = fullCanvas.toDataURL('image/jpeg', 0.95);
+    fullImg.src = fullCanvas.toDataURL('image/jpeg', 0.96);
 }
 
 // =============================================================================
