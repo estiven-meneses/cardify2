@@ -215,16 +215,31 @@ const DOM = {
     paperThemeIcon: document.getElementById('paper-theme-icon'),
     paperThemeLabel: document.getElementById('paper-theme-label'),
 
-    // Modales
+    // Modales y Herramientas de Recorte Avanzado
     cropModal: document.getElementById('crop-modal'),
     cropCanvas: document.getElementById('crop-canvas'),
+    cropLoupe: document.getElementById('crop-loupe'),
+    cropLoupeCanvas: document.getElementById('crop-loupe-canvas'),
+    btnCropTabBox: document.getElementById('btn-crop-tab-box'),
+    btnCropTabQuad: document.getElementById('btn-crop-tab-quad'),
+    btnCropTabRotate: document.getElementById('btn-crop-tab-rotate'),
+    cropBoxControls: document.getElementById('crop-box-controls'),
+    cropQuadControls: document.getElementById('crop-quad-controls'),
+    cropRotateControls: document.getElementById('crop-rotate-controls'),
     btnCloseCrop: document.getElementById('btn-close-crop'),
     btnCancelCrop: document.getElementById('btn-cancel-crop'),
     btnApplyCrop: document.getElementById('btn-apply-crop'),
     btnCropAspectFree: document.getElementById('btn-crop-aspect-free'),
     btnCropAspectCr80: document.getElementById('btn-crop-aspect-cr80'),
-    btnCropRotate: document.getElementById('btn-crop-rotate'),
     btnCropAutoDetect: document.getElementById('btn-crop-auto-detect'),
+    btnCropQuadAuto: document.getElementById('btn-crop-quad-auto'),
+    btnCropQuadReset: document.getElementById('btn-crop-quad-reset'),
+    btnCropRotateLeft: document.getElementById('btn-crop-rotate-left'),
+    btnCropRotateRight: document.getElementById('btn-crop-rotate-right'),
+    cropAngleSlider: document.getElementById('crop-angle-slider'),
+    cropAngleLabel: document.getElementById('crop-angle-label'),
+    btnCropAngleReset: document.getElementById('btn-crop-angle-reset'),
+    btnCropToggleGrid: document.getElementById('btn-crop-toggle-grid'),
     cameraModal: document.getElementById('camera-modal'),
     cameraVideo: document.getElementById('camera-video'),
     cameraGuideBox: document.getElementById('camera-guide-box'),
@@ -2495,11 +2510,23 @@ function updateHistoryButtons() {
 let cropState = {
     cardId: 'frente',
     sourceImg: null,
+    cachedRotatedImg: null,
+    mode: 'box', // 'box' | 'quad' | 'straighten'
     aspect: 'cr80', // 'cr80' | 'free'
+    fineAngle: 0, // Inclinación fina en grados (-45 a +45)
+    rotation90: 0, // Rotación de 90° acumulada (0, 90, 180, 270)
+    showGrid: false,
     cropBox: { x: 20, y: 20, w: 200, h: 140 },
-    dragHandle: null, // null | 'move' | 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w'
+    quadPoints: {
+        tl: { x: 20, y: 20 },
+        tr: { x: 220, y: 20 },
+        br: { x: 220, y: 160 },
+        bl: { x: 20, y: 160 }
+    },
+    dragHandle: null, // 'move' | 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w' | 'tl' | 'tr' | 'br' | 'bl'
     startPointer: { x: 0, y: 0 },
-    startBox: { x: 0, y: 0, w: 0, h: 0 }
+    startBox: { x: 0, y: 0, w: 0, h: 0 },
+    startQuad: null
 };
 
 function openCropModal(cardId) {
@@ -2510,128 +2537,394 @@ function openCropModal(cardId) {
     }
 
     cropState.cardId = cardId;
-    // Preferir siempre la imagen original sin recortar para permitir ampliar o reencuadrar
     cropState.sourceImg = card.rawImage || card.croppedCanvas;
+    cropState.fineAngle = 0;
+    cropState.rotation90 = 0;
+    cropState.showGrid = false;
 
+    if (DOM.cropAngleSlider) DOM.cropAngleSlider.value = 0;
+    if (DOM.cropAngleLabel) DOM.cropAngleLabel.textContent = '0.0°';
+
+    updateRotatedCropCanvas();
     DOM.cropModal.classList.remove('hidden');
 
     const canvas = DOM.cropCanvas;
-    canvas.width = cropState.sourceImg.width;
-    canvas.height = cropState.sourceImg.height;
+    canvas.width = cropState.cachedRotatedImg.width;
+    canvas.height = cropState.cachedRotatedImg.height;
 
-    // Si ya existía un recorte previo para esta tarjeta, restablecerlo como base
+    // Encuadre estándar CR80 centrado
+    const ratio = 85.6 / 53.98;
+    let w = canvas.width * 0.84;
+    let h = w / ratio;
+    if (h > canvas.height * 0.88) {
+        h = canvas.height * 0.84;
+        w = h * ratio;
+    }
+    const bx = (canvas.width - w) / 2;
+    const by = (canvas.height - h) / 2;
+
     if (card.cropRect && card.cropRect.w > 20 && card.cropRect.h > 20 &&
         card.cropRect.x + card.cropRect.w <= canvas.width &&
         card.cropRect.y + card.cropRect.h <= canvas.height) {
         cropState.cropBox = { ...card.cropRect };
     } else {
-        // En caso contrario, encuadre estándar CR80 centrado
-        const ratio = 85.6 / 53.98;
-        let w = canvas.width * 0.84;
-        let h = w / ratio;
-        if (h > canvas.height * 0.88) {
-            h = canvas.height * 0.84;
-            w = h * ratio;
-        }
-        cropState.cropBox = {
-            x: (canvas.width - w) / 2,
-            y: (canvas.height - h) / 2,
-            w: w,
-            h: h
-        };
+        cropState.cropBox = { x: bx, y: by, w, h };
     }
 
+    cropState.quadPoints = {
+        tl: { x: cropState.cropBox.x, y: cropState.cropBox.y },
+        tr: { x: cropState.cropBox.x + cropState.cropBox.w, y: cropState.cropBox.y },
+        br: { x: cropState.cropBox.x + cropState.cropBox.w, y: cropState.cropBox.y + cropState.cropBox.h },
+        bl: { x: cropState.cropBox.x, y: cropState.cropBox.y + cropState.cropBox.h }
+    };
+
+    setCropMode('box');
+}
+
+function setCropMode(mode) {
+    cropState.mode = mode;
+    const activeTabClass = 'px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white transition-all shadow-sm';
+    const inactiveTabClass = 'px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition-all';
+
+    if (DOM.btnCropTabBox) DOM.btnCropTabBox.className = (mode === 'box') ? activeTabClass : inactiveTabClass;
+    if (DOM.btnCropTabQuad) DOM.btnCropTabQuad.className = (mode === 'quad') ? activeTabClass : inactiveTabClass;
+    if (DOM.btnCropTabRotate) DOM.btnCropTabRotate.className = (mode === 'straighten') ? activeTabClass : inactiveTabClass;
+
+    if (DOM.cropBoxControls) DOM.cropBoxControls.classList.toggle('hidden', mode !== 'box');
+    if (DOM.cropQuadControls) DOM.cropQuadControls.classList.toggle('hidden', mode !== 'quad');
+    if (DOM.cropRotateControls) DOM.cropRotateControls.classList.toggle('hidden', mode !== 'straighten');
+
+    if (mode === 'straighten') {
+        cropState.showGrid = true;
+    }
+
+    hideCropLoupe();
     drawCropCanvas();
+}
+
+function updateRotatedCropCanvas() {
+    if (!cropState.sourceImg) return;
+
+    const totalAngle = (cropState.rotation90 + cropState.fineAngle);
+    const rad = totalAngle * Math.PI / 180;
+    const srcW = cropState.sourceImg.width;
+    const srcH = cropState.sourceImg.height;
+
+    if (Math.abs(totalAngle % 360) < 0.05) {
+        cropState.cachedRotatedImg = cropState.sourceImg;
+        DOM.cropCanvas.width = srcW;
+        DOM.cropCanvas.height = srcH;
+        return;
+    }
+
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const newW = Math.max(10, Math.round(srcW * cos + srcH * sin));
+    const newH = Math.max(10, Math.round(srcW * sin + srcH * cos));
+
+    const rotCanvas = document.createElement('canvas');
+    rotCanvas.width = newW;
+    rotCanvas.height = newH;
+    const rCtx = rotCanvas.getContext('2d');
+    rCtx.translate(newW / 2, newH / 2);
+    rCtx.rotate(rad);
+    rCtx.drawImage(cropState.sourceImg, -srcW / 2, -srcH / 2);
+
+    cropState.cachedRotatedImg = rotCanvas;
+    DOM.cropCanvas.width = newW;
+    DOM.cropCanvas.height = newH;
+}
+
+function rotateCrop90(angleDelta = 90) {
+    cropState.rotation90 = (cropState.rotation90 + angleDelta) % 360;
+    if (cropState.rotation90 < 0) cropState.rotation90 += 360;
+    updateRotatedCropCanvas();
+    resetBoxAndQuadBounds();
+    drawCropCanvas();
+    showToast(`Giro de 90° aplicado (${cropState.rotation90}°)`, 'info');
+}
+
+function setFineCropAngle(angleDeg) {
+    cropState.fineAngle = Math.max(-45, Math.min(45, angleDeg));
+    if (DOM.cropAngleSlider) DOM.cropAngleSlider.value = cropState.fineAngle;
+    if (DOM.cropAngleLabel) DOM.cropAngleLabel.textContent = `${cropState.fineAngle >= 0 ? '+' : ''}${cropState.fineAngle.toFixed(1)}°`;
+    updateRotatedCropCanvas();
+    drawCropCanvas();
+}
+
+function resetBoxAndQuadBounds() {
+    const cw = DOM.cropCanvas.width;
+    const ch = DOM.cropCanvas.height;
+    const ratio = 85.6 / 53.98;
+    let w = cw * 0.84;
+    let h = (cropState.aspect === 'cr80') ? (w / ratio) : (ch * 0.84);
+    if (h > ch * 0.86) {
+        h = ch * 0.84;
+        w = h * ratio;
+    }
+    const bx = (cw - w) / 2;
+    const by = (ch - h) / 2;
+    cropState.cropBox = { x: bx, y: by, w, h };
+    cropState.quadPoints = {
+        tl: { x: bx, y: by },
+        tr: { x: bx + w, y: by },
+        br: { x: bx + w, y: by + h },
+        bl: { x: bx, y: by + h }
+    };
+}
+
+function updateCropLoupe(pxX, pxY, clientX, clientY) {
+    if (!DOM.cropLoupe || !DOM.cropLoupeCanvas || !cropState.cachedRotatedImg) return;
+
+    const loupe = DOM.cropLoupe;
+    const lCanvas = DOM.cropLoupeCanvas;
+    const lCtx = lCanvas.getContext('2d');
+    const zoom = 3.0;
+    const lW = lCanvas.width;
+    const lH = lCanvas.height;
+
+    // Posicionar la lupa flotante ~140px por encima del dedo (para no tapar con el pulgar)
+    const loupeSize = 116;
+    let top = clientY - 145;
+    let left = clientX - (loupeSize / 2);
+
+    // Si el dedo está cerca del borde superior, ubicar la lupa debajo
+    if (top < 15) {
+        top = clientY + 45;
+    }
+    if (left < 10) left = 10;
+    if (left + loupeSize > window.innerWidth - 10) {
+        left = window.innerWidth - loupeSize - 10;
+    }
+
+    loupe.style.top = `${top}px`;
+    loupe.style.left = `${left}px`;
+    loupe.classList.remove('hidden');
+
+    lCtx.clearRect(0, 0, lW, lH);
+    lCtx.fillStyle = '#020617';
+    lCtx.fillRect(0, 0, lW, lH);
+
+    const srcSize = lW / zoom;
+    const srcX = pxX - srcSize / 2;
+    const srcY = pxY - srcSize / 2;
+
+    lCtx.drawImage(
+        cropState.cachedRotatedImg,
+        srcX, srcY, srcSize, srcSize,
+        0, 0, lW, lH
+    );
+}
+
+function hideCropLoupe() {
+    if (DOM.cropLoupe) {
+        DOM.cropLoupe.classList.add('hidden');
+    }
 }
 
 function drawCropCanvas() {
     const canvas = DOM.cropCanvas;
     const ctx = canvas.getContext('2d');
-    const box = cropState.cropBox;
+    if (!cropState.cachedRotatedImg) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (cropState.sourceImg) {
-        ctx.drawImage(cropState.sourceImg, 0, 0);
+    ctx.drawImage(cropState.cachedRotatedImg, 0, 0);
+
+    // 1. Rejilla de nivelación (para enderezado o asistencia visual)
+    if (cropState.showGrid || cropState.mode === 'straighten') {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
+        ctx.lineWidth = 1;
+        const gridSize = Math.max(30, Math.round(canvas.width / 14));
+        for (let gx = gridSize; gx < canvas.width; gx += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(gx, 0);
+            ctx.lineTo(gx, canvas.height);
+            ctx.stroke();
+        }
+        for (let gy = gridSize; gy < canvas.height; gy += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, gy);
+            ctx.lineTo(canvas.width, gy);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
 
-    // 1. Fondo oscurecido exterior (viñeta de enfoque)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
-    ctx.fillRect(0, 0, canvas.width, Math.max(0, box.y));
-    ctx.fillRect(0, box.y + box.h, canvas.width, Math.max(0, canvas.height - (box.y + box.h)));
-    ctx.fillRect(0, box.y, Math.max(0, box.x), box.h);
-    ctx.fillRect(box.x + box.w, box.y, Math.max(0, canvas.width - (box.x + box.w)), box.h);
+    // 2. Modo Encuadre Rectangular
+    if (cropState.mode === 'box') {
+        const box = cropState.cropBox;
 
-    // 2. Borde exterior brillante
-    const strokeW = Math.max(2, Math.round(canvas.width * 0.0028));
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = strokeW;
-    ctx.strokeRect(box.x, box.y, box.w, box.h);
+        // Viñeta oscura exterior
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.fillRect(0, 0, canvas.width, Math.max(0, box.y));
+        ctx.fillRect(0, box.y + box.h, canvas.width, Math.max(0, canvas.height - (box.y + box.h)));
+        ctx.fillRect(0, box.y, Math.max(0, box.x), box.h);
+        ctx.fillRect(box.x + box.w, box.y, Math.max(0, canvas.width - (box.x + box.w)), box.h);
 
-    // 3. Regla de tercios (guías internas sutiles)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(box.x + box.w / 3, box.y);
-    ctx.lineTo(box.x + box.w / 3, box.y + box.h);
-    ctx.moveTo(box.x + (box.w * 2) / 3, box.y);
-    ctx.lineTo(box.x + (box.w * 2) / 3, box.y + box.h);
-    ctx.moveTo(box.x, box.y + box.h / 3);
-    ctx.lineTo(box.x + box.w, box.y + box.h / 3);
-    ctx.moveTo(box.x, box.y + (box.h * 2) / 3);
-    ctx.lineTo(box.x + box.w, box.y + (box.h * 2) / 3);
-    ctx.stroke();
+        // Borde azul brillante
+        const strokeW = Math.max(2, Math.round(canvas.width * 0.0028));
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = strokeW;
+        ctx.strokeRect(box.x, box.y, box.w, box.h);
 
-    // 4. Tiradores circulares de esquina táctiles
-    const handleR = Math.max(8, Math.round(canvas.width * 0.013));
-    const corners = [
-        { x: box.x, y: box.y },
-        { x: box.x + box.w, y: box.y },
-        { x: box.x + box.w, y: box.y + box.h },
-        { x: box.x, y: box.y + box.h }
-    ];
-
-    corners.forEach(pt => {
+        // Regla de tercios
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, handleR, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.strokeStyle = '#2563eb';
-        ctx.lineWidth = Math.max(2.5, handleR * 0.3);
+        ctx.moveTo(box.x + box.w / 3, box.y);
+        ctx.lineTo(box.x + box.w / 3, box.y + box.h);
+        ctx.moveTo(box.x + (box.w * 2) / 3, box.y);
+        ctx.lineTo(box.x + (box.w * 2) / 3, box.y + box.h);
+        ctx.moveTo(box.x, box.y + box.h / 3);
+        ctx.lineTo(box.x + box.w, box.y + box.h / 3);
+        ctx.moveTo(box.x, box.y + (box.h * 2) / 3);
+        ctx.lineTo(box.x + box.w, box.y + (box.h * 2) / 3);
         ctx.stroke();
-    });
 
-    // 5. Tiradores laterales en modo libre
-    if (cropState.aspect === 'free') {
-        const sides = [
-            { x: box.x + box.w / 2, y: box.y },
-            { x: box.x + box.w / 2, y: box.y + box.h },
-            { x: box.x, y: box.y + box.h / 2 },
-            { x: box.x + box.w, y: box.y + box.h / 2 }
+        // Tiradores de esquina táctiles
+        const handleR = Math.max(9, Math.round(canvas.width * 0.014));
+        const corners = [
+            { x: box.x, y: box.y },
+            { x: box.x + box.w, y: box.y },
+            { x: box.x + box.w, y: box.y + box.h },
+            { x: box.x, y: box.y + box.h }
         ];
-        const sideR = Math.max(6, handleR * 0.7);
-        sides.forEach(pt => {
+
+        corners.forEach(pt => {
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y, sideR, 0, Math.PI * 2);
+            ctx.arc(pt.x, pt.y, handleR, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
             ctx.strokeStyle = '#2563eb';
-            ctx.lineWidth = Math.max(2, sideR * 0.3);
+            ctx.lineWidth = Math.max(2.5, handleR * 0.28);
             ctx.stroke();
+        });
+
+        // Tiradores laterales en modo libre
+        if (cropState.aspect === 'free') {
+            const sides = [
+                { x: box.x + box.w / 2, y: box.y },
+                { x: box.x + box.w / 2, y: box.y + box.h },
+                { x: box.x, y: box.y + box.h / 2 },
+                { x: box.x + box.w, y: box.y + box.h / 2 }
+            ];
+            const sideR = Math.max(6, handleR * 0.7);
+            sides.forEach(pt => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, sideR, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        // Etiqueta de dimensiones
+        const label = `${Math.round(box.w)} × ${Math.round(box.h)} px ${cropState.aspect === 'cr80' ? '(CR80)' : ''}`;
+        const fontSize = Math.max(11, Math.round(canvas.width * 0.017));
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+        const textW = ctx.measureText(label).width;
+        const tagX = box.x + 8;
+        const tagY = box.y + box.h - 8;
+        if (tagY > box.y + 24) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+            ctx.fillRect(tagX - 4, tagY - fontSize - 2, textW + 8, fontSize + 6);
+            ctx.fillStyle = '#60a5fa';
+            ctx.fillText(label, tagX, tagY);
+        }
+    }
+
+    // 3. Modo Perspectiva 4 Puntos Libres
+    if (cropState.mode === 'quad') {
+        const qp = cropState.quadPoints;
+
+        // Oscurecer área exterior del cuadrilátero
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, canvas.width, canvas.height);
+        ctx.moveTo(qp.tl.x, qp.tl.y);
+        ctx.lineTo(qp.bl.x, qp.bl.y);
+        ctx.lineTo(qp.br.x, qp.br.y);
+        ctx.lineTo(qp.tr.x, qp.tr.y);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.fill();
+        ctx.restore();
+
+        // Borde perimetral del cuadrilátero
+        ctx.save();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = Math.max(2.5, Math.round(canvas.width * 0.0032));
+        ctx.beginPath();
+        ctx.moveTo(qp.tl.x, qp.tl.y);
+        ctx.lineTo(qp.tr.x, qp.tr.y);
+        ctx.lineTo(qp.br.x, qp.br.y);
+        ctx.lineTo(qp.bl.x, qp.bl.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Guías diagonales de perspectiva
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo((qp.tl.x + qp.tr.x) / 2, (qp.tl.y + qp.tr.y) / 2);
+        ctx.lineTo((qp.bl.x + qp.br.x) / 2, (qp.bl.y + qp.br.y) / 2);
+        ctx.moveTo((qp.tl.x + qp.bl.x) / 2, (qp.tl.y + qp.bl.y) / 2);
+        ctx.lineTo((qp.tr.x + qp.br.x) / 2, (qp.tr.y + qp.br.y) / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // 4 Tiradores grandes de esquina numerados
+        const qCorners = [
+            { name: 'tl', label: '1', pt: qp.tl },
+            { name: 'tr', label: '2', pt: qp.tr },
+            { name: 'br', label: '3', pt: qp.br },
+            { name: 'bl', label: '4', pt: qp.bl }
+        ];
+        const qHandleR = Math.max(12, Math.round(canvas.width * 0.016));
+
+        qCorners.forEach(c => {
+            ctx.beginPath();
+            ctx.arc(c.pt.x, c.pt.y, qHandleR, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = Math.max(3, qHandleR * 0.28);
+            ctx.stroke();
+
+            ctx.fillStyle = '#0369a1';
+            ctx.font = `bold ${Math.round(qHandleR * 0.95)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(c.label, c.pt.x, c.pt.y + 0.5);
         });
     }
 
-    // 6. Etiqueta informativa de tamaño
-    const label = `${Math.round(box.w)} × ${Math.round(box.h)} px ${cropState.aspect === 'cr80' ? '(CR80)' : ''}`;
-    const fontSize = Math.max(11, Math.round(canvas.width * 0.017));
-    ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
-    const textW = ctx.measureText(label).width;
-    const tagX = box.x + 8;
-    const tagY = box.y + box.h - 8;
-    if (tagY > box.y + 24) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(tagX - 4, tagY - fontSize - 2, textW + 8, fontSize + 6);
-        ctx.fillStyle = '#60a5fa';
-        ctx.fillText(label, tagX, tagY);
+    // 4. Modo Enderezado Fino
+    if (cropState.mode === 'straighten') {
+        const box = cropState.cropBox;
+        ctx.save();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.strokeRect(box.x, box.y, box.w, box.h);
+        ctx.restore();
+
+        // Indicador central de ángulo
+        const angText = `${cropState.fineAngle >= 0 ? '+' : ''}${cropState.fineAngle.toFixed(1)}° (${cropState.rotation90 + cropState.fineAngle}°)`;
+        ctx.font = 'bold 13px system-ui, sans-serif';
+        const tw = ctx.measureText(angText).width;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(cx - (tw / 2) - 8, cy - 14, tw + 16, 28);
+        ctx.fillStyle = '#38bdf8';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(angText, cx, cy);
     }
 }
 
@@ -2642,23 +2935,47 @@ function getCropPointerCanvasCoords(e) {
     const scaleY = canvas.height / Math.max(1, rect.height);
     return {
         x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY
+        y: (e.clientY - rect.top) * scaleY,
+        clientX: e.clientX,
+        clientY: e.clientY
     };
+}
+
+function isPointInQuad(px, py, qp) {
+    const pts = [qp.tl, qp.tr, qp.br, qp.bl];
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i].x, yi = pts[i].y;
+        const xj = pts[j].x, yj = pts[j].y;
+        const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
 }
 
 function getCropHandleAt(px, py) {
     const canvas = DOM.cropCanvas;
     const rect = canvas.getBoundingClientRect();
-    const box = cropState.cropBox;
     const screenScale = canvas.width / Math.max(1, rect.width);
-    const hitR = Math.max(28, 32 * screenScale);
+    const hitR = Math.max(32, 38 * screenScale);
 
+    if (cropState.mode === 'quad') {
+        const qp = cropState.quadPoints;
+        if (Math.hypot(px - qp.tl.x, py - qp.tl.y) <= hitR) return 'tl';
+        if (Math.hypot(px - qp.tr.x, py - qp.tr.y) <= hitR) return 'tr';
+        if (Math.hypot(px - qp.br.x, py - qp.br.y) <= hitR) return 'br';
+        if (Math.hypot(px - qp.bl.x, py - qp.bl.y) <= hitR) return 'bl';
+        if (isPointInQuad(px, py, qp)) return 'move';
+        return null;
+    }
+
+    const box = cropState.cropBox;
     if (Math.hypot(px - box.x, py - box.y) <= hitR) return 'nw';
     if (Math.hypot(px - (box.x + box.w), py - box.y) <= hitR) return 'ne';
     if (Math.hypot(px - (box.x + box.w), py - (box.y + box.h)) <= hitR) return 'se';
     if (Math.hypot(px - box.x, py - (box.y + box.h)) <= hitR) return 'sw';
 
-    if (cropState.aspect === 'free') {
+    if (cropState.aspect === 'free' && cropState.mode === 'box') {
         if (Math.abs(py - box.y) <= hitR && px >= box.x && px <= box.x + box.w) return 'n';
         if (Math.abs(py - (box.y + box.h)) <= hitR && px >= box.x && px <= box.x + box.w) return 's';
         if (Math.abs(px - box.x) <= hitR && py >= box.y && py <= box.y + box.h) return 'w';
@@ -2678,9 +2995,13 @@ function updateCropCursor(handle) {
     switch (handle) {
         case 'move': canvas.style.cursor = 'move'; break;
         case 'nw':
-        case 'se': canvas.style.cursor = 'nwse-resize'; break;
+        case 'se':
+        case 'tl':
+        case 'br': canvas.style.cursor = 'nwse-resize'; break;
         case 'ne':
-        case 'sw': canvas.style.cursor = 'nesw-resize'; break;
+        case 'sw':
+        case 'tr':
+        case 'bl': canvas.style.cursor = 'nesw-resize'; break;
         case 'n':
         case 's': canvas.style.cursor = 'ns-resize'; break;
         case 'e':
@@ -2698,7 +3019,24 @@ function onCropPointerDown(e) {
     cropState.dragHandle = handle;
     cropState.startPointer = { x: pt.x, y: pt.y };
     cropState.startBox = { ...cropState.cropBox };
+    cropState.startQuad = {
+        tl: { ...cropState.quadPoints.tl },
+        tr: { ...cropState.quadPoints.tr },
+        br: { ...cropState.quadPoints.br },
+        bl: { ...cropState.quadPoints.bl }
+    };
+
     try { DOM.cropCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+
+    // Activar lupa de inmediato al tocar una esquina
+    if (['nw', 'ne', 'se', 'sw', 'tl', 'tr', 'br', 'bl'].includes(handle)) {
+        let cornerX = pt.x, cornerY = pt.y;
+        if (cropState.mode === 'quad' && cropState.quadPoints[handle]) {
+            cornerX = cropState.quadPoints[handle].x;
+            cornerY = cropState.quadPoints[handle].y;
+        }
+        updateCropLoupe(cornerX, cornerY, e.clientX, e.clientY);
+    }
 }
 
 function onCropPointerMove(e) {
@@ -2712,10 +3050,42 @@ function onCropPointerMove(e) {
     e.preventDefault();
     const dx = pt.x - cropState.startPointer.x;
     const dy = pt.y - cropState.startPointer.y;
-    const sb = cropState.startBox;
     const cw = DOM.cropCanvas.width;
     const ch = DOM.cropCanvas.height;
-    const isCr80 = cropState.aspect === 'cr80';
+
+    // 1. Manejo en Modo Perspectiva 4 Puntos Libres
+    if (cropState.mode === 'quad') {
+        const sq = cropState.startQuad;
+        const qp = cropState.quadPoints;
+
+        if (cropState.dragHandle === 'move') {
+            const minX = Math.min(sq.tl.x, sq.tr.x, sq.br.x, sq.bl.x);
+            const maxX = Math.max(sq.tl.x, sq.tr.x, sq.br.x, sq.bl.x);
+            const minY = Math.min(sq.tl.y, sq.tr.y, sq.br.y, sq.bl.y);
+            const maxY = Math.max(sq.tl.y, sq.tr.y, sq.br.y, sq.bl.y);
+
+            const clampDx = Math.max(-minX, Math.min(cw - maxX, dx));
+            const clampDy = Math.max(-minY, Math.min(ch - maxY, dy));
+
+            qp.tl = { x: sq.tl.x + clampDx, y: sq.tl.y + clampDy };
+            qp.tr = { x: sq.tr.x + clampDx, y: sq.tr.y + clampDy };
+            qp.br = { x: sq.br.x + clampDx, y: sq.br.y + clampDy };
+            qp.bl = { x: sq.bl.x + clampDx, y: sq.bl.y + clampDy };
+            hideCropLoupe();
+        } else if (['tl', 'tr', 'br', 'bl'].includes(cropState.dragHandle)) {
+            const targetHandle = cropState.dragHandle;
+            qp[targetHandle].x = Math.max(0, Math.min(cw, sq[targetHandle].x + dx));
+            qp[targetHandle].y = Math.max(0, Math.min(ch, sq[targetHandle].y + dy));
+            updateCropLoupe(qp[targetHandle].x, qp[targetHandle].y, e.clientX, e.clientY);
+        }
+
+        drawCropCanvas();
+        return;
+    }
+
+    // 2. Manejo en Modo Encuadre Rectangular / Enderezado
+    const sb = cropState.startBox;
+    const isCr80 = (cropState.aspect === 'cr80');
     const ratio = 85.6 / 53.98;
     const minW = Math.max(30, cw * 0.05);
     const minH = Math.max(20, ch * 0.05);
@@ -2726,6 +3096,7 @@ function onCropPointerMove(e) {
         case 'move': {
             x = Math.max(0, Math.min(cw - w, sb.x + dx));
             y = Math.max(0, Math.min(ch - h, sb.y + dy));
+            hideCropLoupe();
             break;
         }
         case 'se': {
@@ -2739,6 +3110,7 @@ function onCropPointerMove(e) {
             } else {
                 h = Math.max(minH, Math.min(ch - sb.y, sb.h + dy));
             }
+            updateCropLoupe(sb.x + w, sb.y + h, e.clientX, e.clientY);
             break;
         }
         case 'sw': {
@@ -2760,6 +3132,7 @@ function onCropPointerMove(e) {
             } else {
                 h = Math.max(minH, Math.min(ch - sb.y, sb.h + dy));
             }
+            updateCropLoupe(x, sb.y + h, e.clientX, e.clientY);
             break;
         }
         case 'ne': {
@@ -2782,6 +3155,7 @@ function onCropPointerMove(e) {
                 h = targetH;
                 y = targetY;
             }
+            updateCropLoupe(sb.x + w, y, e.clientX, e.clientY);
             break;
         }
         case 'nw': {
@@ -2812,6 +3186,7 @@ function onCropPointerMove(e) {
                 h = targetH;
                 y = targetY;
             }
+            updateCropLoupe(x, y, e.clientX, e.clientY);
             break;
         }
         case 'n': {
@@ -2855,61 +3230,24 @@ function onCropPointerUp(e) {
         cropState.dragHandle = null;
         try { DOM.cropCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
         updateCropCursor(null);
+        hideCropLoupe();
         drawCropCanvas();
     }
 }
 
-function rotateCropImage() {
-    if (!cropState.sourceImg) return;
-    const src = cropState.sourceImg;
-    const rotCanvas = document.createElement('canvas');
-    rotCanvas.width = src.height;
-    rotCanvas.height = src.width;
-    const rCtx = rotCanvas.getContext('2d');
-    rCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
-    rCtx.rotate(90 * Math.PI / 180);
-    rCtx.drawImage(src, -src.width / 2, -src.height / 2);
-
-    const rotatedImg = new Image();
-    rotatedImg.onload = () => {
-        cropState.sourceImg = rotatedImg;
-        const canvas = DOM.cropCanvas;
-        canvas.width = rotatedImg.width;
-        canvas.height = rotatedImg.height;
-
-        const ratio = 85.6 / 53.98;
-        let w = canvas.width * 0.84;
-        let h = cropState.aspect === 'cr80' ? (w / ratio) : (canvas.height * 0.84);
-        if (h > canvas.height * 0.88) {
-            h = canvas.height * 0.84;
-            w = h * ratio;
-        }
-        cropState.cropBox = {
-            x: (canvas.width - w) / 2,
-            y: (canvas.height - h) / 2,
-            w: w,
-            h: h
-        };
-        drawCropCanvas();
-        showToast('Foto rotada 90°', 'info');
-    };
-    rotatedImg.src = rotCanvas.toDataURL('image/jpeg', 0.95);
-}
-
 function detectDocumentBounds() {
-    if (!cropState.sourceImg) return;
+    if (!cropState.cachedRotatedImg) return;
     const canvas = DOM.cropCanvas;
     const cw = canvas.width;
     const ch = canvas.height;
 
-    // Canvas de muestreo ligero para detección de contornos instantánea
     const sw = 240;
     const sh = Math.round(sw * (ch / cw));
     const sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = sw;
     sampleCanvas.height = sh;
     const sCtx = sampleCanvas.getContext('2d');
-    sCtx.drawImage(cropState.sourceImg, 0, 0, sw, sh);
+    sCtx.drawImage(cropState.cachedRotatedImg, 0, 0, sw, sh);
 
     const imgData = sCtx.getImageData(0, 0, sw, sh);
     const data = imgData.data;
@@ -2919,7 +3257,6 @@ function detectDocumentBounds() {
         lum[i / 4] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
     }
 
-    // Calcular luminancia de borde (fondo / mesa de apoyo)
     let borderSum = 0, borderCount = 0;
     for (let y = 0; y < sh; y++) {
         for (let x = 0; x < sw; x++) {
@@ -2932,7 +3269,7 @@ function detectDocumentBounds() {
     const borderAvg = borderSum / Math.max(1, borderCount);
 
     let minX = sw, maxX = 0, minY = sh, maxY = 0;
-    const threshold = 20;
+    const threshold = 18;
 
     for (let y = 6; y < sh - 6; y++) {
         for (let x = 6; x < sw - 6; x++) {
@@ -2971,80 +3308,260 @@ function detectDocumentBounds() {
         };
         showToast('🎯 Contorno de carnet detectado', 'success');
     } else {
-        const ratio = 85.6 / 53.98;
-        const defaultW = cw * 0.84;
-        const defaultH = defaultW / ratio;
-        cropState.cropBox = {
-            x: (cw - defaultW) / 2,
-            y: (ch - defaultH) / 2,
-            w: defaultW,
-            h: defaultH
-        };
+        resetBoxAndQuadBounds();
         showToast('Encuadre estándar CR80 centrado', 'info');
     }
 
     drawCropCanvas();
 }
 
+function detectDocumentQuad() {
+    if (!cropState.cachedRotatedImg) return;
+    const canvas = DOM.cropCanvas;
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    const sw = 240;
+    const sh = Math.round(sw * (ch / cw));
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = sw;
+    sampleCanvas.height = sh;
+    const sCtx = sampleCanvas.getContext('2d');
+    sCtx.drawImage(cropState.cachedRotatedImg, 0, 0, sw, sh);
+
+    const imgData = sCtx.getImageData(0, 0, sw, sh);
+    const data = imgData.data;
+
+    const lum = new Uint8Array(sw * sh);
+    for (let i = 0; i < data.length; i += 4) {
+        lum[i / 4] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
+    }
+
+    let borderSum = 0, borderCount = 0;
+    for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+            if (x < 6 || x >= sw - 6 || y < 6 || y >= sh - 6) {
+                borderSum += lum[y * sw + x];
+                borderCount++;
+            }
+        }
+    }
+    const borderAvg = borderSum / Math.max(1, borderCount);
+    const threshold = 18;
+
+    let minX = sw, maxX = 0, minY = sh, maxY = 0;
+    for (let y = 6; y < sh - 6; y++) {
+        for (let x = 6; x < sw - 6; x++) {
+            if (Math.abs(lum[y * sw + x] - borderAvg) > threshold) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    const scaleX = cw / sw;
+    const scaleY = ch / sh;
+
+    if (maxX > minX + 20 && maxY > minY + 20) {
+        cropState.quadPoints = {
+            tl: { x: Math.max(0, minX * scaleX), y: Math.max(0, minY * scaleY) },
+            tr: { x: Math.min(cw, maxX * scaleX), y: Math.max(0, minY * scaleY) },
+            br: { x: Math.min(cw, maxX * scaleX), y: Math.min(ch, maxY * scaleY) },
+            bl: { x: Math.max(0, minX * scaleX), y: Math.min(ch, maxY * scaleY) }
+        };
+        showToast('🎯 Esquinas detectadas automáticamente', 'success');
+    } else {
+        resetQuadPoints();
+        showToast('Esquinas centradas estándar', 'info');
+    }
+
+    drawCropCanvas();
+}
+
+function resetQuadPoints() {
+    resetBoxAndQuadBounds();
+    drawCropCanvas();
+}
+
+// Transformación de perspectiva exacta (Homografía bilineal en malla triangular)
+function warpQuadToRectangle(sourceImg, qp, outW, outH) {
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = outW;
+    outCanvas.height = outH;
+    const ctx = outCanvas.getContext('2d');
+
+    const steps = 16;
+    const p0 = qp.tl, p1 = qp.tr, p2 = qp.br, p3 = qp.bl;
+
+    function getQuadPoint(u, v) {
+        return {
+            x: (1 - u) * (1 - v) * p0.x + u * (1 - v) * p1.x + u * v * p2.x + (1 - u) * v * p3.x,
+            y: (1 - u) * (1 - v) * p0.y + u * (1 - v) * p1.y + u * v * p2.y + (1 - u) * v * p3.y
+        };
+    }
+
+    for (let y = 0; y < steps; y++) {
+        const v0 = y / steps;
+        const v1 = (y + 1) / steps;
+        const dy0 = v0 * outH;
+        const dy1 = v1 * outH;
+
+        for (let x = 0; x < steps; x++) {
+            const u0 = x / steps;
+            const u1 = (x + 1) / steps;
+            const dx0 = u0 * outW;
+            const dx1 = u1 * outW;
+
+            const pt00 = getQuadPoint(u0, v0);
+            const pt10 = getQuadPoint(u1, v0);
+            const pt01 = getQuadPoint(u0, v1);
+            const pt11 = getQuadPoint(u1, v1);
+
+            renderMappedTriangle(ctx, sourceImg,
+                pt00, pt10, pt01,
+                { x: dx0, y: dy0 }, { x: dx1, y: dy0 }, { x: dx0, y: dy1 }
+            );
+
+            renderMappedTriangle(ctx, sourceImg,
+                pt10, pt11, pt01,
+                { x: dx1, y: dy0 }, { x: dx1, y: dy1 }, { x: dx0, y: dy1 }
+            );
+        }
+    }
+
+    return outCanvas;
+}
+
+function renderMappedTriangle(ctx, img, s0, s1, s2, d0, d1, d2) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(d0.x, d0.y);
+    ctx.lineTo(d1.x, d1.y);
+    ctx.lineTo(d2.x, d2.y);
+    ctx.closePath();
+    ctx.clip();
+
+    const denom = (s0.x * (s1.y - s2.y) - s1.x * (s0.y - s2.y) + s2.x * (s0.y - s1.y));
+    if (Math.abs(denom) < 0.0001) {
+        ctx.restore();
+        return;
+    }
+
+    const a = (d0.x * (s1.y - s2.y) - d1.x * (s0.y - s2.y) + d2.x * (s0.y - s1.y)) / denom;
+    const b = (d0.y * (s1.y - s2.y) - d1.y * (s0.y - s2.y) + d2.y * (s0.y - s1.y)) / denom;
+    const c = (s0.x * (d1.x - d2.x) - s1.x * (d0.x - d2.x) + s2.x * (d0.x - d1.x)) / denom;
+    const d = (s0.x * (d1.y - d2.y) - s1.x * (d0.y - d2.y) + s2.x * (d0.y - d1.y)) / denom;
+    const e = (s0.x * (s1.y * d2.x - s2.y * d1.x) - s1.x * (s0.y * d2.x - s2.y * d0.x) + s2.x * (s0.y * d1.x - s1.y * d0.x)) / denom;
+    const f = (s0.x * (s1.y * d2.y - s2.y * d1.y) - s1.x * (s0.y * d2.y - s2.y * d0.y) + s2.x * (s0.y * d1.y - s1.y * d0.y)) / denom;
+
+    ctx.transform(a, b, c, d, e, f);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+}
+
 function applyCroppedResult() {
-    const box = cropState.cropBox;
-    if (!cropState.sourceImg || box.w <= 5 || box.h <= 5) return;
+    if (!cropState.cachedRotatedImg) return;
 
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = Math.round(box.w);
-    croppedCanvas.height = Math.round(box.h);
+    let croppedCanvas = null;
 
-    const ctx = croppedCanvas.getContext('2d');
-    ctx.drawImage(
-        cropState.sourceImg,
-        box.x, box.y, box.w, box.h,
-        0, 0, croppedCanvas.width, croppedCanvas.height
-    );
+    if (cropState.mode === 'quad') {
+        const qp = cropState.quadPoints;
+        const wTop = Math.hypot(qp.tr.x - qp.tl.x, qp.tr.y - qp.tl.y);
+        const wBot = Math.hypot(qp.br.x - qp.bl.x, qp.br.y - qp.bl.y);
+        const outW = Math.max(100, Math.round(Math.max(wTop, wBot)));
+        const outH = Math.max(60, Math.round(outW / (85.6 / 53.98)));
+        croppedCanvas = warpQuadToRectangle(cropState.cachedRotatedImg, qp, outW, outH);
+    } else {
+        const box = cropState.cropBox;
+        if (box.w <= 5 || box.h <= 5) return;
+        croppedCanvas = document.createElement('canvas');
+        croppedCanvas.width = Math.round(box.w);
+        croppedCanvas.height = Math.round(box.h);
+        const ctx = croppedCanvas.getContext('2d');
+        ctx.drawImage(
+            cropState.cachedRotatedImg,
+            box.x, box.y, box.w, box.h,
+            0, 0, croppedCanvas.width, croppedCanvas.height
+        );
+    }
 
     const card = STATE.cards[cropState.cardId];
     card.croppedCanvas = croppedCanvas;
     card.rawImage = cropState.sourceImg;
-    card.cropRect = { ...box };
+    card.cropRect = { ...cropState.cropBox };
     card.cachedCanvas = null;
     card.dirty = true;
 
-    // Actualizar proporción de la tarjeta según el recorte
+    // Proporción estándar de carnet
     card.widthMm = 85.6;
-    card.heightMm = 85.6 * (box.h / box.w);
+    card.heightMm = 85.6 * (croppedCanvas.height / croppedCanvas.width);
 
     DOM.cropModal.classList.add('hidden');
+    hideCropLoupe();
     updateDropzoneUI(cropState.cardId, croppedCanvas.toDataURL('image/jpeg', 0.92));
-    saveHistoryState(`Recortar ${card.name}`);
+    saveHistoryState(`Recortar & Enderezar ${card.name}`);
     scheduleRender();
-    showToast(`Recorte aplicado a ${card.name}`, 'success');
+    showToast(`Recorte y enderezado aplicados a ${card.name}`, 'success');
 }
 
-// Eventos del modal de recorte
-DOM.btnCloseCrop.addEventListener('click', () => DOM.cropModal.classList.add('hidden'));
-DOM.btnCancelCrop.addEventListener('click', () => DOM.cropModal.classList.add('hidden'));
+// Eventos del modal de recorte interactivo
+DOM.btnCloseCrop.addEventListener('click', () => { DOM.cropModal.classList.add('hidden'); hideCropLoupe(); });
+DOM.btnCancelCrop.addEventListener('click', () => { DOM.cropModal.classList.add('hidden'); hideCropLoupe(); });
 
-if (DOM.btnCropRotate) DOM.btnCropRotate.addEventListener('click', rotateCropImage);
+if (DOM.btnCropTabBox) DOM.btnCropTabBox.addEventListener('click', () => setCropMode('box'));
+if (DOM.btnCropTabQuad) DOM.btnCropTabQuad.addEventListener('click', () => setCropMode('quad'));
+if (DOM.btnCropTabRotate) DOM.btnCropTabRotate.addEventListener('click', () => setCropMode('straighten'));
+
+if (DOM.btnCropAspectCr80) {
+    DOM.btnCropAspectCr80.addEventListener('click', () => {
+        cropState.aspect = 'cr80';
+        DOM.btnCropAspectCr80.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
+        DOM.btnCropAspectFree.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700';
+        const box = cropState.cropBox;
+        const ratio = 85.6 / 53.98;
+        box.h = box.w / ratio;
+        if (box.y + box.h > DOM.cropCanvas.height) {
+            box.y = Math.max(0, DOM.cropCanvas.height - box.h);
+        }
+        drawCropCanvas();
+    });
+}
+
+if (DOM.btnCropAspectFree) {
+    DOM.btnCropAspectFree.addEventListener('click', () => {
+        cropState.aspect = 'free';
+        DOM.btnCropAspectFree.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
+        DOM.btnCropAspectCr80.className = 'min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700';
+        drawCropCanvas();
+    });
+}
+
 if (DOM.btnCropAutoDetect) DOM.btnCropAutoDetect.addEventListener('click', detectDocumentBounds);
+if (DOM.btnCropQuadAuto) DOM.btnCropQuadAuto.addEventListener('click', detectDocumentQuad);
+if (DOM.btnCropQuadReset) DOM.btnCropQuadReset.addEventListener('click', resetQuadPoints);
 
-DOM.btnCropAspectCr80.addEventListener('click', () => {
-    cropState.aspect = 'cr80';
-    DOM.btnCropAspectCr80.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
-    DOM.btnCropAspectFree.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200';
-    const box = cropState.cropBox;
-    const ratio = 85.6 / 53.98;
-    box.h = box.w / ratio;
-    if (box.y + box.h > DOM.cropCanvas.height) {
-        box.y = Math.max(0, DOM.cropCanvas.height - box.h);
-    }
-    drawCropCanvas();
-});
+if (DOM.btnCropRotateLeft) DOM.btnCropRotateLeft.addEventListener('click', () => rotateCrop90(-90));
+if (DOM.btnCropRotateRight) DOM.btnCropRotateRight.addEventListener('click', () => rotateCrop90(90));
 
-DOM.btnCropAspectFree.addEventListener('click', () => {
-    cropState.aspect = 'free';
-    DOM.btnCropAspectFree.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
-    DOM.btnCropAspectCr80.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200';
-    drawCropCanvas();
-});
+if (DOM.cropAngleSlider) {
+    DOM.cropAngleSlider.addEventListener('input', (e) => setFineCropAngle(parseFloat(e.target.value)));
+}
+
+if (DOM.btnCropAngleReset) {
+    DOM.btnCropAngleReset.addEventListener('click', () => setFineCropAngle(0));
+}
+
+if (DOM.btnCropToggleGrid) {
+    DOM.btnCropToggleGrid.addEventListener('click', () => {
+        cropState.showGrid = !cropState.showGrid;
+        DOM.btnCropToggleGrid.className = cropState.showGrid
+            ? 'px-2 py-1 bg-blue-600 text-white rounded-lg font-bold text-[11px]'
+            : 'px-2 py-1 bg-slate-800 text-slate-400 hover:text-white rounded-lg font-bold text-[11px]';
+        drawCropCanvas();
+    });
+}
 
 DOM.cropCanvas.addEventListener('pointerdown', onCropPointerDown);
 DOM.cropCanvas.addEventListener('pointermove', onCropPointerMove);
