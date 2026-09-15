@@ -31,12 +31,12 @@ const FACTORY_DEFAULTS = {
             widthMm: 85.6,
             heightMm: 53.98,
             xMm: 0,
-            yMm: 45,
-            scale: 70, // %
+            yMm: 21,
+            scale: 150, // % (Configuración preferida del usuario)
             rotation: 0,
             flipH: false,
             flipV: false,
-            borderRadiusMm: 3.5,
+            borderRadiusMm: 6,
             filter: 'normal',
             brightness: 0,
             contrast: 0,
@@ -51,12 +51,12 @@ const FACTORY_DEFAULTS = {
             widthMm: 85.6,
             heightMm: 53.98,
             xMm: 0,
-            yMm: 5,
-            scale: 70, // %
+            yMm: -8,
+            scale: 150, // % (Configuración preferida del usuario)
             rotation: 0,
             flipH: false,
             flipV: false,
-            borderRadiusMm: 3.5,
+            borderRadiusMm: 6,
             filter: 'normal',
             brightness: 0,
             contrast: 0,
@@ -237,7 +237,7 @@ const INTERACTION = {
     resizeHandle: null,
     dragStart: { x: 0, y: 0 },
     cardInitialPos: { x: 0, y: 0 },
-    cardInitialScale: 70,
+    cardInitialScale: 150,
     activeSnapLines: [],
 };
 
@@ -509,13 +509,13 @@ function flipCard(cardId, axis = 'h') {
 function resetActiveCardAdjustments() {
     const card = STATE.cards[STATE.activeCardId];
     const def = FACTORY_DEFAULTS.cards[STATE.activeCardId];
-    card.scale = 70;
-    card.xMm = 0;
+    card.scale = def.scale;
+    card.xMm = def.xMm;
     card.yMm = def.yMm;
-    card.borderRadiusMm = 3.5;
-    card.filter = 'normal';
-    card.brightness = 0;
-    card.contrast = 0;
+    card.borderRadiusMm = def.borderRadiusMm;
+    card.filter = def.filter;
+    card.brightness = def.brightness;
+    card.contrast = def.contrast;
     card.rotation = 0;
     card.flipH = false;
     card.flipV = false;
@@ -525,13 +525,13 @@ function resetActiveCardAdjustments() {
         const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
         const otherDef = FACTORY_DEFAULTS.cards[otherId];
         const other = STATE.cards[otherId];
-        other.scale = 70;
-        other.xMm = 0;
+        other.scale = otherDef.scale;
+        other.xMm = otherDef.xMm;
         other.yMm = otherDef.yMm;
-        other.borderRadiusMm = 3.5;
-        other.filter = 'normal';
-        other.brightness = 0;
-        other.contrast = 0;
+        other.borderRadiusMm = otherDef.borderRadiusMm;
+        other.filter = otherDef.filter;
+        other.brightness = otherDef.brightness;
+        other.contrast = otherDef.contrast;
         other.rotation = 0;
         other.flipH = false;
         other.flipV = false;
@@ -1272,7 +1272,7 @@ function setupCardControls() {
 
     if (DOM.btnResetRadius) {
         DOM.btnResetRadius.addEventListener('click', () => {
-            const val = 3.5;
+            const val = FACTORY_DEFAULTS.cards[STATE.activeCardId].borderRadiusMm;
             STATE.cards[STATE.activeCardId].borderRadiusMm = val;
             if (STATE.syncCards) {
                 const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
