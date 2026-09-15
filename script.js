@@ -76,6 +76,7 @@ STATE.selectedCardId = null;
 STATE.snapEnabled = true;
 STATE.zoom = 1.0;
 STATE.theme = 'light';
+STATE.darkPaper = false;
 STATE.mobileView = 'canvas'; // 'canvas' | 'controls'
 
 // Historial para Deshacer / Rehacer
@@ -141,6 +142,7 @@ const DOM = {
     checkSyncCards: document.getElementById('check-sync-cards'),
     tabBtnFrente: document.getElementById('tab-btn-frente'),
     tabBtnDorso: document.getElementById('tab-btn-dorso'),
+    tabBtnBoth: document.getElementById('tab-btn-both'),
     btnApplyCr80: document.getElementById('btn-apply-cr80'),
     activeCardDimensions: document.getElementById('active-card-dimensions'),
     cardScaleRange: document.getElementById('card-scale-range'),
@@ -193,11 +195,15 @@ const DOM = {
     zoomLevelLabel: document.getElementById('zoom-level-label'),
     canvasQuickBar: document.getElementById('canvas-quick-bar'),
     quickCardBadge: document.getElementById('quick-card-badge'),
+    btnQuickSelectBoth: document.getElementById('btn-quick-select-both'),
+    quickSelectBothLabel: document.getElementById('quick-select-both-label'),
     quickScaleLabel: document.getElementById('quick-scale-label'),
     btnQuickScaleDown: document.getElementById('btn-quick-scale-down'),
     btnQuickScaleUp: document.getElementById('btn-quick-scale-up'),
     btnQuickRotate: document.getElementById('btn-quick-rotate'),
     btnQuickCrop: document.getElementById('btn-quick-crop'),
+    btnQuickCenterX: document.getElementById('btn-quick-center-x'),
+    btnQuickCenterY: document.getElementById('btn-quick-center-y'),
     btnQuickCenter: document.getElementById('btn-quick-center'),
     btnQuickToSettings: document.getElementById('btn-quick-to-settings'),
     viewportContainer: document.getElementById('viewport-container'),
@@ -205,6 +211,9 @@ const DOM = {
     emptyState: document.getElementById('empty-state'),
     canvasStatusHint: document.getElementById('canvas-status-hint'),
     sheetInfoBadge: document.getElementById('sheet-info-badge'),
+    btnTogglePaperTheme: document.getElementById('btn-toggle-paper-theme'),
+    paperThemeIcon: document.getElementById('paper-theme-icon'),
+    paperThemeLabel: document.getElementById('paper-theme-label'),
 
     // Modales
     cropModal: document.getElementById('crop-modal'),
@@ -491,7 +500,25 @@ function restoreFactoryDefaults() {
 }
 
 function flipCard(cardId, axis = 'h') {
+    if (cardId === 'both' || STATE.activeCardId === 'both' || STATE.selectedCardId === 'both') {
+        flipSingleCard('frente', axis);
+        flipSingleCard('dorso', axis);
+        syncControlsFromActiveCard();
+        scheduleRender();
+        saveHistoryState(`Voltear Ambos ${axis.toUpperCase()}`);
+        showToast(`Ambos carnets: Volteo ${axis === 'h' ? 'Horizontal' : 'Vertical'}`, 'info');
+        return;
+    }
+    flipSingleCard(cardId, axis);
+    syncControlsFromActiveCard();
+    scheduleRender();
+    saveHistoryState(`Voltear ${axis.toUpperCase()} ${STATE.cards[cardId].name}`);
+    showToast(`${STATE.cards[cardId].name}: Volteo ${axis === 'h' ? 'Horizontal' : 'Vertical'}`, 'info');
+}
+
+function flipSingleCard(cardId, axis = 'h') {
     const card = STATE.cards[cardId];
+    if (!card) return;
     if (axis === 'h') {
         card.flipH = !card.flipH;
     } else {
@@ -507,15 +534,31 @@ function flipCard(cardId, axis = 'h') {
         }
         STATE.cards[otherId].dirty = true;
     }
-    syncControlsFromActiveCard();
-    scheduleRender();
-    saveHistoryState(`Voltear ${axis.toUpperCase()} ${card.name}`);
-    showToast(`${card.name}: Volteo ${axis === 'h' ? 'Horizontal' : 'Vertical'}`, 'info');
 }
 
 function resetActiveCardAdjustments() {
-    const card = STATE.cards[STATE.activeCardId];
-    const def = FACTORY_DEFAULTS.cards[STATE.activeCardId];
+    if (STATE.activeCardId === 'both' || STATE.selectedCardId === 'both') {
+        resetCardToFactory('frente');
+        resetCardToFactory('dorso');
+        saveHistoryState('Restablecer Ambos Carnets');
+        showToast('Ajustes de ambos carnets restablecidos a valores iniciales', 'info');
+    } else {
+        resetCardToFactory(STATE.activeCardId);
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            resetCardToFactory(otherId);
+        }
+        saveHistoryState(`Restablecer ${STATE.cards[STATE.activeCardId].name}`);
+        showToast(`Ajustes de ${STATE.cards[STATE.activeCardId].name} restablecidos`, 'info');
+    }
+    syncControlsFromActiveCard();
+    scheduleRender();
+}
+
+function resetCardToFactory(cardId) {
+    const card = STATE.cards[cardId];
+    if (!card) return;
+    const def = FACTORY_DEFAULTS.cards[cardId];
     card.scale = def.scale;
     card.xMm = def.xMm;
     card.yMm = def.yMm;
@@ -527,28 +570,6 @@ function resetActiveCardAdjustments() {
     card.flipH = false;
     card.flipV = false;
     card.dirty = true;
-
-    if (STATE.syncCards) {
-        const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-        const otherDef = FACTORY_DEFAULTS.cards[otherId];
-        const other = STATE.cards[otherId];
-        other.scale = otherDef.scale;
-        other.xMm = otherDef.xMm;
-        other.yMm = otherDef.yMm;
-        other.borderRadiusMm = otherDef.borderRadiusMm;
-        other.filter = otherDef.filter;
-        other.brightness = otherDef.brightness;
-        other.contrast = otherDef.contrast;
-        other.rotation = 0;
-        other.flipH = false;
-        other.flipV = false;
-        other.dirty = true;
-    }
-
-    syncControlsFromActiveCard();
-    saveHistoryState(`Restablecer ${card.name}`);
-    scheduleRender();
-    showToast(`Ajustes de ${card.name} restablecidos a valores iniciales`, 'info');
 }
 
 // =============================================================================
@@ -567,18 +588,41 @@ function applyTheme(theme) {
         document.documentElement.classList.add('dark');
         DOM.themeIconDark.classList.remove('hidden');
         DOM.themeIconLight.classList.add('hidden');
+        STATE.darkPaper = true;
     } else {
         document.documentElement.classList.remove('dark');
         DOM.themeIconDark.classList.add('hidden');
         DOM.themeIconLight.classList.remove('hidden');
+        STATE.darkPaper = false;
     }
     localStorage.setItem('cardify-theme', theme);
+    updatePaperThemeUI();
     scheduleRender();
 }
 
 function toggleTheme() {
     STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
     applyTheme(STATE.theme);
+}
+
+function togglePaperTheme() {
+    STATE.darkPaper = !STATE.darkPaper;
+    updatePaperThemeUI();
+    scheduleRender();
+    showToast(STATE.darkPaper ? '🌙 Modo Papel Oscuro activado (anti-deslumbramiento)' : '☀️ Modo Papel Blanco activado', 'info');
+}
+
+function updatePaperThemeUI() {
+    if (!DOM.btnTogglePaperTheme) return;
+    if (STATE.darkPaper) {
+        if (DOM.paperThemeIcon) DOM.paperThemeIcon.textContent = '☀️';
+        if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = 'Papel Blanco';
+        DOM.btnTogglePaperTheme.title = 'Cambiar vista previa a hoja blanca';
+    } else {
+        if (DOM.paperThemeIcon) DOM.paperThemeIcon.textContent = '🌙';
+        if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = 'Papel Oscuro';
+        DOM.btnTogglePaperTheme.title = 'Cambiar vista previa a hoja oscura (anti-deslumbramiento)';
+    }
 }
 
 // =============================================================================
@@ -722,6 +766,7 @@ function setupEventListeners() {
     // Pestañas y Controles de Tarjeta
     DOM.tabBtnFrente.addEventListener('click', () => setActiveTab('frente'));
     DOM.tabBtnDorso.addEventListener('click', () => setActiveTab('dorso'));
+    if (DOM.tabBtnBoth) DOM.tabBtnBoth.addEventListener('click', () => setActiveTab('both'));
     DOM.btnApplyCr80.addEventListener('click', applyCr80Preset);
     DOM.btnCopyToOther.addEventListener('click', copyActiveCardSettingsToOther);
 
@@ -750,58 +795,96 @@ function setupEventListeners() {
     DOM.btnZoomOut.addEventListener('click', () => changeZoom(-0.15));
     DOM.btnZoomFit.addEventListener('click', fitZoomToContainer);
 
+    if (DOM.btnQuickSelectBoth) {
+        DOM.btnQuickSelectBoth.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSelectBoth();
+        });
+    }
+
     if (DOM.btnQuickScaleDown) {
         DOM.btnQuickScaleDown.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (STATE.selectedCardId) {
+            if (STATE.selectedCardId === 'both') {
+                STATE.cards.frente.scale = Math.max(30, STATE.cards.frente.scale - 5);
+                STATE.cards.dorso.scale = Math.max(30, STATE.cards.dorso.scale - 5);
+            } else if (STATE.selectedCardId) {
                 const c = STATE.cards[STATE.selectedCardId];
                 c.scale = Math.max(30, c.scale - 5);
                 if (STATE.syncCards) {
                     const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
                     STATE.cards[otherId].scale = c.scale;
                 }
-                syncControlsFromActiveCard();
-                scheduleRender();
             }
+            syncControlsFromActiveCard();
+            scheduleRender();
         });
     }
 
     if (DOM.btnQuickScaleUp) {
         DOM.btnQuickScaleUp.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (STATE.selectedCardId) {
+            if (STATE.selectedCardId === 'both') {
+                STATE.cards.frente.scale = Math.min(180, STATE.cards.frente.scale + 5);
+                STATE.cards.dorso.scale = Math.min(180, STATE.cards.dorso.scale + 5);
+            } else if (STATE.selectedCardId) {
                 const c = STATE.cards[STATE.selectedCardId];
                 c.scale = Math.min(180, c.scale + 5);
                 if (STATE.syncCards) {
                     const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
                     STATE.cards[otherId].scale = c.scale;
                 }
-                syncControlsFromActiveCard();
-                scheduleRender();
             }
+            syncControlsFromActiveCard();
+            scheduleRender();
         });
     }
 
     if (DOM.btnQuickRotate) {
         DOM.btnQuickRotate.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (STATE.selectedCardId) rotateCard(STATE.selectedCardId, 90);
+            if (STATE.selectedCardId === 'both') {
+                rotateCard('frente', 90);
+                rotateCard('dorso', 90);
+            } else if (STATE.selectedCardId) {
+                rotateCard(STATE.selectedCardId, 90);
+            }
         });
     }
 
     if (DOM.btnQuickCrop) {
         DOM.btnQuickCrop.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (STATE.selectedCardId) openCropModal(STATE.selectedCardId);
+            const id = STATE.selectedCardId === 'both' ? 'frente' : STATE.selectedCardId;
+            if (id) openCropModal(id);
+        });
+    }
+
+    if (DOM.btnQuickCenterX) {
+        DOM.btnQuickCenterX.addEventListener('click', (e) => {
+            e.stopPropagation();
+            centerCardsHorizontal();
+        });
+    }
+
+    if (DOM.btnQuickCenterY) {
+        DOM.btnQuickCenterY.addEventListener('click', (e) => {
+            e.stopPropagation();
+            centerCardsVertical();
         });
     }
 
     if (DOM.btnQuickCenter) {
         DOM.btnQuickCenter.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (STATE.selectedCardId) {
-                centerCard(STATE.selectedCardId);
-            }
+            centerCardsBoth();
+        });
+    }
+
+    if (DOM.btnTogglePaperTheme) {
+        DOM.btnTogglePaperTheme.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePaperTheme();
         });
     }
 
@@ -934,8 +1017,27 @@ function removeCard(cardId) {
 }
 
 function rotateCard(cardId, angleDeg = 90) {
+    if (cardId === 'both' || STATE.activeCardId === 'both' || STATE.selectedCardId === 'both') {
+        const f = STATE.cards.frente;
+        const d = STATE.cards.dorso;
+        if (f.rawImage) rotateSingleCard('frente', angleDeg);
+        if (d.rawImage) rotateSingleCard('dorso', angleDeg);
+        syncControlsFromActiveCard();
+        saveHistoryState(`Rotar Ambos ${angleDeg}°`);
+        scheduleRender();
+        showToast(`Ambos carnets rotados ${angleDeg}°`, 'info');
+        return;
+    }
+    rotateSingleCard(cardId, angleDeg);
+    syncControlsFromActiveCard();
+    saveHistoryState(`Rotar ${STATE.cards[cardId].name} ${angleDeg}°`);
+    scheduleRender();
+    showToast(`${STATE.cards[cardId].name} rotado`, 'info');
+}
+
+function rotateSingleCard(cardId, angleDeg = 90) {
     const card = STATE.cards[cardId];
-    if (!card.rawImage) return;
+    if (!card || !card.rawImage) return;
 
     card.rotation = (card.rotation + angleDeg) % 360;
     if (angleDeg === 90 || angleDeg === 270) {
@@ -957,10 +1059,6 @@ function rotateCard(cardId, angleDeg = 90) {
             otherCard.dirty = true;
         }
     }
-
-    saveHistoryState(`Rotar ${card.name} ${angleDeg}°`);
-    scheduleRender();
-    showToast(`${card.name} rotado`, 'info');
 }
 
 function swapCards() {
@@ -1079,7 +1177,8 @@ function handleGlobalPaste(e) {
             } else if (!STATE.cards.dorso.rawImage) {
                 loadFileIntoCard(blob, 'dorso');
             } else {
-                loadFileIntoCard(blob, STATE.activeCardId);
+                const targetId = (STATE.activeCardId === 'both' || STATE.selectedCardId === 'both') ? 'frente' : STATE.activeCardId;
+                loadFileIntoCard(blob, targetId);
             }
             break;
         }
@@ -1101,13 +1200,18 @@ function handleGlobalKeydown(e) {
 
     if (STATE.selectedCardId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
-        const card = STATE.cards[STATE.selectedCardId];
         const step = e.shiftKey ? 5 : 1;
-        if (e.key === 'ArrowUp') card.yMm -= step;
-        if (e.key === 'ArrowDown') card.yMm += step;
-        if (e.key === 'ArrowLeft') card.xMm -= step;
-        if (e.key === 'ArrowRight') card.xMm += step;
-        
+        const targetCards = (STATE.selectedCardId === 'both')
+            ? [STATE.cards.frente, STATE.cards.dorso]
+            : [STATE.cards[STATE.selectedCardId]];
+
+        targetCards.forEach(card => {
+            if (e.key === 'ArrowUp') card.yMm -= step;
+            if (e.key === 'ArrowDown') card.yMm += step;
+            if (e.key === 'ArrowLeft') card.xMm -= step;
+            if (e.key === 'ArrowRight') card.xMm += step;
+        });
+
         syncControlsFromActiveCard();
         scheduleRender();
         return;
@@ -1115,7 +1219,12 @@ function handleGlobalKeydown(e) {
 
     if (STATE.selectedCardId && (e.key === 'Delete' || e.key === 'Backspace')) {
         if (document.activeElement.tagName !== 'INPUT') {
-            removeCard(STATE.selectedCardId);
+            if (STATE.selectedCardId === 'both') {
+                removeCard('frente');
+                removeCard('dorso');
+            } else {
+                removeCard(STATE.selectedCardId);
+            }
         }
     }
 }
@@ -1126,20 +1235,42 @@ function handleGlobalKeydown(e) {
 
 function setActiveTab(cardId) {
     STATE.activeCardId = cardId;
-    if (cardId === 'frente') {
-        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
-        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
-    } else {
-        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
-        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
+    if (cardId === 'both') {
+        STATE.selectedCardId = 'both';
+    } else if (STATE.selectedCardId === 'both') {
+        STATE.selectedCardId = cardId;
+    }
+
+    const inactiveClass = 'flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all';
+    const activeClass = 'flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
+
+    DOM.tabBtnFrente.className = (cardId === 'frente') ? activeClass : inactiveClass;
+    DOM.tabBtnDorso.className = (cardId === 'dorso') ? activeClass : inactiveClass;
+    if (DOM.tabBtnBoth) {
+        DOM.tabBtnBoth.className = (cardId === 'both') ? activeClass : inactiveClass;
     }
 
     syncControlsFromActiveCard();
     scheduleRender();
 }
 
+function applyToActiveCards(mutator) {
+    if (STATE.activeCardId === 'both' || STATE.selectedCardId === 'both') {
+        mutator(STATE.cards.frente, 'frente');
+        mutator(STATE.cards.dorso, 'dorso');
+    } else {
+        const id = STATE.activeCardId || 'frente';
+        mutator(STATE.cards[id], id);
+        if (STATE.syncCards) {
+            const otherId = id === 'frente' ? 'dorso' : 'frente';
+            mutator(STATE.cards[otherId], otherId);
+        }
+    }
+}
+
 function syncControlsFromActiveCard() {
-    const card = STATE.cards[STATE.activeCardId];
+    const isBoth = (STATE.activeCardId === 'both' || STATE.selectedCardId === 'both');
+    const card = (STATE.activeCardId === 'dorso' && !isBoth) ? STATE.cards.dorso : STATE.cards.frente;
 
     DOM.cardScaleRange.value = card.scale;
     DOM.cardScaleNum.value = card.scale;
@@ -1157,7 +1288,9 @@ function syncControlsFromActiveCard() {
 
     const currentW = (card.widthMm * card.scale / 100).toFixed(1);
     const currentH = (card.heightMm * card.scale / 100).toFixed(1);
-    DOM.activeCardDimensions.textContent = `(${currentW} × ${currentH} mm)`;
+    DOM.activeCardDimensions.textContent = isBoth 
+        ? `(Ambos: ~${currentW} × ${currentH} mm)` 
+        : `(${currentW} × ${currentH} mm)`;
 
     DOM.filterPresetBtns.forEach(btn => {
         if (btn.dataset.filter === card.filter) {
@@ -1167,17 +1300,30 @@ function syncControlsFromActiveCard() {
         }
     });
 
-    DOM.selectedCardIndicator.textContent = STATE.selectedCardId 
-        ? `Editando ${STATE.cards[STATE.selectedCardId].name}` 
-        : 'Arrastra para mover';
+    if (isBoth) {
+        DOM.selectedCardIndicator.textContent = '👥 Editando Ambos (Frente + Dorso)';
+    } else if (STATE.selectedCardId) {
+        DOM.selectedCardIndicator.textContent = `Editando ${STATE.cards[STATE.selectedCardId].name}`;
+    } else {
+        DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
+    }
 
     // Barra Rápida en el Canvas para Manipulación Directa (Agrandar con 1 Tap)
     if (DOM.canvasQuickBar) {
-        if (STATE.selectedCardId && STATE.cards[STATE.selectedCardId].rawImage) {
+        const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
+        if ((STATE.selectedCardId || isBoth) && hasAnyImage) {
             DOM.canvasQuickBar.classList.remove('hidden');
-            const selCard = STATE.cards[STATE.selectedCardId];
-            if (DOM.quickCardBadge) DOM.quickCardBadge.textContent = selCard.name;
-            if (DOM.quickScaleLabel) DOM.quickScaleLabel.textContent = `${selCard.scale}%`;
+            if (DOM.quickCardBadge) {
+                DOM.quickCardBadge.textContent = isBoth
+                    ? 'Frente + Dorso'
+                    : STATE.cards[STATE.selectedCardId || STATE.activeCardId].name;
+            }
+            if (DOM.quickSelectBothLabel) {
+                DOM.quickSelectBothLabel.textContent = isBoth ? 'Solo Uno' : 'Ambos';
+            }
+            if (DOM.quickScaleLabel) {
+                DOM.quickScaleLabel.textContent = `${card.scale}%`;
+            }
         } else {
             DOM.canvasQuickBar.classList.add('hidden');
         }
@@ -1186,33 +1332,84 @@ function syncControlsFromActiveCard() {
     updateDefaultConfigBadge();
 }
 
-function centerCard(cardId) {
-    if (!cardId || !STATE.cards[cardId]) return;
-
-    const targetCard = STATE.cards[cardId];
-    targetCard.xMm = 0;
-    targetCard.yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[cardId].yMm);
-
-    if (STATE.syncCards) {
-        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
-        STATE.cards[otherId].xMm = 0;
-        STATE.cards[otherId].yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[otherId].yMm);
+function centerCardsHorizontal() {
+    const isBoth = STATE.activeCardId === 'both' || STATE.selectedCardId === 'both' || STATE.syncCards;
+    if (isBoth) {
+        STATE.cards.frente.xMm = 0;
+        STATE.cards.dorso.xMm = 0;
+    } else {
+        const id = STATE.selectedCardId || STATE.activeCardId || 'frente';
+        STATE.cards[id].xMm = 0;
     }
-
     syncControlsFromActiveCard();
-    saveHistoryState(`Centrar ${targetCard.name}`);
+    saveHistoryState('Centrar Horizontalmente (X=0)');
     scheduleRender();
-    showToast(`Carnet centrado en posición óptima (X: 0, Y: ${targetCard.yMm}mm)`, 'success');
+    showToast('↔ Centrado en el eje horizontal (X = 0 mm)', 'success');
+}
+
+function centerCardsVertical() {
+    const isBoth = STATE.activeCardId === 'both' || STATE.selectedCardId === 'both' || STATE.syncCards;
+    if (isBoth) {
+        if (STATE.layout.arrange === 'horizontal') {
+            STATE.cards.frente.yMm = 0;
+            STATE.cards.dorso.yMm = 0;
+        } else {
+            STATE.cards.frente.yMm = FACTORY_DEFAULTS.cards.frente.yMm;
+            STATE.cards.dorso.yMm = FACTORY_DEFAULTS.cards.dorso.yMm;
+        }
+    } else {
+        const id = STATE.selectedCardId || STATE.activeCardId || 'frente';
+        STATE.cards[id].yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[id].yMm);
+    }
+    syncControlsFromActiveCard();
+    saveHistoryState('Centrar Verticalmente (Eje Y)');
+    scheduleRender();
+    showToast('↕ Centrado en el eje vertical (Y óptimo)', 'success');
+}
+
+function centerCardsBoth() {
+    const isBoth = STATE.activeCardId === 'both' || STATE.selectedCardId === 'both' || STATE.syncCards;
+    if (isBoth) {
+        STATE.cards.frente.xMm = 0;
+        STATE.cards.dorso.xMm = 0;
+        if (STATE.layout.arrange === 'horizontal') {
+            STATE.cards.frente.yMm = 0;
+            STATE.cards.dorso.yMm = 0;
+        } else {
+            STATE.cards.frente.yMm = FACTORY_DEFAULTS.cards.frente.yMm;
+            STATE.cards.dorso.yMm = FACTORY_DEFAULTS.cards.dorso.yMm;
+        }
+    } else {
+        const id = STATE.selectedCardId || STATE.activeCardId || 'frente';
+        STATE.cards[id].xMm = 0;
+        STATE.cards[id].yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[id].yMm);
+    }
+    syncControlsFromActiveCard();
+    saveHistoryState('Centrar Ambos Ejes (X/Y)');
+    scheduleRender();
+    showToast('🎯 Centrado en ambos ejes (X e Y)', 'success');
+}
+
+function centerCard(cardId) {
+    centerCardsBoth();
+}
+
+function toggleSelectBoth() {
+    if (STATE.selectedCardId === 'both' || STATE.activeCardId === 'both') {
+        STATE.selectedCardId = 'frente';
+        setActiveTab('frente');
+        showToast('Editando cara Frente individualmente', 'info');
+    } else {
+        STATE.selectedCardId = 'both';
+        setActiveTab('both');
+        showToast('👥 Ambos carnets seleccionados (Frente + Dorso)', 'info');
+    }
 }
 
 function setupCardControls() {
     // Escala
     const onScaleChange = (val) => {
-        STATE.cards[STATE.activeCardId].scale = val;
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].scale = val;
-        }
+        applyToActiveCards((c) => { c.scale = val; });
         syncControlsFromActiveCard();
         scheduleRender();
     };
@@ -1222,56 +1419,30 @@ function setupCardControls() {
 
     // Posición X
     const onXChange = (val) => {
-        STATE.cards[STATE.activeCardId].xMm = val;
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].xMm = val;
-        }
+        applyToActiveCards((c) => { c.xMm = val; });
         scheduleRender();
     };
     DOM.cardXRange.addEventListener('input', (e) => onXChange(parseFloat(e.target.value)));
     DOM.cardXNum.addEventListener('input', (e) => onXChange(parseFloat(e.target.value) || 0));
 
     // Posición Y
-    DOM.cardYRange.addEventListener('input', (e) => {
-        STATE.cards[STATE.activeCardId].yMm = parseFloat(e.target.value);
+    const onYChange = (val) => {
+        applyToActiveCards((c) => { c.yMm = val; });
         scheduleRender();
-    });
-    DOM.cardYNum.addEventListener('input', (e) => {
-        STATE.cards[STATE.activeCardId].yMm = parseFloat(e.target.value) || 0;
-        scheduleRender();
-    });
+    };
+    DOM.cardYRange.addEventListener('input', (e) => onYChange(parseFloat(e.target.value)));
+    DOM.cardYNum.addEventListener('input', (e) => onYChange(parseFloat(e.target.value) || 0));
 
     // Alineaciones
     if (DOM.btnAlignCenterBoth) {
-        DOM.btnAlignCenterBoth.addEventListener('click', () => {
-            centerCard(STATE.activeCardId);
-        });
+        DOM.btnAlignCenterBoth.addEventListener('click', centerCardsBoth);
     }
-
-    DOM.btnAlignCenterX.addEventListener('click', () => {
-        STATE.cards[STATE.activeCardId].xMm = 0;
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].xMm = 0;
-        }
-        syncControlsFromActiveCard();
-        saveHistoryState('Centrar Horizontalmente');
-        scheduleRender();
-    });
-
-    DOM.btnAlignCenterY.addEventListener('click', () => {
-        const id = STATE.activeCardId;
-        const targetY = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[id].yMm);
-        STATE.cards[id].yMm = targetY;
-        if (STATE.syncCards) {
-            const otherId = id === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[otherId].yMm);
-        }
-        syncControlsFromActiveCard();
-        saveHistoryState('Centrar Verticalmente');
-        scheduleRender();
-    });
+    if (DOM.btnAlignCenterX) {
+        DOM.btnAlignCenterX.addEventListener('click', centerCardsHorizontal);
+    }
+    if (DOM.btnAlignCenterY) {
+        DOM.btnAlignCenterY.addEventListener('click', centerCardsVertical);
+    }
 
     // Rotación y Volteo
     if (DOM.btnRotateActive90) {
@@ -1290,11 +1461,7 @@ function setupCardControls() {
     // Esquinas Redondeadas con Input Numérico y Reset
     DOM.cardRadiusRange.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
-        STATE.cards[STATE.activeCardId].borderRadiusMm = val;
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].borderRadiusMm = val;
-        }
+        applyToActiveCards((c) => { c.borderRadiusMm = val; });
         if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = val;
         scheduleRender();
     });
@@ -1302,11 +1469,7 @@ function setupCardControls() {
     if (DOM.cardRadiusNum) {
         DOM.cardRadiusNum.addEventListener('input', (e) => {
             const val = Math.min(15, Math.max(0, parseFloat(e.target.value) || 0));
-            STATE.cards[STATE.activeCardId].borderRadiusMm = val;
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].borderRadiusMm = val;
-            }
+            applyToActiveCards((c) => { c.borderRadiusMm = val; });
             DOM.cardRadiusRange.value = val;
             scheduleRender();
         });
@@ -1314,12 +1477,9 @@ function setupCardControls() {
 
     if (DOM.btnResetRadius) {
         DOM.btnResetRadius.addEventListener('click', () => {
-            const val = FACTORY_DEFAULTS.cards[STATE.activeCardId].borderRadiusMm;
-            STATE.cards[STATE.activeCardId].borderRadiusMm = val;
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].borderRadiusMm = val;
-            }
+            applyToActiveCards((c, id) => {
+                c.borderRadiusMm = FACTORY_DEFAULTS.cards[id].borderRadiusMm;
+            });
             syncControlsFromActiveCard();
             scheduleRender();
         });
@@ -1329,16 +1489,10 @@ function setupCardControls() {
     DOM.filterPresetBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const filterMode = btn.dataset.filter;
-            const card = STATE.cards[STATE.activeCardId];
-            card.filter = filterMode;
-            card.dirty = true;
-
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].filter = filterMode;
-                STATE.cards[otherId].dirty = true;
-            }
-
+            applyToActiveCards((c) => {
+                c.filter = filterMode;
+                c.dirty = true;
+            });
             syncControlsFromActiveCard();
             saveHistoryState(`Filtro ${filterMode}`);
             scheduleRender();
@@ -1348,13 +1502,10 @@ function setupCardControls() {
     // Brillo con Input Numérico y Reset
     DOM.cardBrightnessRange.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
-        STATE.cards[STATE.activeCardId].brightness = val;
-        STATE.cards[STATE.activeCardId].dirty = true;
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].brightness = val;
-            STATE.cards[otherId].dirty = true;
-        }
+        applyToActiveCards((c) => {
+            c.brightness = val;
+            c.dirty = true;
+        });
         if (DOM.cardBrightnessNum) DOM.cardBrightnessNum.value = val;
         scheduleRender();
     });
@@ -1362,13 +1513,10 @@ function setupCardControls() {
     if (DOM.cardBrightnessNum) {
         DOM.cardBrightnessNum.addEventListener('input', (e) => {
             const val = Math.min(50, Math.max(-50, parseInt(e.target.value, 10) || 0));
-            STATE.cards[STATE.activeCardId].brightness = val;
-            STATE.cards[STATE.activeCardId].dirty = true;
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].brightness = val;
-                STATE.cards[otherId].dirty = true;
-            }
+            applyToActiveCards((c) => {
+                c.brightness = val;
+                c.dirty = true;
+            });
             DOM.cardBrightnessRange.value = val;
             scheduleRender();
         });
@@ -1376,13 +1524,10 @@ function setupCardControls() {
 
     if (DOM.btnResetBrightness) {
         DOM.btnResetBrightness.addEventListener('click', () => {
-            STATE.cards[STATE.activeCardId].brightness = 0;
-            STATE.cards[STATE.activeCardId].dirty = true;
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].brightness = 0;
-                STATE.cards[otherId].dirty = true;
-            }
+            applyToActiveCards((c) => {
+                c.brightness = 0;
+                c.dirty = true;
+            });
             syncControlsFromActiveCard();
             scheduleRender();
         });
@@ -1391,13 +1536,10 @@ function setupCardControls() {
     // Contraste con Input Numérico y Reset
     DOM.cardContrastRange.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
-        STATE.cards[STATE.activeCardId].contrast = val;
-        STATE.cards[STATE.activeCardId].dirty = true;
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            STATE.cards[otherId].contrast = val;
-            STATE.cards[otherId].dirty = true;
-        }
+        applyToActiveCards((c) => {
+            c.contrast = val;
+            c.dirty = true;
+        });
         if (DOM.cardContrastNum) DOM.cardContrastNum.value = val;
         scheduleRender();
     });
@@ -1405,13 +1547,10 @@ function setupCardControls() {
     if (DOM.cardContrastNum) {
         DOM.cardContrastNum.addEventListener('input', (e) => {
             const val = Math.min(50, Math.max(-50, parseInt(e.target.value, 10) || 0));
-            STATE.cards[STATE.activeCardId].contrast = val;
-            STATE.cards[STATE.activeCardId].dirty = true;
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].contrast = val;
-                STATE.cards[otherId].dirty = true;
-            }
+            applyToActiveCards((c) => {
+                c.contrast = val;
+                c.dirty = true;
+            });
             DOM.cardContrastRange.value = val;
             scheduleRender();
         });
@@ -1419,13 +1558,10 @@ function setupCardControls() {
 
     if (DOM.btnResetContrast) {
         DOM.btnResetContrast.addEventListener('click', () => {
-            STATE.cards[STATE.activeCardId].contrast = 0;
-            STATE.cards[STATE.activeCardId].dirty = true;
-            if (STATE.syncCards) {
-                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].contrast = 0;
-                STATE.cards[otherId].dirty = true;
-            }
+            applyToActiveCards((c) => {
+                c.contrast = 0;
+                c.dirty = true;
+            });
             syncControlsFromActiveCard();
             scheduleRender();
         });
@@ -1433,8 +1569,9 @@ function setupCardControls() {
 }
 
 function copyActiveCardSettingsToOther() {
-    const current = STATE.cards[STATE.activeCardId];
-    const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+    const srcId = (STATE.activeCardId === 'dorso') ? 'dorso' : 'frente';
+    const otherId = srcId === 'frente' ? 'dorso' : 'frente';
+    const current = STATE.cards[srcId];
     const other = STATE.cards[otherId];
 
     other.scale = current.scale;
@@ -1443,6 +1580,9 @@ function copyActiveCardSettingsToOther() {
     other.filter = current.filter;
     other.brightness = current.brightness;
     other.contrast = current.contrast;
+    other.rotation = current.rotation;
+    other.flipH = current.flipH;
+    other.flipV = current.flipV;
     other.dirty = true;
 
     saveHistoryState(`Copiar ajustes a ${other.name}`);
@@ -1451,19 +1591,12 @@ function copyActiveCardSettingsToOther() {
 }
 
 function applyCr80Preset() {
-    const card = STATE.cards[STATE.activeCardId];
-    card.widthMm = 85.6;
-    card.heightMm = 53.98;
-    card.scale = 100;
-    card.borderRadiusMm = 3.18;
-
-    if (STATE.syncCards) {
-        const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-        STATE.cards[otherId].widthMm = 85.6;
-        STATE.cards[otherId].heightMm = 53.98;
-        STATE.cards[otherId].scale = 100;
-        STATE.cards[otherId].borderRadiusMm = 3.18;
-    }
+    applyToActiveCards((card) => {
+        card.widthMm = 85.6;
+        card.heightMm = 53.98;
+        card.scale = 100;
+        card.borderRadiusMm = 3.18;
+    });
 
     syncControlsFromActiveCard();
     saveHistoryState('Aplicar Estándar CR80');
@@ -1689,8 +1822,8 @@ function renderLoop() {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // Fondo blanco puro de la hoja
-    ctx.fillStyle = '#ffffff';
+    // Fondo de la hoja (Blanco o Modo Papel Oscuro según preferencia)
+    ctx.fillStyle = STATE.darkPaper ? '#1e293b' : '#ffffff';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     const mmToPx = canvasWidth / STATE.paper.widthMm;
@@ -1704,7 +1837,11 @@ function renderLoop() {
         drawSnapLines(ctx, canvasWidth, canvasHeight, mmToPx);
     }
 
-    if (STATE.selectedCardId) {
+    if (STATE.selectedCardId === 'both' || STATE.activeCardId === 'both') {
+        for (const inst of cardInstances) {
+            drawSelectionBox(ctx, inst);
+        }
+    } else if (STATE.selectedCardId) {
         const selectedInst = cardInstances.find(i => i.card.id === STATE.selectedCardId);
         if (selectedInst) {
             drawSelectionBox(ctx, selectedInst);
@@ -1954,16 +2091,33 @@ function setupCanvasPointerEvents() {
         const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
 
         if (STATE.selectedCardId) {
-            const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
-            if (selectedInst) {
-                const handle = hitTestHandles(coords.x, coords.y, selectedInst);
-                if (handle) {
-                    INTERACTION.isResizing = true;
-                    INTERACTION.resizeHandle = handle;
-                    INTERACTION.dragStart = { x: coords.x, y: coords.y };
-                    INTERACTION.cardInitialScale = selectedInst.card.scale;
-                    canvas.setPointerCapture(e.pointerId);
-                    return;
+            if (STATE.selectedCardId === 'both') {
+                for (const inst of instances) {
+                    const handle = hitTestHandles(coords.x, coords.y, inst);
+                    if (handle) {
+                        INTERACTION.isResizing = true;
+                        INTERACTION.resizeHandle = handle;
+                        INTERACTION.dragStart = { x: coords.x, y: coords.y };
+                        INTERACTION.cardInitialScale = {
+                            frente: STATE.cards.frente.scale,
+                            dorso: STATE.cards.dorso.scale
+                        };
+                        canvas.setPointerCapture(e.pointerId);
+                        return;
+                    }
+                }
+            } else {
+                const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
+                if (selectedInst) {
+                    const handle = hitTestHandles(coords.x, coords.y, selectedInst);
+                    if (handle) {
+                        INTERACTION.isResizing = true;
+                        INTERACTION.resizeHandle = handle;
+                        INTERACTION.dragStart = { x: coords.x, y: coords.y };
+                        INTERACTION.cardInitialScale = selectedInst.card.scale;
+                        canvas.setPointerCapture(e.pointerId);
+                        return;
+                    }
                 }
             }
         }
@@ -1979,6 +2133,18 @@ function setupCanvasPointerEvents() {
         }
 
         if (clickedInst) {
+            if (STATE.selectedCardId === 'both') {
+                INTERACTION.isDragging = true;
+                INTERACTION.dragStart = { x: coords.x, y: coords.y };
+                INTERACTION.cardInitialPos = {
+                    frente: { x: STATE.cards.frente.xMm, y: STATE.cards.frente.yMm },
+                    dorso: { x: STATE.cards.dorso.xMm, y: STATE.cards.dorso.yMm }
+                };
+                canvas.setPointerCapture(e.pointerId);
+                scheduleRender();
+                return;
+            }
+
             STATE.selectedCardId = clickedInst.card.id;
             setActiveTab(clickedInst.card.id);
             INTERACTION.isDragging = true;
@@ -2003,9 +2169,7 @@ function setupCanvasPointerEvents() {
         if (INTERACTION.isResizing) {
             const deltaX = (coords.x - INTERACTION.dragStart.x) / mmToPx;
             const deltaY = (coords.y - INTERACTION.dragStart.y) / mmToPx;
-            const card = STATE.cards[STATE.selectedCardId];
 
-            // Escalado intuitivo según la esquina arrastrada
             let effectiveDelta = 0;
             switch (INTERACTION.resizeHandle) {
                 case 'br':
@@ -2024,12 +2188,22 @@ function setupCanvasPointerEvents() {
                     effectiveDelta = deltaX;
             }
 
-            const scaleChange = (effectiveDelta / (card.widthMm / 100));
-
-            card.scale = Math.min(180, Math.max(30, Math.round(INTERACTION.cardInitialScale + scaleChange)));
-            if (STATE.syncCards) {
-                const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].scale = card.scale;
+            if (STATE.selectedCardId === 'both') {
+                const initF = (typeof INTERACTION.cardInitialScale === 'object') ? INTERACTION.cardInitialScale.frente : INTERACTION.cardInitialScale;
+                const initD = (typeof INTERACTION.cardInitialScale === 'object') ? INTERACTION.cardInitialScale.dorso : INTERACTION.cardInitialScale;
+                const scaleDeltaF = (effectiveDelta / (STATE.cards.frente.widthMm / 100));
+                const scaleDeltaD = (effectiveDelta / (STATE.cards.dorso.widthMm / 100));
+                STATE.cards.frente.scale = Math.min(180, Math.max(30, Math.round(initF + scaleDeltaF)));
+                STATE.cards.dorso.scale = Math.min(180, Math.max(30, Math.round(initD + scaleDeltaD)));
+            } else {
+                const card = STATE.cards[STATE.selectedCardId];
+                const initScale = (typeof INTERACTION.cardInitialScale === 'number') ? INTERACTION.cardInitialScale : (INTERACTION.cardInitialScale[STATE.selectedCardId] || card.scale);
+                const scaleChange = (effectiveDelta / (card.widthMm / 100));
+                card.scale = Math.min(180, Math.max(30, Math.round(initScale + scaleChange)));
+                if (STATE.syncCards) {
+                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                    STATE.cards[otherId].scale = card.scale;
+                }
             }
             syncControlsFromActiveCard();
             scheduleRender();
@@ -2039,33 +2213,46 @@ function setupCanvasPointerEvents() {
         if (INTERACTION.isDragging) {
             const deltaX = (coords.x - INTERACTION.dragStart.x) / mmToPx;
             const deltaY = (coords.y - INTERACTION.dragStart.y) / mmToPx;
-            const card = STATE.cards[STATE.selectedCardId];
 
-            let newX = Math.round(INTERACTION.cardInitialPos.x + deltaX);
-            let newY = Math.round(INTERACTION.cardInitialPos.y + deltaY);
+            if (STATE.selectedCardId === 'both') {
+                const initF = (INTERACTION.cardInitialPos && INTERACTION.cardInitialPos.frente) || { x: STATE.cards.frente.xMm, y: STATE.cards.frente.yMm };
+                const initD = (INTERACTION.cardInitialPos && INTERACTION.cardInitialPos.dorso) || { x: STATE.cards.dorso.xMm, y: STATE.cards.dorso.yMm };
 
-            INTERACTION.activeSnapLines = [];
-            if (STATE.snapEnabled) {
-                if (Math.abs(newX) <= 2) {
-                    newX = 0;
-                    INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: STATE.paper.widthMm / 2 });
-                }
+                STATE.cards.frente.xMm = Math.min(100, Math.max(-100, Math.round(initF.x + deltaX)));
+                STATE.cards.frente.yMm = Math.min(100, Math.max(-100, Math.round(initF.y + deltaY)));
+                STATE.cards.dorso.xMm = Math.min(100, Math.max(-100, Math.round(initD.x + deltaX)));
+                STATE.cards.dorso.yMm = Math.min(100, Math.max(-100, Math.round(initD.y + deltaY)));
+            } else {
+                const card = STATE.cards[STATE.selectedCardId];
+                const initX = (INTERACTION.cardInitialPos && INTERACTION.cardInitialPos.x !== undefined) ? INTERACTION.cardInitialPos.x : card.xMm;
+                const initY = (INTERACTION.cardInitialPos && INTERACTION.cardInitialPos.y !== undefined) ? INTERACTION.cardInitialPos.y : card.yMm;
 
-                const otherCard = STATE.activeCardId === 'frente' ? STATE.cards.dorso : STATE.cards.frente;
-                if (otherCard && otherCard.rawImage) {
-                    if (Math.abs(newX - otherCard.xMm) <= 2) {
-                        newX = otherCard.xMm;
-                        INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: (STATE.paper.widthMm / 2) + newX });
+                let newX = Math.round(initX + deltaX);
+                let newY = Math.round(initY + deltaY);
+
+                INTERACTION.activeSnapLines = [];
+                if (STATE.snapEnabled) {
+                    if (Math.abs(newX) <= 2) {
+                        newX = 0;
+                        INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: STATE.paper.widthMm / 2 });
+                    }
+
+                    const otherCard = STATE.selectedCardId === 'frente' ? STATE.cards.dorso : STATE.cards.frente;
+                    if (otherCard && otherCard.rawImage) {
+                        if (Math.abs(newX - otherCard.xMm) <= 2) {
+                            newX = otherCard.xMm;
+                            INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: (STATE.paper.widthMm / 2) + newX });
+                        }
                     }
                 }
-            }
 
-            card.xMm = Math.min(100, Math.max(-100, newX));
-            card.yMm = Math.min(100, Math.max(-100, newY));
+                card.xMm = Math.min(100, Math.max(-100, newX));
+                card.yMm = Math.min(100, Math.max(-100, newY));
 
-            if (STATE.syncCards) {
-                const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].xMm = card.xMm;
+                if (STATE.syncCards) {
+                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                    STATE.cards[otherId].xMm = card.xMm;
+                }
             }
 
             syncControlsFromActiveCard();
@@ -2073,7 +2260,15 @@ function setupCanvasPointerEvents() {
             return;
         }
 
-        if (STATE.selectedCardId) {
+        if (STATE.selectedCardId === 'both') {
+            for (const inst of instances) {
+                const handle = hitTestHandles(coords.x, coords.y, inst);
+                if (handle) {
+                    canvas.style.cursor = (handle === 'tl' || handle === 'br') ? 'nwse-resize' : 'nesw-resize';
+                    return;
+                }
+            }
+        } else if (STATE.selectedCardId) {
             const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
             if (selectedInst) {
                 const handle = hitTestHandles(coords.x, coords.y, selectedInst);
@@ -2090,14 +2285,17 @@ function setupCanvasPointerEvents() {
 
     // Soporte nativo de pellizco multitáctil (Pinch-to-Resize) para agrandar en celulares
     let pinchStartDist = 0;
-    let pinchInitialScale = 70;
+    let pinchInitialScale = { frente: 70, dorso: 70 };
 
     canvas.addEventListener('touchstart', (e) => {
         if (e.touches.length === 2 && STATE.selectedCardId) {
             const t1 = e.touches[0];
             const t2 = e.touches[1];
             pinchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            pinchInitialScale = STATE.cards[STATE.selectedCardId].scale;
+            pinchInitialScale = {
+                frente: STATE.cards.frente.scale,
+                dorso: STATE.cards.dorso.scale
+            };
         }
     }, { passive: true });
 
@@ -2107,13 +2305,19 @@ function setupCanvasPointerEvents() {
             const t2 = e.touches[1];
             const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
             const factor = currentDist / pinchStartDist;
-            const newScale = Math.min(180, Math.max(30, Math.round(pinchInitialScale * factor)));
-            
-            const card = STATE.cards[STATE.selectedCardId];
-            card.scale = newScale;
-            if (STATE.syncCards) {
-                const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
-                STATE.cards[otherId].scale = newScale;
+
+            if (STATE.selectedCardId === 'both') {
+                STATE.cards.frente.scale = Math.min(180, Math.max(30, Math.round(pinchInitialScale.frente * factor)));
+                STATE.cards.dorso.scale = Math.min(180, Math.max(30, Math.round(pinchInitialScale.dorso * factor)));
+            } else {
+                const card = STATE.cards[STATE.selectedCardId];
+                const initScale = pinchInitialScale[STATE.selectedCardId] || card.scale;
+                const newScale = Math.min(180, Math.max(30, Math.round(initScale * factor)));
+                card.scale = newScale;
+                if (STATE.syncCards) {
+                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                    STATE.cards[otherId].scale = newScale;
+                }
             }
             syncControlsFromActiveCard();
             scheduleRender();
