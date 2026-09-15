@@ -244,6 +244,24 @@ window.addEventListener('resize', () => {
     scheduleRender();
 });
 
+// Prevención radical de zoom de doble toque y gestos accidentales en móviles
+let lastTouchEndTime = 0;
+document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEndTime <= 300) {
+        e.preventDefault();
+        if (e.target) {
+            const clickable = e.target.closest('button, a, label, select');
+            if (clickable) clickable.click();
+        }
+    }
+    lastTouchEndTime = now;
+}, { passive: false });
+
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+document.addEventListener('gestureend', (e) => e.preventDefault());
+
 // =============================================================================
 // 4. RESPONSIVE Y VISTA MÓVIL (Edge-to-Edge)
 // =============================================================================
@@ -1173,10 +1191,10 @@ function resizeCanvasViewport() {
     const container = DOM.viewportContainer;
     const isMobile = window.innerWidth < 640;
     
-    // En móviles, maximizar el espacio útil sin márgenes muertos
-    const paddingX = isMobile ? 8 : 24;
-    const paddingY = isMobile ? 8 : 24;
-    const availWidth = container.clientWidth - paddingX;
+    // En móviles, maximizar el espacio útil sin márgenes muertos ni scroll horizontal
+    const paddingX = isMobile ? 4 : 24;
+    const paddingY = isMobile ? 4 : 24;
+    const availWidth = Math.max(80, Math.min(container.clientWidth - paddingX, window.innerWidth - (isMobile ? 8 : 32)));
     const availHeight = container.clientHeight - paddingY;
 
     const sheetAspect = STATE.paper.heightMm / STATE.paper.widthMm;
@@ -1184,17 +1202,26 @@ function resizeCanvasViewport() {
     let displayWidth = isMobile ? availWidth : Math.min(availWidth, 420);
     let displayHeight = displayWidth * sheetAspect;
 
-    if (displayHeight > availHeight && availHeight > 250) {
+    if (displayHeight > availHeight && availHeight > 200) {
         displayHeight = availHeight;
         displayWidth = displayHeight / sheetAspect;
     }
 
-    const dpr = window.devicePixelRatio || 1;
-    DOM.previewCanvas.width = displayWidth * STATE.zoom * dpr;
-    DOM.previewCanvas.height = displayHeight * STATE.zoom * dpr;
+    // Estricto límite en móviles para que jamás genere overflow horizontal
+    if (isMobile) {
+        const maxAllowed = Math.min(container.clientWidth - 2, window.innerWidth - 6);
+        if (displayWidth > maxAllowed) {
+            displayWidth = maxAllowed;
+            displayHeight = displayWidth * sheetAspect;
+        }
+    }
 
-    DOM.previewCanvas.style.width = `${displayWidth * STATE.zoom}px`;
-    DOM.previewCanvas.style.height = `${displayHeight * STATE.zoom}px`;
+    const dpr = window.devicePixelRatio || 1;
+    DOM.previewCanvas.width = Math.round(displayWidth * STATE.zoom * dpr);
+    DOM.previewCanvas.height = Math.round(displayHeight * STATE.zoom * dpr);
+
+    DOM.previewCanvas.style.width = `${Math.round(displayWidth * STATE.zoom)}px`;
+    DOM.previewCanvas.style.height = `${Math.round(displayHeight * STATE.zoom)}px`;
 }
 
 function renderLoop() {

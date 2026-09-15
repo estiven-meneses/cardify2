@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full">
+<html lang="es" class="h-full overflow-x-hidden">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
     <title>Cardify 2.1 - Maquetador y Convertidor Profesional de Carnets</title>
     <meta name="description" content="Maqueta, ajusta y convierte carnets e identificaciones a PDF, JPG y PNG en alta definición (300 DPI). Optimizado para móviles, cámara nativa, recorte y filtros.">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -55,16 +55,41 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
     <style>
+        /* ========================================================= */
+        /* PREVENCIÓN DE RAÍZ: CERO SCROLL HORIZONTAL Y CERO AUTO-ZOOM */
+        /* ========================================================= */
+        html, body {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden !important;
+            position: relative;
+            touch-action: pan-y;
+            -webkit-text-size-adjust: 100%;
+            overscroll-behavior-x: none;
+        }
+
         * {
             box-sizing: border-box;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
+
+        /* 
+           CLAVE CRÍTICA: En iOS Safari y Chrome móvil, los inputs con font-size < 16px 
+           disparan un ZOOM AUTOMÁTICO que rompe el layout y causa el scroll horizontal.
+           Forzar font-size: 16px en móviles ELIMINA el problema de raíz.
+        */
+        @media screen and (max-width: 768px) {
+            input, select, textarea {
+                font-size: 16px !important;
+            }
+        }
+
         input, select, textarea {
             user-select: auto;
         }
 
-        /* Estilos de barras de desplazamiento */
+        /* Barras de desplazamiento sutiles */
         ::-webkit-scrollbar {
             width: 4px;
             height: 4px;
@@ -80,14 +105,16 @@
             background: #475569;
         }
 
-        /* Sliders táctiles modernos */
+        /* Sliders táctiles grandes para dedos */
         input[type="range"] {
             -webkit-appearance: none;
             appearance: none;
-            background: #e2e8f0;
+            background: #cbd5e1;
             border-radius: 9999px;
             outline: none;
+            height: 8px;
             transition: all 0.2s ease;
+            touch-action: none;
         }
         .dark input[type="range"] {
             background: #334155;
@@ -95,26 +122,26 @@
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 18px;
-            height: 18px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             background: #2563eb;
             cursor: grab;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: 2.5px solid #ffffff;
             transition: transform 0.15s ease, background-color 0.15s ease;
-            border: 2px solid #ffffff;
         }
         .dark input[type="range"]::-webkit-slider-thumb {
-            border: 2px solid #1e293b;
+            border: 2.5px solid #1e293b;
             background: #3b82f6;
         }
         input[type="range"]:active::-webkit-slider-thumb {
             cursor: grabbing;
-            transform: scale(1.25);
+            transform: scale(1.2);
             background: #1d4ed8;
         }
 
-        /* Dropzones compactas */
+        /* Dropzones táctiles */
         .dropzone {
             border: 2px dashed #cbd5e1;
             transition: all 0.2s ease;
@@ -140,14 +167,18 @@
         .sheet-container {
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 14px 14px;
+            overflow: hidden !important;
+            touch-action: none !important;
         }
         .dark .sheet-container {
             background-image: radial-gradient(#334155 1px, transparent 1px);
         }
 
         #preview-canvas {
-            box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06);
             transition: box-shadow 0.2s ease;
+            touch-action: none !important;
+            -webkit-user-drag: none;
         }
         .dark #preview-canvas {
             box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12);
@@ -176,15 +207,15 @@
         }
     </style>
 </head>
-<body class="h-full bg-slate-100 text-slate-800 dark:bg-dark-bg dark:text-slate-100 flex flex-col transition-colors duration-200 antialiased font-sans">
+<body class="h-full bg-slate-100 text-slate-800 dark:bg-dark-bg dark:text-slate-100 flex flex-col transition-colors duration-200 antialiased font-sans overflow-x-hidden">
 
-    <!-- Top Navigation Header (Ultra Compacto para Móviles) -->
-    <header class="bg-white/90 dark:bg-dark-surface/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-2 sm:px-4 py-2">
+    <!-- Top Navigation Header -->
+    <header class="bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-2 sm:px-4 py-2 w-full max-w-full">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
             
             <!-- Logo y Marca -->
             <div class="flex items-center gap-2">
-                <div class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 shadow-md shadow-blue-500/20 text-white font-bold">
+                <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 shadow-md shadow-blue-500/20 text-white font-bold">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="4" width="18" height="16" rx="3"></rect>
                         <line x1="7" y1="8" x2="13" y2="8"></line>
@@ -197,32 +228,32 @@
                         <h1 class="text-base sm:text-lg font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
                             Cardify
                         </h1>
-                        <span class="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        <span class="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
                             2.1
                         </span>
                     </div>
                 </div>
             </div>
 
-            <!-- Selector de Vista en Móvil (Pestañas Hoja vs Controles) -->
-            <div class="flex lg:hidden bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-lg text-xs font-semibold">
-                <button id="mobile-tab-canvas" class="py-1 px-2.5 rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <!-- Selector de Vista en Móvil (Botones Grandes de 40px) -->
+            <div class="flex lg:hidden bg-slate-200/90 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold shadow-inner">
+                <button id="mobile-tab-canvas" class="py-2 px-3.5 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     <span>Hoja</span>
                 </button>
-                <button id="mobile-tab-controls" class="py-1 px-2.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                <button id="mobile-tab-controls" class="py-2 px-3.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
                     <span>Ajustes</span>
                 </button>
             </div>
 
             <!-- Acciones Rápidas del Header -->
-            <div class="flex items-center gap-1 sm:gap-1.5">
+            <div class="flex items-center gap-1 sm:gap-2">
                 
                 <!-- Botón Guardar Predeterminado ⭐ -->
                 <button id="btn-save-defaults" title="Guardar la configuración actual como predeterminada"
-                        class="px-2 sm:px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 transition-colors flex items-center gap-1 shadow-sm">
-                    <svg class="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" viewBox="0 0 24 24">
+                        class="h-9 px-2.5 sm:px-3 text-xs font-bold rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 transition-colors flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-4 h-4 text-emerald-500 fill-emerald-500" viewBox="0 0 24 24">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                     </svg>
                     <span class="hidden sm:inline">Guardar Favorito</span>
@@ -230,8 +261,8 @@
 
                 <!-- Botón Cargar Demo -->
                 <button id="btn-load-demo" title="Carga carnets de prueba con 1 clic"
-                        class="px-2 sm:px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 transition-colors flex items-center gap-1 shadow-sm">
-                    <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="h-9 px-2.5 sm:px-3 text-xs font-bold rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 transition-colors flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
                     <span class="hidden sm:inline">Ejemplo</span>
@@ -239,7 +270,7 @@
 
                 <!-- Toggle Tema Oscuro -->
                 <button id="btn-theme-toggle" title="Cambiar tema"
-                        class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                        class="w-9 h-9 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">
                     <svg id="theme-icon-dark" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                     </svg>
@@ -248,9 +279,9 @@
                     </svg>
                 </button>
 
-                <!-- Menú Desplegable / Reset -->
+                <!-- Menú Reset -->
                 <button id="btn-reset-all" title="Restablecer ajustes"
-                        class="p-1.5 text-slate-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors">
+                        class="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
@@ -259,8 +290,8 @@
         </div>
     </header>
 
-    <!-- Main Workspace Container (Optimizado para Pantalla Completa en Móviles) -->
-    <main class="flex-1 w-full max-w-7xl mx-auto p-1 sm:p-2.5 md:p-3 grid lg:grid-cols-12 gap-2 sm:gap-3 items-start">
+    <!-- Main Workspace Container (Sin márgenes laterales en móvil) -->
+    <main class="flex-1 w-full max-w-7xl mx-auto px-1 sm:px-3 py-2 grid lg:grid-cols-12 gap-2 sm:gap-3 items-start overflow-x-hidden">
 
         <!-- ========================================== -->
         <!-- COLUMNA IZQUIERDA: CONTROLES Y HERRAMIENTAS -->
@@ -268,108 +299,110 @@
         <div id="panel-controls" class="lg:col-span-5 flex flex-col gap-2.5 w-full">
 
             <!-- 1. ZONA DE CARGA DE IMÁGENES -->
-            <div class="bg-white dark:bg-dark-surface rounded-xl p-3 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="bg-white dark:bg-dark-surface rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
                 <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
                         Imágenes del Carnet
                     </h2>
-                    <span class="text-[10px] text-slate-400 hidden sm:inline">Pega con Ctrl+V</span>
+                    <span class="text-[11px] text-slate-400 hidden sm:inline">Pega con Ctrl+V</span>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 relative">
+                <div class="grid grid-cols-2 gap-2 sm:gap-3 relative">
                     
                     <!-- FRENTE CARD -->
-                    <div class="flex flex-col gap-1">
+                    <div class="flex flex-col gap-1.5">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Frente</span>
-                            <div class="flex items-center gap-0.5" id="frente-actions" style="display: none;">
-                                <button id="btn-crop-frente" title="Recortar Frente" class="p-1 text-slate-500 hover:text-blue-600 rounded">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 18h18M6 3v18M18 3v18"></path></svg>
+                            <div class="flex items-center gap-1" id="frente-actions" style="display: none;">
+                                <button id="btn-crop-frente" title="Recortar Frente" class="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 18h18M6 3v18M18 3v18"></path></svg>
                                 </button>
-                                <button id="btn-rotate-frente" title="Rotar 90°" class="p-1 text-slate-500 hover:text-blue-600 rounded">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9"></path></svg>
+                                <button id="btn-rotate-frente" title="Rotar 90°" class="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9"></path></svg>
                                 </button>
-                                <button id="btn-remove-frente" title="Eliminar" class="p-1 text-slate-500 hover:text-red-600 rounded">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                <button id="btn-remove-frente" title="Eliminar" class="p-1.5 text-slate-500 hover:text-red-600 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
                         </div>
 
-                        <div id="dropzone-frente" class="dropzone relative rounded-xl p-2 flex flex-col items-center justify-center min-h-[90px] sm:min-h-[105px] cursor-pointer bg-slate-50 dark:bg-slate-800/40">
+                        <!-- Área de Carga Táctil Grande -->
+                        <div id="dropzone-frente" class="dropzone relative rounded-2xl p-3 flex flex-col items-center justify-center min-h-[105px] sm:min-h-[120px] cursor-pointer bg-slate-50 dark:bg-slate-800/40">
                             <div id="frente-preview-wrap" class="hidden w-full h-full flex flex-col items-center justify-center">
-                                <img id="frente-img" class="max-h-16 sm:max-h-20 w-auto object-contain rounded shadow-sm border border-slate-200 dark:border-slate-700" alt="Frente">
-                                <span class="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">✓ Listo</span>
+                                <img id="frente-img" class="max-h-20 sm:max-h-24 w-auto object-contain rounded-lg shadow-sm border border-slate-200 dark:border-slate-700" alt="Frente">
+                                <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">✓ Frente Listo</span>
                             </div>
 
                             <div id="frente-placeholder" class="text-center py-1">
-                                <div class="w-7 h-7 mx-auto rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center mb-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="w-8 h-8 mx-auto rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center mb-1.5">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                                     </svg>
                                 </div>
-                                <p class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Subir frente</p>
+                                <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Subir frente</p>
+                                <p class="text-[10px] text-slate-400">Toca o arrastra</p>
                             </div>
 
-                            <!-- Input de galería estándar -->
                             <input type="file" id="frente-input" class="hidden" accept="image/*">
-                            <!-- Input directo de cámara móvil nativa -->
                             <input type="file" id="frente-camera-input" class="hidden" accept="image/*" capture="environment">
                         </div>
 
-                        <!-- Botones de Cámara (En Vivo + Nativa de Celular) -->
-                        <div class="grid grid-cols-2 gap-1">
-                            <button id="btn-camera-frente" title="Abrir visor en vivo" class="py-1 px-1 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1">
-                                <svg class="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <!-- Botones de Cámara con Altura Cómoda (44px) -->
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button id="btn-camera-frente" title="Abrir visor con encuadre" class="min-h-[42px] py-2 px-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 shadow-sm">
+                                <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 <span>Visor</span>
                             </button>
-                            <button id="btn-native-cam-frente" title="Tomar foto con la cámara nativa del teléfono" class="py-1 px-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                            <button id="btn-native-cam-frente" title="Tomar foto con la cámara nativa del teléfono" class="min-h-[42px] py-2 px-2 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-1.5 shadow-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
                                 <span>Cámara</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- BOTÓN SWAP CENTRAL FLOTANTE -->
+                    <!-- BOTÓN SWAP CENTRAL -->
                     <button id="btn-swap-cards" title="Intercambiar Frente y Dorso"
-                            class="absolute left-1/2 top-10 -translate-x-1/2 z-10 w-7 h-7 rounded-full bg-white dark:bg-dark-surface border border-slate-200 dark:border-slate-700 shadow-md hover:scale-110 active:scale-95 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="absolute left-1/2 top-12 -translate-x-1/2 z-10 w-8 h-8 rounded-full bg-white dark:bg-dark-surface border border-slate-200 dark:border-slate-700 shadow-md hover:scale-110 active:scale-95 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                         </svg>
                     </button>
 
                     <!-- DORSO CARD -->
-                    <div class="flex flex-col gap-1">
+                    <div class="flex flex-col gap-1.5">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Dorso</span>
-                            <div class="flex items-center gap-0.5" id="dorso-actions" style="display: none;">
-                                <button id="btn-crop-dorso" title="Recortar Dorso" class="p-1 text-slate-500 hover:text-blue-600 rounded">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 18h18M6 3v18M18 3v18"></path></svg>
+                            <div class="flex items-center gap-1" id="dorso-actions" style="display: none;">
+                                <button id="btn-crop-dorso" title="Recortar Dorso" class="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 18h18M6 3v18M18 3v18"></path></svg>
                                 </button>
-                                <button id="btn-rotate-dorso" title="Rotar 90°" class="p-1 text-slate-500 hover:text-blue-600 rounded">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9"></path></svg>
+                                <button id="btn-rotate-dorso" title="Rotar 90°" class="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9"></path></svg>
                                 </button>
-                                <button id="btn-remove-dorso" title="Eliminar" class="p-1 text-slate-500 hover:text-red-600 rounded">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                <button id="btn-remove-dorso" title="Eliminar" class="p-1.5 text-slate-500 hover:text-red-600 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
                         </div>
 
-                        <div id="dropzone-dorso" class="dropzone relative rounded-xl p-2 flex flex-col items-center justify-center min-h-[90px] sm:min-h-[105px] cursor-pointer bg-slate-50 dark:bg-slate-800/40">
+                        <!-- Área de Carga Dorso -->
+                        <div id="dropzone-dorso" class="dropzone relative rounded-2xl p-3 flex flex-col items-center justify-center min-h-[105px] sm:min-h-[120px] cursor-pointer bg-slate-50 dark:bg-slate-800/40">
                             <div id="dorso-preview-wrap" class="hidden w-full h-full flex flex-col items-center justify-center">
-                                <img id="dorso-img" class="max-h-16 sm:max-h-20 w-auto object-contain rounded shadow-sm border border-slate-200 dark:border-slate-700" alt="Dorso">
-                                <span class="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">✓ Listo</span>
+                                <img id="dorso-img" class="max-h-20 sm:max-h-24 w-auto object-contain rounded-lg shadow-sm border border-slate-200 dark:border-slate-700" alt="Dorso">
+                                <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">✓ Dorso Listo</span>
                             </div>
 
                             <div id="dorso-placeholder" class="text-center py-1">
-                                <div class="w-7 h-7 mx-auto rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-500 flex items-center justify-center mb-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="w-8 h-8 mx-auto rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-500 flex items-center justify-center mb-1.5">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                                     </svg>
                                 </div>
-                                <p class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Subir dorso</p>
+                                <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Subir dorso</p>
+                                <p class="text-[10px] text-slate-400">Toca o arrastra</p>
                             </div>
 
                             <input type="file" id="dorso-input" class="hidden" accept="image/*">
@@ -377,13 +410,13 @@
                         </div>
 
                         <!-- Botones de Cámara Dorso -->
-                        <div class="grid grid-cols-2 gap-1">
-                            <button id="btn-camera-dorso" title="Abrir visor en vivo" class="py-1 px-1 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1">
-                                <svg class="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button id="btn-camera-dorso" title="Abrir visor con encuadre" class="min-h-[42px] py-2 px-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 shadow-sm">
+                                <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 <span>Visor</span>
                             </button>
-                            <button id="btn-native-cam-dorso" title="Tomar foto con la cámara nativa del teléfono" class="py-1 px-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded border border-purple-200 dark:border-purple-800 flex items-center justify-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                            <button id="btn-native-cam-dorso" title="Tomar foto con la cámara nativa del teléfono" class="min-h-[42px] py-2 px-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50/70 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-xl border border-purple-200 dark:border-purple-800 flex items-center justify-center gap-1.5 shadow-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
                                 <span>Cámara</span>
                             </button>
                         </div>
@@ -393,19 +426,19 @@
             </div>
 
             <!-- 2. CONFIGURACIÓN DE PLANTILLA Y PAPEL -->
-            <div class="bg-white dark:bg-dark-surface rounded-xl p-3 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                <h2 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="bg-white dark:bg-dark-surface rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                     Plantilla y Hoja
                 </h2>
 
-                <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="grid grid-cols-2 gap-2.5 text-xs">
                     <!-- Modo de Caras -->
                     <div>
-                        <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Caras</label>
-                        <select id="layout-mode-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Caras a Imprimir</label>
+                        <select id="layout-mode-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
                             <option value="both" selected>Frente y Dorso</option>
                             <option value="front-only">Solo Frente</option>
                             <option value="back-only">Solo Dorso</option>
@@ -416,8 +449,8 @@
 
                     <!-- Disposición -->
                     <div>
-                        <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Disposición</label>
-                        <select id="layout-arrange-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Disposición</label>
+                        <select id="layout-arrange-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
                             <option value="vertical" selected>Vertical</option>
                             <option value="horizontal">Horizontal</option>
                         </select>
@@ -425,8 +458,8 @@
 
                     <!-- Tamaño de Papel -->
                     <div>
-                        <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Papel</label>
-                        <select id="paper-size-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Papel</label>
+                        <select id="paper-size-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
                             <option value="a4" selected>A4 (210 × 297 mm)</option>
                             <option value="letter">Carta (216 × 279 mm)</option>
                         </select>
@@ -434,141 +467,143 @@
 
                     <!-- Orientación de Hoja -->
                     <div>
-                        <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Orientación</label>
-                        <div class="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
-                            <button id="btn-orient-portrait" class="py-0.5 text-xs font-semibold rounded bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300">Vert.</button>
-                            <button id="btn-orient-landscape" class="py-0.5 text-xs font-semibold rounded text-slate-600 dark:text-slate-400">Horiz.</button>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Orientación</label>
+                        <div class="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                            <button id="btn-orient-portrait" class="py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300">Vert.</button>
+                            <button id="btn-orient-landscape" class="py-1 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400">Horiz.</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Opciones Limpias: Corte y Bordes (Desactivadas por defecto para evitar rayas entrecortadas) -->
-                <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
-                        <input type="checkbox" id="check-cut-lines" class="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                <!-- Opciones de Corte Limpias (Desactivadas por defecto) -->
+                <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        <input type="checkbox" id="check-cut-lines" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
                         <span>Líneas de corte ✂️</span>
                     </label>
 
-                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
-                        <input type="checkbox" id="check-card-border" class="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        <input type="checkbox" id="check-card-border" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
                         <span>Borde sutil</span>
                     </label>
                 </div>
             </div>
 
-            <!-- 3. PESTAÑAS DE AJUSTE POR CARNET + VINCULAR AJUSTES (Espejo) -->
-            <div class="bg-white dark:bg-dark-surface rounded-xl p-3 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <!-- 3. PESTAÑAS DE AJUSTE POR CARNET + VINCULAR AJUSTES -->
+            <div class="bg-white dark:bg-dark-surface rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
                 
-                <!-- Toggle Sincronizar / Vincular Frente y Dorso -->
-                <div class="flex items-center justify-between bg-blue-50 dark:bg-blue-950/40 p-2 rounded-lg border border-blue-200 dark:border-blue-800/60 mb-2.5">
-                    <div class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                <!-- Interruptor Grande Vincular Ajustes (Espejo) -->
+                <div class="flex items-center justify-between bg-blue-50/90 dark:bg-blue-950/50 p-3 rounded-xl border border-blue-200/80 dark:border-blue-800/60 mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        </div>
                         <div>
-                            <p class="text-xs font-bold text-blue-800 dark:text-blue-300">Vincular Ajustes (Espejo)</p>
-                            <p class="text-[10px] text-blue-600 dark:text-blue-400">Copiar tamaño y filtros automáticamente</p>
+                            <p class="text-xs font-bold text-blue-950 dark:text-blue-200">Vincular Ajustes (Espejo)</p>
+                            <p class="text-[11px] text-blue-700 dark:text-blue-400">Copiar tamaño y filtros automáticamente</p>
                         </div>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="check-sync-cards" checked class="sr-only peer">
-                        <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                 </div>
 
-                <div class="flex items-center justify-between mb-2.5">
-                    <div class="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg w-full max-w-[220px]">
-                        <button id="tab-btn-frente" class="flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full max-w-[240px]">
+                        <button id="tab-btn-frente" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all">
                             Frente
                         </button>
-                        <button id="tab-btn-dorso" class="flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all">
+                        <button id="tab-btn-dorso" class="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all">
                             Dorso
                         </button>
                     </div>
 
                     <!-- Preset CR80 -->
                     <button id="btn-apply-cr80" title="Ajustar a 85.6 × 54 mm"
-                            class="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                            class="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline px-1">
                         Estándar (CR80)
                     </button>
                 </div>
 
                 <!-- CONTROLES DINÁMICOS -->
-                <div class="space-y-2.5">
+                <div class="space-y-3">
                     
                     <!-- Escala / Tamaño -->
                     <div>
                         <div class="flex justify-between items-center text-xs mb-1">
-                            <label class="font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                            <label class="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                                 <span>Tamaño (%)</span>
-                                <span id="active-card-dimensions" class="text-[10px] text-slate-400 font-mono">(85.6 × 54.0 mm)</span>
+                                <span id="active-card-dimensions" class="text-[11px] text-slate-400 font-mono font-normal">(85.6 × 54.0 mm)</span>
                             </label>
-                            <input type="number" id="card-scale-num" min="30" max="180" value="70" class="w-12 text-center font-mono text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 py-0.5">
+                            <input type="number" id="card-scale-num" min="30" max="180" value="70" class="w-14 text-center font-mono text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 py-1">
                         </div>
-                        <input type="range" id="card-scale-range" min="30" max="180" value="70" class="w-full h-1.5">
+                        <input type="range" id="card-scale-range" min="30" max="180" value="70" class="w-full">
                     </div>
 
                     <!-- Posición X e Y -->
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-2 gap-2.5">
                         <div>
-                            <div class="flex justify-between items-center text-xs mb-0.5">
-                                <label class="text-[11px] font-medium text-slate-600 dark:text-slate-300">Pos. X (mm)</label>
-                                <input type="number" id="card-x-num" min="-100" max="100" value="0" class="w-10 text-center font-mono text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 py-0.5">
+                            <div class="flex justify-between items-center text-xs mb-1">
+                                <label class="text-[11px] font-bold text-slate-600 dark:text-slate-300">Pos. X (mm)</label>
+                                <input type="number" id="card-x-num" min="-100" max="100" value="0" class="w-12 text-center font-mono text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 py-1">
                             </div>
-                            <input type="range" id="card-x-range" min="-100" max="100" value="0" class="w-full h-1.5">
+                            <input type="range" id="card-x-range" min="-100" max="100" value="0" class="w-full">
                         </div>
 
                         <div>
-                            <div class="flex justify-between items-center text-xs mb-0.5">
-                                <label class="text-[11px] font-medium text-slate-600 dark:text-slate-300">Pos. Y (mm)</label>
-                                <input type="number" id="card-y-num" min="-100" max="100" value="45" class="w-10 text-center font-mono text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 py-0.5">
+                            <div class="flex justify-between items-center text-xs mb-1">
+                                <label class="text-[11px] font-bold text-slate-600 dark:text-slate-300">Pos. Y (mm)</label>
+                                <input type="number" id="card-y-num" min="-100" max="100" value="45" class="w-12 text-center font-mono text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 py-1">
                             </div>
-                            <input type="range" id="card-y-range" min="-100" max="100" value="45" class="w-full h-1.5">
+                            <input type="range" id="card-y-range" min="-100" max="100" value="45" class="w-full">
                         </div>
                     </div>
 
                     <!-- Botones de Alineación Rápida -->
-                    <div class="flex items-center gap-1 pt-0.5">
-                        <button id="btn-align-center-x" class="flex-1 py-1 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded transition-colors">
+                    <div class="flex items-center gap-1.5 pt-1">
+                        <button id="btn-align-center-x" class="min-h-[38px] flex-1 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors">
                             Centrar X
                         </button>
-                        <button id="btn-align-center-y" class="flex-1 py-1 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded transition-colors">
+                        <button id="btn-align-center-y" class="min-h-[38px] flex-1 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors">
                             Centrar Y
                         </button>
-                        <button id="btn-copy-to-other" class="flex-1 py-1 text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded border border-indigo-200 dark:border-indigo-800 transition-colors">
+                        <button id="btn-copy-to-other" class="min-h-[38px] flex-1 py-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-colors">
                             Copiar al Otro
                         </button>
                     </div>
 
                     <!-- Esquinas Redondeadas -->
                     <div>
-                        <div class="flex justify-between items-center text-xs mb-0.5">
-                            <label class="text-[11px] font-medium text-slate-600 dark:text-slate-300">Radio Esquinas</label>
-                            <span id="corner-radius-label" class="text-xs font-mono text-slate-500">3.5 mm</span>
+                        <div class="flex justify-between items-center text-xs mb-1">
+                            <label class="font-bold text-slate-700 dark:text-slate-300">Radio de Esquinas</label>
+                            <span id="corner-radius-label" class="text-xs font-mono font-bold text-slate-500">3.5 mm</span>
                         </div>
-                        <input type="range" id="card-radius-range" min="0" max="15" step="0.5" value="3.5" class="w-full h-1.5">
+                        <input type="range" id="card-radius-range" min="0" max="15" step="0.5" value="3.5" class="w-full">
                     </div>
 
                     <!-- Filtros de Imagen -->
-                    <div class="pt-1.5 border-t border-slate-100 dark:border-slate-800">
-                        <div class="grid grid-cols-3 gap-1 mb-1.5">
-                            <button data-filter="normal" class="filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <div class="grid grid-cols-3 gap-1.5 mb-2">
+                            <button data-filter="normal" class="filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                                 Original
                             </button>
-                            <button data-filter="scan" class="filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            <button data-filter="scan" class="filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                                 Escáner
                             </button>
-                            <button data-filter="bw" class="filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                                B&W
+                            <button data-filter="bw" class="filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                Fotocopia B&W
                             </button>
                         </div>
 
                         <div class="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                                <span class="text-[10px] text-slate-500">Brillo</span>
-                                <input type="range" id="card-brightness-range" min="-50" max="50" value="0" class="w-full h-1.5">
+                                <span class="text-[11px] font-medium text-slate-500">Brillo</span>
+                                <input type="range" id="card-brightness-range" min="-50" max="50" value="0" class="w-full mt-1">
                             </div>
                             <div>
-                                <span class="text-[10px] text-slate-500">Contraste</span>
-                                <input type="range" id="card-contrast-range" min="-50" max="50" value="0" class="w-full h-1.5">
+                                <span class="text-[11px] font-medium text-slate-500">Contraste</span>
+                                <input type="range" id="card-contrast-range" min="-50" max="50" value="0" class="w-full mt-1">
                             </div>
                         </div>
                     </div>
@@ -577,18 +612,18 @@
             </div>
 
             <!-- 4. OPCIONES DE EXPORTACIÓN Y BOTONES DE DESCARGA -->
-            <div class="bg-white dark:bg-dark-surface rounded-xl p-3 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                <h2 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="bg-white dark:bg-dark-surface rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
                     Exportación y Descarga
                 </h2>
 
-                <div class="grid grid-cols-2 gap-2 mb-2.5">
+                <div class="grid grid-cols-2 gap-2.5 mb-3">
                     <div>
-                        <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Formato</label>
-                        <select id="export-format-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold outline-none">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Formato</label>
+                        <select id="export-format-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold outline-none">
                             <option value="pdf" selected>PDF Listo para Imprimir</option>
                             <option value="png">PNG (Sin Pérdida)</option>
                             <option value="jpg">JPG (Imagen)</option>
@@ -597,8 +632,8 @@
                     </div>
 
                     <div>
-                        <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Calidad</label>
-                        <select id="export-dpi-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold outline-none">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Resolución</label>
+                        <select id="export-dpi-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold outline-none">
                             <option value="300" selected>300 DPI (Impresión)</option>
                             <option value="150">150 DPI (Rápido)</option>
                             <option value="450">450 DPI (Ultra HD)</option>
@@ -606,10 +641,10 @@
                     </div>
                 </div>
 
-                <!-- Botón Principal Descargar -->
+                <!-- Botón Principal Descargar (Grande y Destacado) -->
                 <button id="btn-generate-download"
-                        class="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-bold py-2.5 px-3 rounded-xl shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="min-h-[48px] w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold text-sm py-3 px-4 rounded-xl shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
                     <span id="btn-generate-text">Generar y Descargar</span>
@@ -618,16 +653,16 @@
                 <!-- Acciones Secundarias: Imprimir y Copiar -->
                 <div class="grid grid-cols-2 gap-2 mt-2">
                     <button id="btn-direct-print" title="Imprimir directamente sin descargar"
-                            class="py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1 transition-colors">
-                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="min-h-[42px] py-2 px-3 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 transition-colors">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                         </svg>
                         <span>Imprimir</span>
                     </button>
 
                     <button id="btn-copy-clipboard" title="Copiar hoja al portapapeles"
-                            class="py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1 transition-colors">
-                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="min-h-[42px] py-2 px-3 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 transition-colors">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
                         </svg>
                         <span>Copiar</span>
@@ -640,67 +675,67 @@
         <!-- ========================================== -->
         <!-- COLUMNA DERECHA: CANVAS Y MESA DE TRABAJO -->
         <!-- ========================================== -->
-        <div id="panel-canvas" class="lg:col-span-7 flex flex-col gap-2 w-full lg:sticky lg:top-14">
+        <div id="panel-canvas" class="lg:col-span-7 flex flex-col gap-2 w-full lg:sticky lg:top-14 overflow-hidden">
             
             <!-- Barra de Herramientas Flotante del Canvas -->
-            <div class="bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md rounded-xl p-1.5 px-2.5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs">
+            <div class="bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md rounded-xl p-1.5 px-3 shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs w-full">
                 
                 <!-- Historial Undo / Redo -->
                 <div class="flex items-center gap-1">
-                    <button id="btn-undo" title="Deshacer (Ctrl+Z)" disabled class="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40">
+                    <button id="btn-undo" title="Deshacer (Ctrl+Z)" disabled class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v2M3 10l6-6m-6 6l6 6"></path></svg>
                     </button>
-                    <button id="btn-redo" title="Rehacer (Ctrl+Y)" disabled class="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40">
+                    <button id="btn-redo" title="Rehacer (Ctrl+Y)" disabled class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a5 5 0 00-5 5v2m15-7l-6-6m6 6l-6 6"></path></svg>
                     </button>
 
-                    <div class="h-3.5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                    <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                    <span id="selected-card-indicator" class="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[130px] sm:max-w-none">
+                    <span id="selected-card-indicator" class="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[140px] sm:max-w-none">
                         Arrastra para mover
                     </span>
                 </div>
 
                 <!-- Zoom y Magnetismo -->
                 <div class="flex items-center gap-1">
-                    <button id="btn-toggle-snap" title="Alineación magnética" class="p-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                    <button id="btn-toggle-snap" title="Alineación magnética" class="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
                     </button>
 
-                    <button id="btn-zoom-out" title="Reducir zoom" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                    <button id="btn-zoom-out" title="Reducir zoom" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
                     </button>
-                    <span id="zoom-level-label" class="font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300 w-8 text-center">100%</span>
-                    <button id="btn-zoom-in" title="Aumentar zoom" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    <span id="zoom-level-label" class="font-mono text-xs font-bold text-slate-600 dark:text-slate-300 w-9 text-center">100%</span>
+                    <button id="btn-zoom-in" title="Aumentar zoom" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     </button>
-                    <button id="btn-zoom-fit" title="Ajustar a pantalla" class="px-1.5 py-0.5 text-[10px] font-medium rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    <button id="btn-zoom-fit" title="Ajustar a pantalla" class="h-8 px-2 text-xs font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
                         Ajustar
                     </button>
                 </div>
             </div>
 
-            <!-- Contenedor de la Hoja (Mesa de Trabajo - Edge to edge en móviles) -->
-            <div id="viewport-container" class="sheet-container relative bg-slate-200/70 dark:bg-slate-900/60 rounded-xl p-1 sm:p-3 flex items-center justify-center min-h-[460px] sm:min-h-[540px] max-h-[82vh] sm:max-h-[750px] overflow-auto border border-slate-200/80 dark:border-slate-800 w-full">
+            <!-- Contenedor de la Hoja (Mesa de Trabajo - Edge-to-Edge con cero overflow) -->
+            <div id="viewport-container" class="sheet-container relative bg-slate-200/80 dark:bg-slate-900/80 rounded-2xl p-0.5 sm:p-2 flex items-center justify-center min-h-[480px] sm:min-h-[560px] max-h-[85vh] sm:max-h-[760px] border border-slate-200/80 dark:border-slate-800 w-full overflow-hidden">
                 
                 <!-- Canvas de Renderizado 60 FPS -->
                 <canvas id="preview-canvas" class="bg-white rounded cursor-default origin-center"></canvas>
 
                 <!-- Estado Vacío Inicial -->
                 <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4 text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-white/90 dark:bg-dark-surface/90 shadow-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-blue-500 mb-2">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-16 h-16 rounded-2xl bg-white/90 dark:bg-dark-surface/90 shadow-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-blue-500 mb-2">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <rect x="3" y="4" width="18" height="16" rx="3" stroke-width="1.8"></rect>
-                            <line x1="7" y1="8" x2="13" y2="8" stroke-width="1.8"></line>
-                            <line x1="7" y1="12" x2="11" y2="12" stroke-width="1.8"></line>
-                            <circle cx="16" cy="12" r="2" stroke-width="1.8"></circle>
+                            <line x1="7" y1="8" x2="13" y2="8"></line>
+                            <line x1="7" y1="12" x2="11" y2="12"></line>
+                            <circle cx="16" cy="12" r="2"></circle>
                         </svg>
                     </div>
-                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-200 mb-1">Comienza subiendo tus carnets</h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xs mb-2.5">
+                    <h3 class="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-200 mb-1">Comienza subiendo tus carnets</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xs mb-3">
                         Toma una foto con tu celular o sube las imágenes.
                     </p>
-                    <button id="btn-empty-demo" class="pointer-events-auto px-3.5 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow hover:scale-105 active:scale-95 transition-all">
+                    <button id="btn-empty-demo" class="pointer-events-auto min-h-[44px] px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:scale-105 active:scale-95 transition-all">
                         ✨ Probar con Ejemplo
                     </button>
                 </div>
@@ -708,12 +743,12 @@
             </div>
 
             <!-- Footer Informativo -->
-            <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-1">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
                 <div class="flex items-center gap-1.5">
-                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Arrastra o toca para mover</span>
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Toca o arrastra para mover</span>
                 </div>
-                <span id="sheet-info-badge" class="font-mono text-[10px]">A4 • 210 × 297 mm</span>
+                <span id="sheet-info-badge" class="font-mono text-xs">A4 • 210 × 297 mm</span>
             </div>
 
         </div>
@@ -724,15 +759,15 @@
     <!-- MODALES Y ELEMENTOS FLOTANTES -->
     <!-- ========================================== -->
 
-    <!-- Modal de Recorte (Crop Modal) -->
-    <div id="crop-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
-        <div class="bg-white dark:bg-dark-surface rounded-2xl max-w-2xl w-full p-3 sm:p-4 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2.5">
+    <!-- Modal de Recorte -->
+    <div id="crop-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
+        <div class="bg-white dark:bg-dark-surface rounded-2xl max-w-2xl w-full p-3 sm:p-4 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-3">
             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                 <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                     <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 18h18M6 3v18M18 3v18"></path></svg>
                     <span>Recortar Carnet</span>
                 </h3>
-                <button id="btn-close-crop" class="p-1 text-slate-400 hover:text-slate-700">
+                <button id="btn-close-crop" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -742,21 +777,21 @@
             </div>
 
             <div class="flex items-center justify-between text-xs pt-1">
-                <div class="flex items-center gap-1.5">
-                    <button id="btn-crop-aspect-free" class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium">Libre</button>
-                    <button id="btn-crop-aspect-cr80" class="px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium">Tarjeta CR80</button>
+                <div class="flex items-center gap-2">
+                    <button id="btn-crop-aspect-free" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold">Libre</button>
+                    <button id="btn-crop-aspect-cr80" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-bold">Tarjeta CR80</button>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="btn-cancel-crop" class="px-3 py-1.5 font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
-                    <button id="btn-apply-crop" class="px-3.5 py-1.5 font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white">Aplicar</button>
+                    <button id="btn-cancel-crop" class="min-h-[40px] px-3.5 py-1.5 font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                    <button id="btn-apply-crop" class="min-h-[40px] px-4 py-1.5 font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white">Aplicar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Cámara Mejorado (Con cambio de cámara Trasera/Frontal) -->
-    <div id="camera-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
-        <div class="bg-white dark:bg-dark-surface rounded-2xl max-w-md w-full p-3 sm:p-4 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2.5">
+    <!-- Modal de Cámara -->
+    <div id="camera-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
+        <div class="bg-white dark:bg-dark-surface rounded-2xl max-w-md w-full p-3 sm:p-4 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-3">
             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                 <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                     <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
@@ -764,33 +799,29 @@
                 </h3>
                 
                 <div class="flex items-center gap-1">
-                    <!-- Botón Alternar Cámara (Trasera / Frontal) -->
-                    <button id="btn-switch-camera" title="Cambiar cámara" class="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <button id="btn-switch-camera" title="Cambiar cámara (trasera/frontal)" class="w-9 h-9 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
-                    <button id="btn-close-camera" class="p-1 text-slate-400 hover:text-slate-700">
+                    <button id="btn-close-camera" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
             </div>
 
-            <!-- Video Feed con Guía de Encuadre de Carnet -->
-            <div class="relative w-full h-64 sm:h-72 bg-black rounded-xl overflow-hidden flex items-center justify-center">
+            <div class="relative w-full h-64 sm:h-72 bg-black rounded-2xl overflow-hidden flex items-center justify-center">
                 <video id="camera-video" autoplay playsinline class="w-full h-full object-cover"></video>
-                
-                <!-- Guía visual con esquinas iluminadas tipo escáner bancario -->
-                <div class="absolute w-56 sm:w-64 h-36 sm:h-40 border-2 border-emerald-400/90 rounded-xl pointer-events-none shadow-2xl flex items-center justify-center">
-                    <span class="text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm">Alinea el carnet aquí</span>
+                <div class="absolute w-60 sm:w-68 h-38 sm:h-44 border-2 border-emerald-400 rounded-2xl pointer-events-none shadow-2xl flex items-center justify-center">
+                    <span class="text-[11px] font-bold text-white bg-black/60 px-2.5 py-1 rounded-lg backdrop-blur-sm">Alinea el carnet aquí</span>
                 </div>
             </div>
 
             <div class="flex items-center justify-between pt-1">
-                <button id="btn-camera-use-native" class="text-xs text-blue-600 dark:text-blue-400 font-semibold underline">
-                    Usar cámara del celular
+                <button id="btn-camera-use-native" class="text-xs text-blue-600 dark:text-blue-400 font-bold underline py-2">
+                    Abrir cámara del celular
                 </button>
                 <div class="flex items-center gap-2">
-                    <button id="btn-cancel-camera" class="px-3 py-1.5 text-xs font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
-                    <button id="btn-snap-camera" class="px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1 shadow-md shadow-purple-500/20">
+                    <button id="btn-cancel-camera" class="min-h-[42px] px-3.5 py-2 text-xs font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                    <button id="btn-snap-camera" class="min-h-[42px] px-4 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1.5 shadow-md shadow-purple-500/20">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle></svg>
                         <span>Tomar Foto</span>
                     </button>
@@ -800,23 +831,22 @@
     </div>
 
     <!-- Loader Overlay -->
-    <div id="loader-overlay" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-dark-surface rounded-2xl p-5 max-w-xs w-full text-center shadow-2xl border border-slate-200 dark:border-slate-800">
-            <div class="w-10 h-10 border-4 border-blue-200 dark:border-blue-900 border-t-blue-600 rounded-full animate-spin mx-auto mb-2.5"></div>
+    <div id="loader-overlay" class="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-dark-surface rounded-2xl p-6 max-w-xs w-full text-center shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div class="w-10 h-10 border-4 border-blue-200 dark:border-blue-900 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
             <h4 id="loader-title" class="text-sm font-bold text-slate-800 dark:text-slate-100">Procesando...</h4>
-            <p id="loader-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Generando documento</p>
+            <p id="loader-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Generando documento</p>
         </div>
     </div>
 
-    <!-- Contenedor de Toast Notifications -->
+    <!-- Toast Notifications -->
     <div id="toast-container" class="fixed bottom-3 right-3 left-3 sm:left-auto sm:right-4 z-50 flex flex-col gap-1.5 pointer-events-none sm:max-w-sm"></div>
 
-    <!-- Área oculta para impresión directa -->
+    <!-- Área de Impresión Directa -->
     <div id="print-area" class="hidden">
         <img id="print-img" alt="Impresión de carnet">
     </div>
 
-    <!-- Script Principal -->
     <script src="script.js"></script>
 </body>
 </html>
