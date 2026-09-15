@@ -1,714 +1,2015 @@
-// Variables globales para almacenar las imágenes
-let frenteImage = null;
-let dorsoImage = null;
+/**
+ * CARDIFY 2.0 - Motor de Renderizado, Manipulación Directa y Exportación
+ * Desarrollado con HTML5 Canvas 60 FPS, jsPDF, Web APIs y soporte HiDPI.
+ */
 
-// Elementos del DOM
-const frenteInput = document.getElementById('frente-input');
-const dorsoInput = document.getElementById('dorso-input');
-const frenteUpload = document.getElementById('frente-upload');
-const dorsoUpload = document.getElementById('dorso-upload');
-const frentePreview = document.getElementById('frente-preview');
-const dorsoPreview = document.getElementById('dorso-preview');
-const frentePlaceholder = document.getElementById('frente-placeholder');
-const dorsoPlaceholder = document.getElementById('dorso-placeholder');
-const frenteImg = document.getElementById('frente-img');
-const dorsoImg = document.getElementById('dorso-img');
-const convertBtn = document.getElementById('convert-btn');
-const statusMessage = document.getElementById('status-message');
-const statusText = document.getElementById('status-text');
+// =============================================================================
+// 1. ESTADO GLOBAL DE LA APLICACIÓN (Single Source of Truth)
+// =============================================================================
 
-// Controles de ajuste
-const frenteScale = document.getElementById('frente-scale');
-const frenteX = document.getElementById('frente-x');
-const frenteY = document.getElementById('frente-y');
-const dorsoScale = document.getElementById('dorso-scale');
-const dorsoX = document.getElementById('dorso-x');
-const dorsoY = document.getElementById('dorso-y');
-const resetControlsBtn = document.getElementById('reset-controls-btn');
+const STATE = {
+    paper: {
+        size: 'a4', // 'a4' | 'letter'
+        orientation: 'portrait', // 'portrait' | 'landscape'
+        widthMm: 210,
+        heightMm: 297,
+    },
+    layout: {
+        mode: 'both', // 'both' | 'front-only' | 'back-only' | 'multi-2' | 'multi-4'
+        arrange: 'vertical', // 'vertical' | 'horizontal'
+        showCutLines: true,
+        showBorder: true,
+    },
+    cards: {
+        frente: {
+            id: 'frente',
+            name: 'Frente',
+            rawImage: null,
+            croppedCanvas: null,
+            cachedCanvas: null,
+            widthMm: 85.6,
+            heightMm: 53.98,
+            xMm: 0,
+            yMm: 45,
+            scale: 70, // %
+            rotation: 0, // 0, 90, 180, 270
+            flipH: false,
+            flipV: false,
+            borderRadiusMm: 3.5,
+            filter: 'normal', // 'normal' | 'scan' | 'bw'
+            brightness: 0, // -50 to 50
+            contrast: 0, // -50 to 50
+            dirty: true,
+        },
+        dorso: {
+            id: 'dorso',
+            name: 'Dorso',
+            rawImage: null,
+            croppedCanvas: null,
+            cachedCanvas: null,
+            widthMm: 85.6,
+            heightMm: 53.98,
+            xMm: 0,
+            yMm: 5,
+            scale: 70, // %
+            rotation: 0,
+            flipH: false,
+            flipV: false,
+            borderRadiusMm: 3.5,
+            filter: 'normal',
+            brightness: 0,
+            contrast: 0,
+            dirty: true,
+        }
+    },
+    activeCardId: 'frente', // Pestaña de edición activa ('frente' | 'dorso')
+    selectedCardId: null,   // Card seleccionada en canvas
+    snapEnabled: true,
+    zoom: 1.0,
+    exportFormat: 'pdf',
+    exportDpi: 300,
+    theme: 'light',
+};
 
-// Loader
-const loaderOverlay = document.getElementById('loader-overlay');
+// Historial para Deshacer / Rehacer
+const HISTORY = {
+    undoStack: [],
+    redoStack: [],
+    maxItems: 30,
+    isApplyingHistory: false
+};
 
-// Preview
-const previewCanvas = document.getElementById('preview-canvas');
-const previewPlaceholder = document.getElementById('preview-placeholder');
-const previewCtx = previewCanvas ? previewCanvas.getContext('2d') : null;
+// =============================================================================
+// 2. REFERENCIAS AL DOM
+// =============================================================================
 
-// Inicialización
-document.addEventListener('DOMContentLoaded', function() {
+const DOM = {
+    // Header & Globales
+    btnLoadDemo: document.getElementById('btn-load-demo'),
+    btnEmptyDemo: document.getElementById('btn-empty-demo'),
+    btnShortcuts: document.getElementById('btn-shortcuts'),
+    btnThemeToggle: document.getElementById('btn-theme-toggle'),
+    themeIconDark: document.getElementById('theme-icon-dark'),
+    themeIconLight: document.getElementById('theme-icon-light'),
+    btnResetAll: document.getElementById('btn-reset-all'),
+
+    // Dropzones & Carga
+    dropzoneFrente: document.getElementById('dropzone-frente'),
+    dropzoneDorso: document.getElementById('dropzone-dorso'),
+    frenteInput: document.getElementById('frente-input'),
+    dorsoInput: document.getElementById('dorso-input'),
+    frentePreviewWrap: document.getElementById('frente-preview-wrap'),
+    dorsoPreviewWrap: document.getElementById('dorso-preview-wrap'),
+    frentePlaceholder: document.getElementById('frente-placeholder'),
+    dorsoPlaceholder: document.getElementById('dorso-placeholder'),
+    frenteImg: document.getElementById('frente-img'),
+    dorsoImg: document.getElementById('dorso-img'),
+    frenteActions: document.getElementById('frente-actions'),
+    dorsoActions: document.getElementById('dorso-actions'),
+    btnCropFrente: document.getElementById('btn-crop-frente'),
+    btnRotateFrente: document.getElementById('btn-rotate-frente'),
+    btnRemoveFrente: document.getElementById('btn-remove-frente'),
+    btnCropDorso: document.getElementById('btn-crop-dorso'),
+    btnRotateDorso: document.getElementById('btn-rotate-dorso'),
+    btnRemoveDorso: document.getElementById('btn-remove-dorso'),
+    btnCameraFrente: document.getElementById('btn-camera-frente'),
+    btnCameraDorso: document.getElementById('btn-camera-dorso'),
+    btnSwapCards: document.getElementById('btn-swap-cards'),
+
+    // Plantilla y Papel
+    layoutModeSelect: document.getElementById('layout-mode-select'),
+    layoutArrangeSelect: document.getElementById('layout-arrange-select'),
+    paperSizeSelect: document.getElementById('paper-size-select'),
+    btnOrientPortrait: document.getElementById('btn-orient-portrait'),
+    btnOrientLandscape: document.getElementById('btn-orient-landscape'),
+    checkCutLines: document.getElementById('check-cut-lines'),
+    checkCardBorder: document.getElementById('check-card-border'),
+
+    // Pestañas de Ajustes
+    tabBtnFrente: document.getElementById('tab-btn-frente'),
+    tabBtnDorso: document.getElementById('tab-btn-dorso'),
+    btnApplyCr80: document.getElementById('btn-apply-cr80'),
+    activeCardDimensions: document.getElementById('active-card-dimensions'),
+    cardScaleRange: document.getElementById('card-scale-range'),
+    cardScaleNum: document.getElementById('card-scale-num'),
+    cardXRange: document.getElementById('card-x-range'),
+    cardXNum: document.getElementById('card-x-num'),
+    cardYRange: document.getElementById('card-y-range'),
+    cardYNum: document.getElementById('card-y-num'),
+    btnAlignCenterX: document.getElementById('btn-align-center-x'),
+    btnAlignCenterY: document.getElementById('btn-align-center-y'),
+    btnAlignMatch: document.getElementById('btn-align-match'),
+    cardRadiusRange: document.getElementById('card-radius-range'),
+    cornerRadiusLabel: document.getElementById('corner-radius-label'),
+    filterPresetBtns: document.querySelectorAll('.filter-preset-btn'),
+    cardBrightnessRange: document.getElementById('card-brightness-range'),
+    cardContrastRange: document.getElementById('card-contrast-range'),
+
+    // Exportación
+    exportFormatSelect: document.getElementById('export-format-select'),
+    exportDpiSelect: document.getElementById('export-dpi-select'),
+    btnGenerateDownload: document.getElementById('btn-generate-download'),
+    btnGenerateText: document.getElementById('btn-generate-text'),
+    btnDirectPrint: document.getElementById('btn-direct-print'),
+    btnCopyClipboard: document.getElementById('btn-copy-clipboard'),
+
+    // Canvas & Herramientas Flotantes
+    btnUndo: document.getElementById('btn-undo'),
+    btnRedo: document.getElementById('btn-redo'),
+    selectedCardIndicator: document.getElementById('selected-card-indicator'),
+    btnToggleSnap: document.getElementById('btn-toggle-snap'),
+    btnZoomOut: document.getElementById('btn-zoom-out'),
+    btnZoomIn: document.getElementById('btn-zoom-in'),
+    btnZoomFit: document.getElementById('btn-zoom-fit'),
+    zoomLevelLabel: document.getElementById('zoom-level-label'),
+    viewportContainer: document.getElementById('viewport-container'),
+    previewCanvas: document.getElementById('preview-canvas'),
+    emptyState: document.getElementById('empty-state'),
+    sheetInfoBadge: document.getElementById('sheet-info-badge'),
+
+    // Modales & Overlays
+    cropModal: document.getElementById('crop-modal'),
+    cropCanvas: document.getElementById('crop-canvas'),
+    btnCloseCrop: document.getElementById('btn-close-crop'),
+    btnCancelCrop: document.getElementById('btn-cancel-crop'),
+    btnApplyCrop: document.getElementById('btn-apply-crop'),
+    btnCropAspectFree: document.getElementById('btn-crop-aspect-free'),
+    btnCropAspectCr80: document.getElementById('btn-crop-aspect-cr80'),
+    cameraModal: document.getElementById('camera-modal'),
+    cameraVideo: document.getElementById('camera-video'),
+    btnCloseCamera: document.getElementById('btn-close-camera'),
+    btnCancelCamera: document.getElementById('btn-cancel-camera'),
+    btnSnapCamera: document.getElementById('btn-snap-camera'),
+    shortcutsModal: document.getElementById('shortcuts-modal'),
+    btnCloseShortcuts: document.getElementById('btn-close-shortcuts'),
+    loaderOverlay: document.getElementById('loader-overlay'),
+    loaderTitle: document.getElementById('loader-title'),
+    loaderSubtitle: document.getElementById('loader-subtitle'),
+    toastContainer: document.getElementById('toast-container'),
+    printArea: document.getElementById('print-area'),
+    printImg: document.getElementById('print-img')
+};
+
+// Canvas Context & Engine Variables
+const previewCtx = DOM.previewCanvas.getContext('2d');
+let renderScheduled = false;
+let cameraStream = null;
+let targetCameraCard = 'frente';
+
+// Estado de interacción en Canvas
+const INTERACTION = {
+    isDragging: false,
+    isResizing: false,
+    resizeHandle: null, // 'tl', 'tr', 'bl', 'br'
+    dragStart: { x: 0, y: 0 },
+    cardInitialPos: { x: 0, y: 0 },
+    cardInitialScale: 70,
+    hoverCard: null,
+    activeSnapLines: [], // [{ orientation: 'v'|'h', posMm: number, label: string }]
+};
+
+// =============================================================================
+// 3. INICIALIZACIÓN
+// =============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    setupPaperDimensions();
     setupEventListeners();
-    initializePreviewCanvas();
+    updateUIFromState();
+    resizeCanvasViewport();
+    saveHistoryState('Inicial');
+    scheduleRender();
 });
 
+window.addEventListener('resize', () => {
+    resizeCanvasViewport();
+    scheduleRender();
+});
+
+// =============================================================================
+// 4. GESTIÓN DE TEMA OSCURO / CLARO
+// =============================================================================
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('cardify-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    STATE.theme = savedTheme || (prefersDark ? 'dark' : 'light');
+    applyTheme(STATE.theme);
+}
+
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        DOM.themeIconDark.classList.remove('hidden');
+        DOM.themeIconLight.classList.add('hidden');
+    } else {
+        document.documentElement.classList.remove('dark');
+        DOM.themeIconDark.classList.add('hidden');
+        DOM.themeIconLight.classList.remove('hidden');
+    }
+    localStorage.setItem('cardify-theme', theme);
+    scheduleRender();
+}
+
+function toggleTheme() {
+    STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(STATE.theme);
+}
+
+// =============================================================================
+// 5. PAPEL Y DIMENSIONES
+// =============================================================================
+
+function setupPaperDimensions() {
+    const isPortrait = STATE.paper.orientation === 'portrait';
+    let w = 210;
+    let h = 297;
+
+    if (STATE.paper.size === 'letter') {
+        w = 215.9;
+        h = 279.4;
+    }
+
+    STATE.paper.widthMm = isPortrait ? w : h;
+    STATE.paper.heightMm = isPortrait ? h : w;
+
+    DOM.sheetInfoBadge.textContent = `${STATE.paper.size.toUpperCase()} • ${STATE.paper.widthMm.toFixed(1)} × ${STATE.paper.heightMm.toFixed(1)} mm`;
+}
+
+// =============================================================================
+// 6. EVENT LISTENERS
+// =============================================================================
+
 function setupEventListeners() {
-    // Event listeners para inputs de archivo
-    frenteInput.addEventListener('change', (e) => handleFileSelect(e, 'frente'));
-    dorsoInput.addEventListener('change', (e) => handleFileSelect(e, 'dorso'));
+    // Tema & Header
+    DOM.btnThemeToggle.addEventListener('click', toggleTheme);
+    DOM.btnResetAll.addEventListener('click', resetAllDefaults);
+    DOM.btnShortcuts.addEventListener('click', () => DOM.shortcutsModal.classList.remove('hidden'));
+    DOM.btnCloseShortcuts.addEventListener('click', () => DOM.shortcutsModal.classList.add('hidden'));
 
-    // Event listeners para drag and drop
-    setupDragAndDrop('frente');
-    setupDragAndDrop('dorso');
+    // Carga de Archivos
+    setupDropzone(DOM.dropzoneFrente, DOM.frenteInput, 'frente');
+    setupDropzone(DOM.dropzoneDorso, DOM.dorsoInput, 'dorso');
 
-    // Event listener para el botón de conversión
-    convertBtn.addEventListener('click', convertToPDF);
+    // Botones de Acción de Imágenes
+    DOM.btnRotateFrente.addEventListener('click', (e) => { e.stopPropagation(); rotateCard('frente', 90); });
+    DOM.btnRotateDorso.addEventListener('click', (e) => { e.stopPropagation(); rotateCard('dorso', 90); });
+    DOM.btnRemoveFrente.addEventListener('click', (e) => { e.stopPropagation(); removeCard('frente'); });
+    DOM.btnRemoveDorso.addEventListener('click', (e) => { e.stopPropagation(); removeCard('dorso'); });
+    DOM.btnCropFrente.addEventListener('click', (e) => { e.stopPropagation(); openCropModal('frente'); });
+    DOM.btnCropDorso.addEventListener('click', (e) => { e.stopPropagation(); openCropModal('dorso'); });
 
-    // Event listeners para controles de ajuste
-    setupControlListeners();
-    
-    // Event listener para botón de reiniciar
-    resetControlsBtn.addEventListener('click', resetControls);
+    // Cámara
+    DOM.btnCameraFrente.addEventListener('click', () => openCameraModal('frente'));
+    DOM.btnCameraDorso.addEventListener('click', () => openCameraModal('dorso'));
+    DOM.btnCloseCamera.addEventListener('click', closeCameraModal);
+    DOM.btnCancelCamera.addEventListener('click', closeCameraModal);
+    DOM.btnSnapCamera.addEventListener('click', captureCameraPhoto);
+
+    // Swap & Demos
+    DOM.btnSwapCards.addEventListener('click', swapCards);
+    DOM.btnLoadDemo.addEventListener('click', loadDemoCards);
+    DOM.btnEmptyDemo.addEventListener('click', loadDemoCards);
+
+    // Configuración de Papel y Plantilla
+    DOM.layoutModeSelect.addEventListener('change', (e) => {
+        STATE.layout.mode = e.target.value;
+        saveHistoryState('Modo de Caras');
+        scheduleRender();
+    });
+
+    DOM.layoutArrangeSelect.addEventListener('change', (e) => {
+        STATE.layout.arrange = e.target.value;
+        saveHistoryState('Disposición');
+        scheduleRender();
+    });
+
+    DOM.paperSizeSelect.addEventListener('change', (e) => {
+        STATE.paper.size = e.target.value;
+        setupPaperDimensions();
+        resizeCanvasViewport();
+        saveHistoryState('Tamaño de Papel');
+        scheduleRender();
+    });
+
+    DOM.btnOrientPortrait.addEventListener('click', () => {
+        setOrientation('portrait');
+    });
+
+    DOM.btnOrientLandscape.addEventListener('click', () => {
+        setOrientation('landscape');
+    });
+
+    DOM.checkCutLines.addEventListener('change', (e) => {
+        STATE.layout.showCutLines = e.target.checked;
+        scheduleRender();
+    });
+
+    DOM.checkCardBorder.addEventListener('change', (e) => {
+        STATE.layout.showBorder = e.target.checked;
+        scheduleRender();
+    });
+
+    // Pestañas de Ajustes
+    DOM.tabBtnFrente.addEventListener('click', () => setActiveTab('frente'));
+    DOM.tabBtnDorso.addEventListener('click', () => setActiveTab('dorso'));
+    DOM.btnApplyCr80.addEventListener('click', applyCr80Preset);
+
+    // Sliders e Inputs de Ajuste de la Tarjeta Activa
+    setupCardControls();
+
+    // Exportación
+    DOM.exportFormatSelect.addEventListener('change', (e) => STATE.exportFormat = e.target.value);
+    DOM.exportDpiSelect.addEventListener('change', (e) => STATE.exportDpi = parseInt(e.target.value, 10));
+    DOM.btnGenerateDownload.addEventListener('click', generateAndDownload);
+    DOM.btnDirectPrint.addEventListener('click', directPrintDocument);
+    DOM.btnCopyClipboard.addEventListener('click', copyToClipboard);
+
+    // Canvas Toolbar
+    DOM.btnUndo.addEventListener('click', undo);
+    DOM.btnRedo.addEventListener('click', redo);
+    DOM.btnToggleSnap.addEventListener('click', toggleSnap);
+    DOM.btnZoomIn.addEventListener('click', () => changeZoom(0.15));
+    DOM.btnZoomOut.addEventListener('click', () => changeZoom(-0.15));
+    DOM.btnZoomFit.addEventListener('click', fitZoomToContainer);
+
+    // Canvas Pointer Events para manipulación directa
+    setupCanvasPointerEvents();
+
+    // Atajos de Teclado Globales y Pegar desde Portapapeles
+    window.addEventListener('paste', handleGlobalPaste);
+    window.addEventListener('keydown', handleGlobalKeydown);
 }
 
-function setupControlListeners() {
-    // Referencias a los inputs de número
-    const frenteScaleInput = document.getElementById('frente-scale-input');
-    const frenteXInput = document.getElementById('frente-x-input');
-    const frenteYInput = document.getElementById('frente-y-input');
-    const dorsoScaleInput = document.getElementById('dorso-scale-input');
-    const dorsoXInput = document.getElementById('dorso-x-input');
-    const dorsoYInput = document.getElementById('dorso-y-input');
-    
-    // Frente - Slider actualiza input
-    frenteScale.addEventListener('input', (e) => {
-        frenteScaleInput.value = e.target.value;
-        updatePreview();
-    });
-    
-    frenteX.addEventListener('input', (e) => {
-        frenteXInput.value = e.target.value;
-        updatePreview();
-    });
-    
-    frenteY.addEventListener('input', (e) => {
-        frenteYInput.value = e.target.value;
-        updatePreview();
-    });
-    
-    // Frente - Input actualiza slider
-    frenteScaleInput.addEventListener('input', (e) => {
-        frenteScale.value = e.target.value;
-        updatePreview();
-    });
-    
-    frenteXInput.addEventListener('input', (e) => {
-        frenteX.value = e.target.value;
-        updatePreview();
-    });
-    
-    frenteYInput.addEventListener('input', (e) => {
-        frenteY.value = e.target.value;
-        updatePreview();
-    });
-    
-    // Dorso - Slider actualiza input
-    dorsoScale.addEventListener('input', (e) => {
-        dorsoScaleInput.value = e.target.value;
-        updatePreview();
-    });
-    
-    dorsoX.addEventListener('input', (e) => {
-        dorsoXInput.value = e.target.value;
-        updatePreview();
-    });
-    
-    dorsoY.addEventListener('input', (e) => {
-        dorsoYInput.value = e.target.value;
-        updatePreview();
-    });
-    
-    // Dorso - Input actualiza slider
-    dorsoScaleInput.addEventListener('input', (e) => {
-        dorsoScale.value = e.target.value;
-        updatePreview();
-    });
-    
-    dorsoXInput.addEventListener('input', (e) => {
-        dorsoX.value = e.target.value;
-        updatePreview();
-    });
-    
-    dorsoYInput.addEventListener('input', (e) => {
-        dorsoY.value = e.target.value;
-        updatePreview();
-    });
-}
+// =============================================================================
+// 7. CARGA DE ARCHIVOS Y DROPZONE
+// =============================================================================
 
-function resetControls() {
-    // Referencias a los inputs de número
-    const frenteScaleInput = document.getElementById('frente-scale-input');
-    const frenteXInput = document.getElementById('frente-x-input');
-    const frenteYInput = document.getElementById('frente-y-input');
-    const dorsoScaleInput = document.getElementById('dorso-scale-input');
-    const dorsoXInput = document.getElementById('dorso-x-input');
-    const dorsoYInput = document.getElementById('dorso-y-input');
-    
-    // Reiniciar valores a los valores por defecto
-    frenteScale.value = 70;
-    frenteX.value = 0;
-    frenteY.value = 45;
-    dorsoScale.value = 70;
-    dorsoX.value = 0;
-    dorsoY.value = 5;
-    
-    // Actualizar inputs de número
-    frenteScaleInput.value = 70;
-    frenteXInput.value = 0;
-    frenteYInput.value = 45;
-    dorsoScaleInput.value = 70;
-    dorsoXInput.value = 0;
-    dorsoYInput.value = 5;
-    
-    // Actualizar preview
-    updatePreview();
-}
+function setupDropzone(dropzoneEl, inputEl, cardId) {
+    dropzoneEl.addEventListener('click', () => inputEl.click());
 
-function initializePreviewCanvas() {
-    if (!previewCanvas) return;
-    
-    // Tamaño A4 en proporción (210 x 297 mm)
-    const maxWidth = previewCanvas.parentElement.clientWidth - 40;
-    const aspectRatio = 297 / 210;
-    const width = Math.min(maxWidth, 300);
-    const height = width * aspectRatio;
-    
-    previewCanvas.width = width;
-    previewCanvas.height = height;
-    previewCanvas.style.maxWidth = '100%';
-}
+    inputEl.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) loadFileIntoCard(file, cardId);
+    });
 
-function updatePreview() {
-    if (!previewCanvas || !previewCtx || (!frenteImage && !dorsoImage)) {
-        if (previewPlaceholder) {
-            previewPlaceholder.style.display = 'block';
-            previewPlaceholder.classList.remove('hidden');
-        }
-        if (previewCanvas) {
-            previewCanvas.style.display = 'none';
-            previewCanvas.classList.add('hidden');
-        }
-        return;
-    }
-    
-    // Ocultar placeholder y mostrar canvas
-    if (previewPlaceholder) {
-        previewPlaceholder.style.display = 'none';
-        previewPlaceholder.classList.add('hidden');
-    }
-    previewCanvas.style.display = 'block';
-    previewCanvas.classList.remove('hidden');
-    
-    const canvasWidth = previewCanvas.width;
-    const canvasHeight = previewCanvas.height;
-    
-    // Limpiar canvas
-    previewCtx.fillStyle = '#FFFFFF';
-    previewCtx.fillRect(0, 0, canvasWidth, canvasHeight);
-    
-    // Obtener valores de los controles
-    const frenteScaleValue = parseFloat(frenteScale.value) / 100;
-    const frenteXOffset = parseFloat(frenteX.value) * (canvasWidth / 210); // Convertir mm a px del canvas
-    const frenteYOffset = parseFloat(frenteY.value) * (canvasHeight / 297);
-    const dorsoScaleValue = parseFloat(dorsoScale.value) / 100;
-    const dorsoXOffset = parseFloat(dorsoX.value) * (canvasWidth / 210);
-    const dorsoYOffset = parseFloat(dorsoY.value) * (canvasHeight / 297);
-    
-    const margin = canvasWidth * 0.05; // 5% de margen
-    const contentWidth = canvasWidth - (margin * 2);
-    const imageHeight = (canvasHeight - (margin * 3)) / 2;
-    
-    // Dibujar frente si existe
-    if (frenteImage) {
-        const ratio = Math.min(contentWidth / frenteImage.width, imageHeight / frenteImage.height);
-        let frenteW = frenteImage.width * ratio * frenteScaleValue;
-        let frenteH = frenteImage.height * ratio * frenteScaleValue;
-        const frenteX = margin + (contentWidth - frenteW) / 2 + frenteXOffset;
-        const frenteY = margin + frenteYOffset;
-        
-        // Dibujar con esquinas redondeadas
-        drawRoundedImage(previewCtx, frenteImage, frenteX, frenteY, frenteW, frenteH, 10);
-    }
-    
-    // Dibujar dorso si existe
-    if (dorsoImage) {
-        const ratio = Math.min(contentWidth / dorsoImage.width, imageHeight / dorsoImage.height);
-        let dorsoW = dorsoImage.width * ratio * dorsoScaleValue;
-        let dorsoH = dorsoImage.height * ratio * dorsoScaleValue;
-        const dorsoX = margin + (contentWidth - dorsoW) / 2 + dorsoXOffset;
-        const dorsoY = margin + imageHeight + margin + dorsoYOffset;
-        
-        // Dibujar con esquinas redondeadas
-        drawRoundedImage(previewCtx, dorsoImage, dorsoX, dorsoY, dorsoW, dorsoH, 10);
-    }
-}
-
-function drawRoundedImage(ctx, img, x, y, width, height, radius) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(img, x, y, width, height);
-    ctx.restore();
-    
-    // Dibujar borde
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.stroke();
-}
-
-function setupDragAndDrop(type) {
-    const uploadArea = document.getElementById(`${type}-upload`);
-    
-    uploadArea.addEventListener('dragover', (e) => {
+    dropzoneEl.addEventListener('dragover', (e) => {
         e.preventDefault();
-        uploadArea.classList.add('dragover');
+        dropzoneEl.classList.add('dragover');
     });
 
-    uploadArea.addEventListener('dragleave', (e) => {
+    dropzoneEl.addEventListener('dragleave', (e) => {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        dropzoneEl.classList.remove('dragover');
     });
 
-    uploadArea.addEventListener('drop', (e) => {
+    dropzoneEl.addEventListener('drop', (e) => {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
-        
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFileSelect({ target: { files } }, type);
-        }
+        dropzoneEl.classList.remove('dragover');
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) loadFileIntoCard(file, cardId);
     });
 }
 
-function handleFileSelect(event, type) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validar que sea una imagen
+function loadFileIntoCard(file, cardId) {
     if (!file.type.startsWith('image/')) {
-        showStatus('Por favor selecciona un archivo de imagen válido', 'error');
-        return;
-    }
-
-    // Validar tamaño (máximo 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-        showStatus('El archivo es demasiado grande. Máximo 10MB', 'error');
+        showToast('Por favor selecciona un archivo de imagen válido (PNG, JPG, WebP).', 'warning');
         return;
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = (e) => {
         const img = new Image();
-        img.onload = function() {
-            // Almacenar la imagen
-            if (type === 'frente') {
-                frenteImage = img;
-                showImagePreview(img, 'frente');
+        img.onload = () => {
+            const card = STATE.cards[cardId];
+            card.rawImage = img;
+            card.croppedCanvas = null;
+            card.cachedCanvas = null;
+            card.dirty = true;
+
+            // Calcular relación de aspecto
+            const aspect = img.width / img.height;
+            if (aspect >= 1) {
+                card.widthMm = 85.6;
+                card.heightMm = 85.6 / aspect;
             } else {
-                dorsoImage = img;
-                showImagePreview(img, 'dorso');
+                card.heightMm = 85.6;
+                card.widthMm = 85.6 * aspect;
             }
-            
-            checkIfCanConvert();
+
+            // Actualizar vista previa en el panel
+            updateDropzoneUI(cardId, img.src);
+            setActiveTab(cardId);
+            saveHistoryState(`Cargar ${card.name}`);
+            scheduleRender();
+            showToast(`${card.name} cargado exitosamente`, 'success');
         };
         img.src = e.target.result;
     };
     reader.readAsDataURL(file);
 }
 
-function showImagePreview(img, type) {
-    const preview = document.getElementById(`${type}-preview`);
-    const placeholder = document.getElementById(`${type}-placeholder`);
-    const imgElement = document.getElementById(`${type}-img`);
-    const uploadArea = document.getElementById(`${type}-upload`);
+function updateDropzoneUI(cardId, src) {
+    const isFrente = cardId === 'frente';
+    const previewWrap = isFrente ? DOM.frentePreviewWrap : DOM.dorsoPreviewWrap;
+    const placeholder = isFrente ? DOM.frentePlaceholder : DOM.dorsoPlaceholder;
+    const imgEl = isFrente ? DOM.frenteImg : DOM.dorsoImg;
+    const dropzone = isFrente ? DOM.dropzoneFrente : DOM.dropzoneDorso;
+    const actions = isFrente ? DOM.frenteActions : DOM.dorsoActions;
 
-    imgElement.src = img.src;
-    preview.classList.remove('hidden');
-    placeholder.classList.add('hidden');
-    uploadArea.classList.add('has-image');
-    
-    // Actualizar preview
-    updatePreview();
-}
-
-function checkIfCanConvert() {
-    if (frenteImage && dorsoImage) {
-        convertBtn.disabled = false;
-        showStatus('¡Listo para convertir!', 'success');
+    if (src) {
+        imgEl.src = src;
+        previewWrap.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        dropzone.classList.add('has-file');
+        actions.style.display = 'flex';
     } else {
-        convertBtn.disabled = true;
-        hideStatus();
+        imgEl.src = '';
+        previewWrap.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+        dropzone.classList.remove('has-file');
+        actions.style.display = 'none';
     }
+
+    updateEmptyStateVisibility();
 }
 
-function showStatus(message, type) {
-    statusText.textContent = message;
-    statusText.className = `text-sm ${type === 'error' ? 'text-red-600' : 'text-green-600'}`;
-    statusMessage.classList.remove('hidden');
+function removeCard(cardId) {
+    const card = STATE.cards[cardId];
+    card.rawImage = null;
+    card.croppedCanvas = null;
+    card.cachedCanvas = null;
+    card.dirty = true;
+
+    if (cardId === 'frente') DOM.frenteInput.value = '';
+    else DOM.dorsoInput.value = '';
+
+    updateDropzoneUI(cardId, null);
+    if (STATE.selectedCardId === cardId) STATE.selectedCardId = null;
+
+    saveHistoryState(`Eliminar ${card.name}`);
+    scheduleRender();
+    showToast(`${card.name} eliminado`, 'info');
 }
 
-function hideStatus() {
-    statusMessage.classList.add('hidden');
-}
+function rotateCard(cardId, angleDeg = 90) {
+    const card = STATE.cards[cardId];
+    if (!card.rawImage) return;
 
-function showLoader() {
-    loaderOverlay.classList.remove('hidden');
-}
-
-function hideLoader() {
-    loaderOverlay.classList.add('hidden');
-}
-
-// Función para comprimir y redimensionar imagen
-function compressImage(img, maxWidth = 1200, maxHeight = 1600) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    card.rotation = (card.rotation + angleDeg) % 360;
     
-    // Calcular nuevas dimensiones manteniendo la proporción
-    let width = img.width;
-    let height = img.height;
-    
-    if (width > maxWidth || height > maxHeight) {
-        const ratio = Math.min(maxWidth / width, maxHeight / height);
-        width = width * ratio;
-        height = height * ratio;
+    // Invertir ancho y alto si rota 90 o 270 grados
+    if (angleDeg === 90 || angleDeg === 270) {
+        const temp = card.widthMm;
+        card.widthMm = card.heightMm;
+        card.heightMm = temp;
     }
-    
-    canvas.width = width;
-    canvas.height = height;
-    
-    // Dibujar la imagen redimensionada
-    ctx.drawImage(img, 0, 0, width, height);
-    
-    return { canvas, width, height };
+
+    card.dirty = true;
+    saveHistoryState(`Rotar ${card.name} ${angleDeg}°`);
+    scheduleRender();
+    showToast(`${card.name} rotado a ${card.rotation}°`, 'info');
 }
 
-// Función para crear una imagen con esquinas redondeadas (SIN comprimir)
-function createRoundedImageHighQuality(img, borderRadius = 70) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = img.width;
-    canvas.height = img.height;
-    
-    // Fondo blanco para consistencia
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Calcular el radio de borde - usar un porcentaje mayor para esquinas más visibles
-    const scaledBorderRadius = Math.min(borderRadius, img.width * 0.08, img.height * 0.08);
-    
-    // Crear el path con esquinas redondeadas
-    ctx.beginPath();
-    ctx.moveTo(scaledBorderRadius, 0);
-    ctx.lineTo(canvas.width - scaledBorderRadius, 0);
-    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, scaledBorderRadius);
-    ctx.lineTo(canvas.width, canvas.height - scaledBorderRadius);
-    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - scaledBorderRadius, canvas.height);
-    ctx.lineTo(scaledBorderRadius, canvas.height);
-    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - scaledBorderRadius);
-    ctx.lineTo(0, scaledBorderRadius);
-    ctx.quadraticCurveTo(0, 0, scaledBorderRadius, 0);
-    ctx.closePath();
-    
-    // Recortar y dibujar la imagen original sin comprimir
-    ctx.clip();
-    ctx.drawImage(img, 0, 0, img.width, img.height);
-    
-    // Retornar la imagen en PNG de alta calidad (sin pérdida)
-    return canvas.toDataURL('image/png', 1.0);
-}
-
-// Función para crear una imagen con esquinas redondeadas y comprimida
-function createRoundedImageCompressed(img, borderRadius = 70) {
-    // Primero comprimir la imagen
-    const { canvas: tempCanvas, width, height } = compressImage(img);
-    
-    // Crear nuevo canvas para las esquinas redondeadas
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = width;
-    canvas.height = height;
-    
-    // Fondo blanco (importante para JPEG que no soporta transparencia)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Calcular el radio de borde - usar un valor fijo más grande basado en el tamaño
-    const scaledBorderRadius = Math.min(borderRadius * (width / img.width), width * 0.08, height * 0.08);
-    
-    // Crear el path con esquinas redondeadas
-    ctx.beginPath();
-    ctx.moveTo(scaledBorderRadius, 0);
-    ctx.lineTo(canvas.width - scaledBorderRadius, 0);
-    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, scaledBorderRadius);
-    ctx.lineTo(canvas.width, canvas.height - scaledBorderRadius);
-    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - scaledBorderRadius, canvas.height);
-    ctx.lineTo(scaledBorderRadius, canvas.height);
-    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - scaledBorderRadius);
-    ctx.lineTo(0, scaledBorderRadius);
-    ctx.quadraticCurveTo(0, 0, scaledBorderRadius, 0);
-    ctx.closePath();
-    
-    // Recortar y dibujar la imagen
-    ctx.clip();
-    ctx.drawImage(tempCanvas, 0, 0, width, height);
-    
-    // Retornar la imagen como JPEG comprimido (calidad 0.85 para balance entre calidad y tamaño)
-    return canvas.toDataURL('image/jpeg', 0.85);
-}
-
-function convertToPDF() {
-    if (!frenteImage || !dorsoImage) {
-        showStatus('Por favor sube ambas imágenes antes de convertir', 'error');
+function swapCards() {
+    if (!STATE.cards.frente.rawImage && !STATE.cards.dorso.rawImage) {
+        showToast('Carga al menos un carnet para intercambiar', 'warning');
         return;
     }
 
-    // Obtener opciones seleccionadas
-    const format = document.querySelector('input[name="format"]:checked').value;
-    const quality = document.querySelector('input[name="quality"]:checked').value;
+    // Intercambiar propiedades de imagen y ajustes visuales
+    const f = STATE.cards.frente;
+    const d = STATE.cards.dorso;
 
-    // Mostrar loader y deshabilitar botón
-    showLoader();
-    convertBtn.disabled = true;
-    hideStatus();
+    const tempRaw = f.rawImage;
+    const tempCropped = f.croppedCanvas;
+    const tempRotation = f.rotation;
+    const tempFilter = f.filter;
+    const tempBrightness = f.brightness;
+    const tempContrast = f.contrast;
+    const tempW = f.widthMm;
+    const tempH = f.heightMm;
 
-    // Usar setTimeout para permitir que el DOM se actualice antes del proceso pesado
-    setTimeout(() => {
-        try {
-            // Decidir qué formato exportar
-            if (format === 'pdf') {
-                exportToPDF(quality);
-            } else if (format === 'jpg') {
-                exportToImage('jpg', quality);
-            } else if (format === 'png') {
-                exportToImage('png', quality);
-            }
-        } catch (error) {
-            console.error('Error al generar archivo:', error);
+    f.rawImage = d.rawImage;
+    f.croppedCanvas = d.croppedCanvas;
+    f.rotation = d.rotation;
+    f.filter = d.filter;
+    f.brightness = d.brightness;
+    f.contrast = d.contrast;
+    f.widthMm = d.widthMm;
+    f.heightMm = d.heightMm;
+    f.dirty = true;
+
+    d.rawImage = tempRaw;
+    d.croppedCanvas = tempCropped;
+    d.rotation = tempRotation;
+    d.filter = tempFilter;
+    d.brightness = tempBrightness;
+    d.contrast = tempContrast;
+    d.widthMm = tempW;
+    d.heightMm = tempH;
+    d.dirty = true;
+
+    updateDropzoneUI('frente', f.rawImage ? f.rawImage.src : null);
+    updateDropzoneUI('dorso', d.rawImage ? d.rawImage.src : null);
+
+    saveHistoryState('Intercambiar Frente ↔ Dorso');
+    scheduleRender();
+    showToast('Frente y Dorso intercambiados', 'success');
+}
+
+function loadDemoCards() {
+    showLoader('Cargando carnets de muestra...', 'Preparando recursos de alta calidad');
+
+    const img1 = new Image();
+    const img2 = new Image();
+    let loaded = 0;
+
+    const checkComplete = () => {
+        loaded++;
+        if (loaded === 2) {
             hideLoader();
-            showStatus('Error al generar el archivo. Inténtalo de nuevo.', 'error');
-            convertBtn.disabled = false;
+            // Asignar frente
+            STATE.cards.frente.rawImage = img1;
+            STATE.cards.frente.croppedCanvas = null;
+            STATE.cards.frente.cachedCanvas = null;
+            STATE.cards.frente.widthMm = 85.6;
+            STATE.cards.frente.heightMm = 54.0;
+            STATE.cards.frente.scale = 75;
+            STATE.cards.frente.xMm = 0;
+            STATE.cards.frente.yMm = 45;
+            STATE.cards.frente.dirty = true;
+
+            // Asignar dorso
+            STATE.cards.dorso.rawImage = img2;
+            STATE.cards.dorso.croppedCanvas = null;
+            STATE.cards.dorso.cachedCanvas = null;
+            STATE.cards.dorso.widthMm = 85.6;
+            STATE.cards.dorso.heightMm = 54.0;
+            STATE.cards.dorso.scale = 75;
+            STATE.cards.dorso.xMm = 0;
+            STATE.cards.dorso.yMm = 15;
+            STATE.cards.dorso.dirty = true;
+
+            updateDropzoneUI('frente', img1.src);
+            updateDropzoneUI('dorso', img2.src);
+            setActiveTab('frente');
+
+            saveHistoryState('Cargar Carnet de Muestra');
+            scheduleRender();
+            showToast('¡Carnet de demostración cargado!', 'success');
         }
+    };
+
+    img1.onload = checkComplete;
+    img2.onload = checkComplete;
+    img1.onerror = () => { hideLoader(); showToast('No se pudo cargar la imagen de muestra', 'error'); };
+    img2.onerror = () => { hideLoader(); showToast('No se pudo cargar la imagen de muestra', 'error'); };
+
+    img1.src = 'recursos/carnet confa 1.png';
+    img2.src = 'recursos/carnet confa 2.png';
+}
+
+function handleGlobalPaste(e) {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+            const blob = item.getAsFile();
+            // Decidir a qué tarjeta asignarlo
+            if (!STATE.cards.frente.rawImage) {
+                loadFileIntoCard(blob, 'frente');
+            } else if (!STATE.cards.dorso.rawImage) {
+                loadFileIntoCard(blob, 'dorso');
+            } else {
+                loadFileIntoCard(blob, STATE.activeCardId);
+            }
+            showToast('Imagen pegada desde el portapapeles', 'info');
+            break;
+        }
+    }
+}
+
+function handleGlobalKeydown(e) {
+    // Deshacer / Rehacer
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+        return;
+    }
+
+    // Movimiento fino con flechas
+    if (STATE.selectedCardId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const card = STATE.cards[STATE.selectedCardId];
+        const step = e.shiftKey ? 5 : 1; // 1mm o 5mm
+        if (e.key === 'ArrowUp') card.yMm -= step;
+        if (e.key === 'ArrowDown') card.yMm += step;
+        if (e.key === 'ArrowLeft') card.xMm -= step;
+        if (e.key === 'ArrowRight') card.xMm += step;
+        
+        syncControlsFromActiveCard();
+        scheduleRender();
+        return;
+    }
+
+    // Suprimir / Delete
+    if (STATE.selectedCardId && (e.key === 'Delete' || e.key === 'Backspace')) {
+        if (document.activeElement.tagName !== 'INPUT') {
+            removeCard(STATE.selectedCardId);
+        }
+    }
+}
+
+// =============================================================================
+// 8. CONTROLES Y PESTAÑAS DE AJUSTE
+// =============================================================================
+
+function setActiveTab(cardId) {
+    STATE.activeCardId = cardId;
+    if (cardId === 'frente') {
+        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
+        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
+    } else {
+        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
+        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
+    }
+
+    syncControlsFromActiveCard();
+    scheduleRender();
+}
+
+function syncControlsFromActiveCard() {
+    const card = STATE.cards[STATE.activeCardId];
+
+    DOM.cardScaleRange.value = card.scale;
+    DOM.cardScaleNum.value = card.scale;
+    DOM.cardXRange.value = card.xMm;
+    DOM.cardXNum.value = card.xMm;
+    DOM.cardYRange.value = card.yMm;
+    DOM.cardYNum.value = card.yMm;
+    DOM.cardRadiusRange.value = card.borderRadiusMm;
+    DOM.cornerRadiusLabel.textContent = `${card.borderRadiusMm} mm`;
+    DOM.cardBrightnessRange.value = card.brightness;
+    DOM.cardContrastRange.value = card.contrast;
+
+    // Dimensiones reales en mm calculadas
+    const currentW = (card.widthMm * card.scale / 100).toFixed(1);
+    const currentH = (card.heightMm * card.scale / 100).toFixed(1);
+    DOM.activeCardDimensions.textContent = `(${currentW} × ${currentH} mm)`;
+
+    // Resaltar preset de filtro activo
+    DOM.filterPresetBtns.forEach(btn => {
+        if (btn.dataset.filter === card.filter) {
+            btn.className = 'filter-preset-btn py-1 px-1.5 text-xs font-medium rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+        } else {
+            btn.className = 'filter-preset-btn py-1 px-1.5 text-xs font-medium rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200';
+        }
+    });
+
+    // Indicador en barra flotante
+    DOM.selectedCardIndicator.textContent = STATE.selectedCardId 
+        ? `Editando ${STATE.cards[STATE.selectedCardId].name}` 
+        : 'Selecciona o arrastra un carnet';
+}
+
+function setupCardControls() {
+    // Escala
+    DOM.cardScaleRange.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        DOM.cardScaleNum.value = val;
+        STATE.cards[STATE.activeCardId].scale = val;
+        syncControlsFromActiveCard();
+        scheduleRender();
+    });
+    DOM.cardScaleNum.addEventListener('input', (e) => {
+        const val = Math.min(180, Math.max(30, parseFloat(e.target.value) || 70));
+        DOM.cardScaleRange.value = val;
+        STATE.cards[STATE.activeCardId].scale = val;
+        syncControlsFromActiveCard();
+        scheduleRender();
+    });
+
+    // Posición X
+    DOM.cardXRange.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        DOM.cardXNum.value = val;
+        STATE.cards[STATE.activeCardId].xMm = val;
+        scheduleRender();
+    });
+    DOM.cardXNum.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        DOM.cardXRange.value = val;
+        STATE.cards[STATE.activeCardId].xMm = val;
+        scheduleRender();
+    });
+
+    // Posición Y
+    DOM.cardYRange.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        DOM.cardYNum.value = val;
+        STATE.cards[STATE.activeCardId].yMm = val;
+        scheduleRender();
+    });
+    DOM.cardYNum.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        DOM.cardYRange.value = val;
+        STATE.cards[STATE.activeCardId].yMm = val;
+        scheduleRender();
+    });
+
+    // Alineaciones
+    DOM.btnAlignCenterX.addEventListener('click', () => {
+        STATE.cards[STATE.activeCardId].xMm = 0;
+        syncControlsFromActiveCard();
+        saveHistoryState(`Centrar Horiz. ${STATE.cards[STATE.activeCardId].name}`);
+        scheduleRender();
+    });
+    DOM.btnAlignCenterY.addEventListener('click', () => {
+        STATE.cards[STATE.activeCardId].yMm = 0;
+        syncControlsFromActiveCard();
+        saveHistoryState(`Centrar Vert. ${STATE.cards[STATE.activeCardId].name}`);
+        scheduleRender();
+    });
+    DOM.btnAlignMatch.addEventListener('click', () => {
+        const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+        const other = STATE.cards[otherId];
+        const current = STATE.cards[STATE.activeCardId];
+        current.scale = other.scale;
+        current.xMm = other.xMm;
+        current.borderRadiusMm = other.borderRadiusMm;
+        syncControlsFromActiveCard();
+        saveHistoryState('Igualar con otro carnet');
+        scheduleRender();
+        showToast('Dimensiones igualadas con el otro carnet', 'info');
+    });
+
+    // Esquinas Redondeadas
+    DOM.cardRadiusRange.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        STATE.cards[STATE.activeCardId].borderRadiusMm = val;
+        DOM.cornerRadiusLabel.textContent = `${val} mm`;
+        scheduleRender();
+    });
+
+    // Filtros Presets
+    DOM.filterPresetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const filterMode = btn.dataset.filter;
+            const card = STATE.cards[STATE.activeCardId];
+            card.filter = filterMode;
+            card.dirty = true;
+            syncControlsFromActiveCard();
+            saveHistoryState(`Filtro ${filterMode}`);
+            scheduleRender();
+        });
+    });
+
+    // Brillo y Contraste
+    DOM.cardBrightnessRange.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        const card = STATE.cards[STATE.activeCardId];
+        card.brightness = val;
+        card.dirty = true;
+        scheduleRender();
+    });
+    DOM.cardContrastRange.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        const card = STATE.cards[STATE.activeCardId];
+        card.contrast = val;
+        card.dirty = true;
+        scheduleRender();
+    });
+}
+
+function applyCr80Preset() {
+    const card = STATE.cards[STATE.activeCardId];
+    card.widthMm = 85.6;
+    card.heightMm = 53.98;
+    card.scale = 100;
+    card.borderRadiusMm = 3.18; // Radio estándar de tarjeta plástica
+    syncControlsFromActiveCard();
+    saveHistoryState('Aplicar Tamaño Estándar CR80');
+    scheduleRender();
+    showToast('Ajustado a tamaño estándar de tarjeta de crédito (CR80)', 'success');
+}
+
+function setOrientation(orientation) {
+    if (STATE.paper.orientation === orientation) return;
+    STATE.paper.orientation = orientation;
+
+    if (orientation === 'portrait') {
+        DOM.btnOrientPortrait.className = 'py-1 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300';
+        DOM.btnOrientLandscape.className = 'py-1 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900';
+    } else {
+        DOM.btnOrientLandscape.className = 'py-1 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300';
+        DOM.btnOrientPortrait.className = 'py-1 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900';
+    }
+
+    setupPaperDimensions();
+    resizeCanvasViewport();
+    saveHistoryState(`Orientación ${orientation}`);
+    scheduleRender();
+}
+
+function resetAllDefaults() {
+    STATE.cards.frente.scale = 70;
+    STATE.cards.frente.xMm = 0;
+    STATE.cards.frente.yMm = 45;
+    STATE.cards.frente.rotation = 0;
+    STATE.cards.frente.borderRadiusMm = 3.5;
+    STATE.cards.frente.filter = 'normal';
+    STATE.cards.frente.brightness = 0;
+    STATE.cards.frente.contrast = 0;
+    STATE.cards.frente.dirty = true;
+
+    STATE.cards.dorso.scale = 70;
+    STATE.cards.dorso.xMm = 0;
+    STATE.cards.dorso.yMm = 5;
+    STATE.cards.dorso.rotation = 0;
+    STATE.cards.dorso.borderRadiusMm = 3.5;
+    STATE.cards.dorso.filter = 'normal';
+    STATE.cards.dorso.brightness = 0;
+    STATE.cards.dorso.contrast = 0;
+    STATE.cards.dorso.dirty = true;
+
+    STATE.layout.mode = 'both';
+    STATE.layout.arrange = 'vertical';
+    STATE.layout.showCutLines = true;
+    STATE.layout.showBorder = true;
+
+    updateUIFromState();
+    saveHistoryState('Restablecer todo');
+    scheduleRender();
+    showToast('Ajustes restablecidos a valores por defecto', 'info');
+}
+
+function updateUIFromState() {
+    DOM.layoutModeSelect.value = STATE.layout.mode;
+    DOM.layoutArrangeSelect.value = STATE.layout.arrange;
+    DOM.paperSizeSelect.value = STATE.paper.size;
+    DOM.checkCutLines.checked = STATE.layout.showCutLines;
+    DOM.checkCardBorder.checked = STATE.layout.showBorder;
+    setActiveTab(STATE.activeCardId);
+}
+
+// =============================================================================
+// 9. PROCESAMIENTO DE IMAGEN & FILTROS (Offscreen Canvas Caching)
+// =============================================================================
+
+function processCardImage(card) {
+    const sourceImg = card.croppedCanvas || card.rawImage;
+    if (!sourceImg) return null;
+
+    // Crear canvas offscreen
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Manejar rotación en el tamaño del canvas
+    const isSideways = card.rotation === 90 || card.rotation === 270;
+    const srcW = sourceImg.width;
+    const srcH = sourceImg.height;
+
+    canvas.width = isSideways ? srcH : srcW;
+    canvas.height = isSideways ? srcW : srcH;
+
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((card.rotation * Math.PI) / 180);
+    ctx.scale(card.flipH ? -1 : 1, card.flipV ? -1 : 1);
+    ctx.drawImage(sourceImg, -srcW / 2, -srcH / 2, srcW, srcH);
+    ctx.restore();
+
+    // Aplicar filtros a nivel de píxeles si es necesario
+    if (card.filter !== 'normal' || card.brightness !== 0 || card.contrast !== 0) {
+        applyPixelFilters(ctx, canvas.width, canvas.height, card.filter, card.brightness, card.contrast);
+    }
+
+    card.cachedCanvas = canvas;
+    card.dirty = false;
+    return canvas;
+}
+
+function applyPixelFilters(ctx, width, height, filterType, brightness, contrast) {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const d = imgData.data;
+    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+    for (let i = 0; i < d.length; i += 4) {
+        let r = d[i];
+        let g = d[i + 1];
+        let b = d[i + 2];
+
+        // Filtros de modo
+        if (filterType === 'bw') {
+            // Escala de grises con luminancia oficial
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            // Mayor contraste para fotocopia
+            const enhanced = gray > 140 ? Math.min(255, gray * 1.15) : Math.max(0, gray * 0.85);
+            r = g = b = enhanced;
+        } else if (filterType === 'scan') {
+            // Realce de documento / nitidez de texto
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (lum > 180) {
+                // Blanquear fondo sucio
+                r = Math.min(255, r * 1.1);
+                g = Math.min(255, g * 1.1);
+                b = Math.min(255, b * 1.1);
+            } else if (lum < 90) {
+                // Oscurecer texto
+                r = Math.max(0, r * 0.85);
+                g = Math.max(0, g * 0.85);
+                b = Math.max(0, b * 0.85);
+            }
+        }
+
+        // Brillo y Contraste
+        if (brightness !== 0) {
+            r += brightness * 2;
+            g += brightness * 2;
+            b += brightness * 2;
+        }
+
+        if (contrast !== 0) {
+            r = factor * (r - 128) + 128;
+            g = factor * (g - 128) + 128;
+            b = factor * (b - 128) + 128;
+        }
+
+        d[i] = Math.min(255, Math.max(0, r));
+        d[i + 1] = Math.min(255, Math.max(0, g));
+        d[i + 2] = Math.min(255, Math.max(0, b));
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+}
+
+// =============================================================================
+// 10. MOTOR DE RENDERIZADO CANVAS A 60 FPS
+// =============================================================================
+
+function scheduleRender() {
+    if (!renderScheduled) {
+        renderScheduled = true;
+        requestAnimationFrame(renderLoop);
+    }
+}
+
+function resizeCanvasViewport() {
+    const container = DOM.viewportContainer;
+    const availWidth = container.clientWidth - 48;
+    const availHeight = container.clientHeight - 48;
+
+    const sheetAspect = STATE.paper.heightMm / STATE.paper.widthMm;
+
+    // Ajustar zoom inicial o tamaño
+    let displayWidth = Math.min(availWidth, 420);
+    let displayHeight = displayWidth * sheetAspect;
+
+    if (displayHeight > availHeight && availHeight > 300) {
+        displayHeight = availHeight;
+        displayWidth = displayHeight / sheetAspect;
+    }
+
+    // HiDPI / Retina Display Scaling
+    const dpr = window.devicePixelRatio || 1;
+    DOM.previewCanvas.width = displayWidth * STATE.zoom * dpr;
+    DOM.previewCanvas.height = displayHeight * STATE.zoom * dpr;
+
+    DOM.previewCanvas.style.width = `${displayWidth * STATE.zoom}px`;
+    DOM.previewCanvas.style.height = `${displayHeight * STATE.zoom}px`;
+}
+
+function renderLoop() {
+    renderScheduled = false;
+    const canvas = DOM.previewCanvas;
+    const ctx = previewCtx;
+
+    const dpr = window.devicePixelRatio || 1;
+    const canvasWidth = canvas.width / dpr;
+    const canvasHeight = canvas.height / dpr;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Fondo blanco de hoja A4 / Carta
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // Calcular factor de escala mm a píxeles
+    const mmToPx = canvasWidth / STATE.paper.widthMm;
+
+    // Calcular instancias de tarjetas según el modo de plantilla
+    const cardInstances = getCardInstances(mmToPx, canvasWidth, canvasHeight);
+
+    // Dibujar cada carnet
+    for (const inst of cardInstances) {
+        drawCardInstance(ctx, inst, mmToPx);
+    }
+
+    // Dibujar guías magnéticas de alineación si están activas
+    if (INTERACTION.isDragging && INTERACTION.activeSnapLines.length > 0) {
+        drawSnapLines(ctx, canvasWidth, canvasHeight, mmToPx);
+    }
+
+    // Dibujar caja de selección y manijas si hay tarjeta seleccionada
+    if (STATE.selectedCardId) {
+        const selectedInst = cardInstances.find(i => i.card.id === STATE.selectedCardId);
+        if (selectedInst) {
+            drawSelectionBox(ctx, selectedInst);
+        }
+    }
+
+    ctx.restore();
+}
+
+function getCardInstances(mmToPx, canvasWidth, canvasHeight) {
+    const instances = [];
+    const mode = STATE.layout.mode;
+    const arrange = STATE.layout.arrange;
+    const paperW = STATE.paper.widthMm;
+    const paperH = STATE.paper.heightMm;
+
+    const f = STATE.cards.frente;
+    const d = STATE.cards.dorso;
+
+    if (mode === 'both') {
+        if (arrange === 'vertical') {
+            // Frente arriba, dorso abajo
+            if (f.rawImage) {
+                const wMm = f.widthMm * (f.scale / 100);
+                const hMm = f.heightMm * (f.scale / 100);
+                const xMm = (paperW - wMm) / 2 + f.xMm;
+                const yMm = 30 + f.yMm;
+                instances.push({ card: f, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+            if (d.rawImage) {
+                const wMm = d.widthMm * (d.scale / 100);
+                const hMm = d.heightMm * (d.scale / 100);
+                const xMm = (paperW - wMm) / 2 + d.xMm;
+                const yMm = (paperH / 2) + 15 + d.yMm;
+                instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+        } else {
+            // Horizontal / Lado a lado
+            const halfW = paperW / 2;
+            if (f.rawImage) {
+                const wMm = f.widthMm * (f.scale / 100);
+                const hMm = f.heightMm * (f.scale / 100);
+                const xMm = (halfW - wMm) / 2 + f.xMm + 5;
+                const yMm = (paperH - hMm) / 2 + f.yMm;
+                instances.push({ card: f, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+            if (d.rawImage) {
+                const wMm = d.widthMm * (d.scale / 100);
+                const hMm = d.heightMm * (d.scale / 100);
+                const xMm = halfW + (halfW - wMm) / 2 + d.xMm - 5;
+                const yMm = (paperH - hMm) / 2 + d.yMm;
+                instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+        }
+    } else if (mode === 'front-only') {
+        if (f.rawImage) {
+            const wMm = f.widthMm * (f.scale / 100);
+            const hMm = f.heightMm * (f.scale / 100);
+            const xMm = (paperW - wMm) / 2 + f.xMm;
+            const yMm = (paperH - hMm) / 2 + f.yMm;
+            instances.push({ card: f, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+        }
+    } else if (mode === 'back-only') {
+        if (d.rawImage) {
+            const wMm = d.widthMm * (d.scale / 100);
+            const hMm = d.heightMm * (d.scale / 100);
+            const xMm = (paperW - wMm) / 2 + d.xMm;
+            const yMm = (paperH - hMm) / 2 + d.yMm;
+            instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+        }
+    } else if (mode === 'multi-2') {
+        // 2 copias del juego frente/dorso
+        const halfH = paperH / 2;
+        [0, halfH].forEach((offsetY) => {
+            if (f.rawImage) {
+                const wMm = f.widthMm * (f.scale / 100);
+                const hMm = f.heightMm * (f.scale / 100);
+                const xMm = 15 + f.xMm;
+                const yMm = offsetY + 15 + f.yMm;
+                instances.push({ card: f, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+            if (d.rawImage) {
+                const wMm = d.widthMm * (d.scale / 100);
+                const hMm = d.heightMm * (d.scale / 100);
+                const xMm = paperW - wMm - 15 + d.xMm;
+                const yMm = offsetY + 15 + d.yMm;
+                instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+        });
+    } else if (mode === 'multi-4') {
+        // 4 copias tipo cuadrícula 2x2
+        const colW = paperW / 2;
+        const rowH = paperH / 2;
+        [
+            { cx: 0, cy: 0 },
+            { cx: colW, cy: 0 },
+            { cx: 0, cy: rowH },
+            { cx: colW, cy: rowH }
+        ].forEach((pos) => {
+            const targetCard = f.rawImage ? f : d;
+            if (targetCard.rawImage) {
+                const wMm = targetCard.widthMm * (targetCard.scale / 100);
+                const hMm = targetCard.heightMm * (targetCard.scale / 100);
+                const xMm = pos.cx + (colW - wMm) / 2 + targetCard.xMm;
+                const yMm = pos.cy + (rowH - hMm) / 2 + targetCard.yMm;
+                instances.push({ card: targetCard, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
+            }
+        });
+    }
+
+    return instances;
+}
+
+function drawCardInstance(ctx, inst, mmToPx) {
+    const card = inst.card;
+    if (card.dirty || !card.cachedCanvas) {
+        processCardImage(card);
+    }
+
+    const img = card.cachedCanvas;
+    if (!img) return;
+
+    const x = inst.pxX;
+    const y = inst.pxY;
+    const w = inst.pxW;
+    const h = inst.pxH;
+    const r = card.borderRadiusMm * mmToPx;
+
+    // Líneas guía de corte con tijera si está activo
+    if (STATE.layout.showCutLines) {
+        ctx.save();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+        ctx.restore();
+    }
+
+    // Dibujar tarjeta con esquinas redondeadas
+    ctx.save();
+    ctx.beginPath();
+    drawRoundedRectPath(ctx, x, y, w, h, r);
+    ctx.clip();
+    ctx.drawImage(img, x, y, w, h);
+    ctx.restore();
+
+    // Borde sutil
+    if (STATE.layout.showBorder) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(203, 213, 225, 0.9)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        drawRoundedRectPath(ctx, x, y, w, h, r);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+function drawRoundedRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function drawSelectionBox(ctx, inst) {
+    const x = inst.pxX;
+    const y = inst.pxY;
+    const w = inst.pxW;
+    const h = inst.pxH;
+
+    ctx.save();
+    // Línea de selección azul
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+    ctx.setLineDash([]);
+
+    // 4 Manijas en las esquinas
+    const handleSize = 8;
+    ctx.fillStyle = '#2563eb';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+
+    const handles = [
+        { x: x - 3, y: y - 3 },
+        { x: x + w + 3, y: y - 3 },
+        { x: x - 3, y: y + h + 3 },
+        { x: x + w + 3, y: y + h + 3 }
+    ];
+
+    for (const hPos of handles) {
+        ctx.fillRect(hPos.x - handleSize / 2, hPos.y - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(hPos.x - handleSize / 2, hPos.y - handleSize / 2, handleSize, handleSize);
+    }
+
+    ctx.restore();
+}
+
+function drawSnapLines(ctx, canvasWidth, canvasHeight, mmToPx) {
+    ctx.save();
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+
+    for (const snap of INTERACTION.activeSnapLines) {
+        ctx.beginPath();
+        if (snap.orientation === 'v') {
+            const pxX = snap.posMm * mmToPx;
+            ctx.moveTo(pxX, 0);
+            ctx.lineTo(pxX, canvasHeight);
+        } else {
+            const pxY = snap.posMm * mmToPx;
+            ctx.moveTo(0, pxY);
+            ctx.lineTo(canvasWidth, pxY);
+        }
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function updateEmptyStateVisibility() {
+    const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
+    if (hasAnyImage) {
+        DOM.emptyState.classList.add('hidden');
+        DOM.btnGenerateDownload.disabled = false;
+    } else {
+        DOM.emptyState.classList.remove('hidden');
+        DOM.btnGenerateDownload.disabled = true;
+    }
+}
+
+// =============================================================================
+// 11. MANIPULACIÓN DIRECTA EN EL CANVAS (Drag, Resize & Snap)
+// =============================================================================
+
+function setupCanvasPointerEvents() {
+    const canvas = DOM.previewCanvas;
+
+    canvas.addEventListener('pointerdown', (e) => {
+        const coords = getCanvasPointerCoords(e);
+        const mmToPx = (canvas.width / (window.devicePixelRatio || 1)) / STATE.paper.widthMm;
+        const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
+
+        // 1. Probar si hizo clic en una manija de resize de la tarjeta seleccionada
+        if (STATE.selectedCardId) {
+            const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
+            if (selectedInst) {
+                const handle = hitTestHandles(coords.x, coords.y, selectedInst);
+                if (handle) {
+                    INTERACTION.isResizing = true;
+                    INTERACTION.resizeHandle = handle;
+                    INTERACTION.dragStart = { x: coords.x, y: coords.y };
+                    INTERACTION.cardInitialScale = selectedInst.card.scale;
+                    canvas.setPointerCapture(e.pointerId);
+                    return;
+                }
+            }
+        }
+
+        // 2. Probar si hizo clic sobre una tarjeta
+        let clickedInst = null;
+        for (let i = instances.length - 1; i >= 0; i--) {
+            const inst = instances[i];
+            if (coords.x >= inst.pxX && coords.x <= inst.pxX + inst.pxW &&
+                coords.y >= inst.pxY && coords.y <= inst.pxY + inst.pxH) {
+                clickedInst = inst;
+                break;
+            }
+        }
+
+        if (clickedInst) {
+            STATE.selectedCardId = clickedInst.card.id;
+            setActiveTab(clickedInst.card.id);
+            INTERACTION.isDragging = true;
+            INTERACTION.dragStart = { x: coords.x, y: coords.y };
+            INTERACTION.cardInitialPos = { x: clickedInst.card.xMm, y: clickedInst.card.yMm };
+            canvas.setPointerCapture(e.pointerId);
+            scheduleRender();
+        } else {
+            // Clic en el fondo vacío -> deseleccionar
+            STATE.selectedCardId = null;
+            DOM.selectedCardIndicator.textContent = 'Selecciona o arrastra un carnet';
+            scheduleRender();
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        const coords = getCanvasPointerCoords(e);
+        const mmToPx = (canvas.width / (window.devicePixelRatio || 1)) / STATE.paper.widthMm;
+        const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
+
+        if (INTERACTION.isResizing) {
+            // Lógica de redimensionamiento directo
+            const deltaX = coords.x - INTERACTION.dragStart.x;
+            const deltaMm = deltaX / mmToPx;
+            const card = STATE.cards[STATE.selectedCardId];
+            const scaleChange = (deltaMm / (card.widthMm / 100));
+
+            card.scale = Math.min(180, Math.max(30, Math.round(INTERACTION.cardInitialScale + scaleChange)));
+            syncControlsFromActiveCard();
+            scheduleRender();
+            return;
+        }
+
+        if (INTERACTION.isDragging) {
+            // Lógica de arrastre y reposicionamiento
+            const deltaX = (coords.x - INTERACTION.dragStart.x) / mmToPx;
+            const deltaY = (coords.y - INTERACTION.dragStart.y) / mmToPx;
+            const card = STATE.cards[STATE.selectedCardId];
+
+            let newX = Math.round(INTERACTION.cardInitialPos.x + deltaX);
+            let newY = Math.round(INTERACTION.cardInitialPos.y + deltaY);
+
+            // Guías magnéticas de Snap
+            INTERACTION.activeSnapLines = [];
+            if (STATE.snapEnabled) {
+                // Snap al centro horizontal de la hoja (xMm = 0)
+                if (Math.abs(newX) <= 2) {
+                    newX = 0;
+                    INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: STATE.paper.widthMm / 2 });
+                }
+
+                // Snap al otro carnet si existe
+                const otherCard = STATE.activeCardId === 'frente' ? STATE.cards.dorso : STATE.cards.frente;
+                if (otherCard && otherCard.rawImage) {
+                    if (Math.abs(newX - otherCard.xMm) <= 2) {
+                        newX = otherCard.xMm;
+                        INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: (STATE.paper.widthMm / 2) + newX });
+                    }
+                }
+            }
+
+            card.xMm = Math.min(100, Math.max(-100, newX));
+            card.yMm = Math.min(100, Math.max(-100, newY));
+
+            syncControlsFromActiveCard();
+            scheduleRender();
+            return;
+        }
+
+        // Cambio de cursor según hover
+        if (STATE.selectedCardId) {
+            const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
+            if (selectedInst) {
+                const handle = hitTestHandles(coords.x, coords.y, selectedInst);
+                if (handle) {
+                    canvas.style.cursor = (handle === 'tl' || handle === 'br') ? 'nwse-resize' : 'nesw-resize';
+                    return;
+                }
+            }
+        }
+
+        const isOverCard = instances.some(i => coords.x >= i.pxX && coords.x <= i.pxX + i.pxW && coords.y >= i.pxY && coords.y <= i.pxY + i.pxH);
+        canvas.style.cursor = isOverCard ? 'grab' : 'default';
+    });
+
+    const endInteraction = (e) => {
+        if (INTERACTION.isDragging || INTERACTION.isResizing) {
+            INTERACTION.isDragging = false;
+            INTERACTION.isResizing = false;
+            INTERACTION.activeSnapLines = [];
+            canvas.style.cursor = 'default';
+            saveHistoryState('Mover / Redimensionar carnet');
+            scheduleRender();
+        }
+    };
+
+    canvas.addEventListener('pointerup', endInteraction);
+    canvas.addEventListener('pointercancel', endInteraction);
+}
+
+function getCanvasPointerCoords(e) {
+    const canvas = DOM.previewCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const scaleX = (canvas.width / dpr) / rect.width;
+    const scaleY = (canvas.height / dpr) / rect.height;
+
+    return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+    };
+}
+
+function hitTestHandles(x, y, inst) {
+    const handleSize = 14;
+    const hList = [
+        { name: 'tl', x: inst.pxX - 3, y: inst.pxY - 3 },
+        { name: 'tr', x: inst.pxX + inst.pxW + 3, y: inst.pxY - 3 },
+        { name: 'bl', x: inst.pxX - 3, y: inst.pxY + inst.pxH + 3 },
+        { name: 'br', x: inst.pxX + inst.pxW + 3, y: inst.pxY + inst.pxH + 3 }
+    ];
+
+    for (const h of hList) {
+        if (Math.abs(x - h.x) <= handleSize && Math.abs(y - h.y) <= handleSize) {
+            return h.name;
+        }
+    }
+    return null;
+}
+
+function toggleSnap() {
+    STATE.snapEnabled = !STATE.snapEnabled;
+    DOM.btnToggleSnap.className = STATE.snapEnabled
+        ? 'p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80'
+        : 'p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800';
+    showToast(STATE.snapEnabled ? 'Guías magnéticas activadas' : 'Guías magnéticas desactivadas', 'info');
+}
+
+function changeZoom(delta) {
+    STATE.zoom = Math.min(2.5, Math.max(0.4, +(STATE.zoom + delta).toFixed(2)));
+    DOM.zoomLevelLabel.textContent = `${Math.round(STATE.zoom * 100)}%`;
+    resizeCanvasViewport();
+    scheduleRender();
+}
+
+function fitZoomToContainer() {
+    STATE.zoom = 1.0;
+    DOM.zoomLevelLabel.textContent = '100%';
+    resizeCanvasViewport();
+    scheduleRender();
+}
+
+// =============================================================================
+// 12. HISTORIAL: UNDO / REDO
+// =============================================================================
+
+function saveHistoryState(actionName) {
+    if (HISTORY.isApplyingHistory) return;
+
+    const snapshot = JSON.stringify({
+        paper: STATE.paper,
+        layout: STATE.layout,
+        cards: {
+            frente: { ...STATE.cards.frente, rawImage: null, croppedCanvas: null, cachedCanvas: null },
+            dorso: { ...STATE.cards.dorso, rawImage: null, croppedCanvas: null, cachedCanvas: null }
+        },
+        actionName
+    });
+
+    HISTORY.undoStack.push(snapshot);
+    if (HISTORY.undoStack.length > HISTORY.maxItems) {
+        HISTORY.undoStack.shift();
+    }
+    HISTORY.redoStack = [];
+
+    updateHistoryButtons();
+}
+
+function undo() {
+    if (HISTORY.undoStack.length <= 1) return;
+
+    HISTORY.isApplyingHistory = true;
+    const currentState = HISTORY.undoStack.pop();
+    HISTORY.redoStack.push(currentState);
+
+    const prevState = JSON.parse(HISTORY.undoStack[HISTORY.undoStack.length - 1]);
+    applySnapshot(prevState);
+    HISTORY.isApplyingHistory = false;
+
+    updateHistoryButtons();
+    scheduleRender();
+    showToast(`Deshecho: ${prevState.actionName || ''}`, 'info');
+}
+
+function redo() {
+    if (HISTORY.redoStack.length === 0) return;
+
+    HISTORY.isApplyingHistory = true;
+    const nextStateStr = HISTORY.redoStack.pop();
+    HISTORY.undoStack.push(nextStateStr);
+
+    const nextState = JSON.parse(nextStateStr);
+    applySnapshot(nextState);
+    HISTORY.isApplyingHistory = false;
+
+    updateHistoryButtons();
+    scheduleRender();
+    showToast(`Rehecho: ${nextState.actionName || ''}`, 'info');
+}
+
+function applySnapshot(snap) {
+    Object.assign(STATE.paper, snap.paper);
+    Object.assign(STATE.layout, snap.layout);
+
+    // Conservar imágenes originales pero restaurar parámetros numéricos
+    ['frente', 'dorso'].forEach(key => {
+        const currentCard = STATE.cards[key];
+        const snapCard = snap.cards[key];
+        Object.assign(currentCard, {
+            scale: snapCard.scale,
+            xMm: snapCard.xMm,
+            yMm: snapCard.yMm,
+            rotation: snapCard.rotation,
+            borderRadiusMm: snapCard.borderRadiusMm,
+            filter: snapCard.filter,
+            brightness: snapCard.brightness,
+            contrast: snapCard.contrast,
+            dirty: true
+        });
+    });
+
+    updateUIFromState();
+}
+
+function updateHistoryButtons() {
+    DOM.btnUndo.disabled = HISTORY.undoStack.length <= 1;
+    DOM.btnRedo.disabled = HISTORY.redoStack.length === 0;
+}
+
+// =============================================================================
+// 13. MODAL DE RECORTE (CROP TOOL)
+// =============================================================================
+
+let cropState = {
+    cardId: 'frente',
+    img: null,
+    aspect: 'free', // 'free' | 'cr80'
+    cropBox: { x: 20, y: 20, w: 200, h: 140 }
+};
+
+function openCropModal(cardId) {
+    const card = STATE.cards[cardId];
+    if (!card.rawImage) return;
+
+    cropState.cardId = cardId;
+    cropState.img = card.croppedCanvas || card.rawImage;
+
+    DOM.cropModal.classList.remove('hidden');
+
+    const canvas = DOM.cropCanvas;
+    const ctx = canvas.getContext('2d');
+    canvas.width = cropState.img.width;
+    canvas.height = cropState.img.height;
+    ctx.drawImage(cropState.img, 0, 0);
+
+    // Inicializar caja de recorte centrada
+    const w = canvas.width * 0.8;
+    const h = w * (54 / 85.6);
+    cropState.cropBox = {
+        x: (canvas.width - w) / 2,
+        y: (canvas.height - h) / 2,
+        w: w,
+        h: h
+    };
+
+    drawCropCanvas();
+}
+
+function drawCropCanvas() {
+    const canvas = DOM.cropCanvas;
+    const ctx = canvas.getContext('2d');
+    const box = cropState.cropBox;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(cropState.img, 0, 0);
+
+    // Oscurecer área fuera del recorte
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, canvas.width, box.y);
+    ctx.fillRect(0, box.y + box.h, canvas.width, canvas.height - (box.y + box.h));
+    ctx.fillRect(0, box.y, box.x, box.h);
+    ctx.fillRect(box.x + box.w, box.y, canvas.width - (box.x + box.w), box.h);
+
+    // Borde de la caja de recorte
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+
+    // Cuadrícula de tercios
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(box.x + box.w / 3, box.y);
+    ctx.lineTo(box.x + box.w / 3, box.y + box.h);
+    ctx.moveTo(box.x + (box.w * 2) / 3, box.y);
+    ctx.lineTo(box.x + (box.w * 2) / 3, box.y + box.h);
+    ctx.moveTo(box.x, box.y + box.h / 3);
+    ctx.lineTo(box.x + box.w, box.y + box.h / 3);
+    ctx.moveTo(box.x, box.y + (box.h * 2) / 3);
+    ctx.lineTo(box.x + box.w, box.y + (box.h * 2) / 3);
+    ctx.stroke();
+}
+
+DOM.btnCloseCrop.addEventListener('click', () => DOM.cropModal.classList.add('hidden'));
+DOM.btnCancelCrop.addEventListener('click', () => DOM.cropModal.classList.add('hidden'));
+
+DOM.btnCropAspectCr80.addEventListener('click', () => {
+    cropState.aspect = 'cr80';
+    DOM.btnCropAspectCr80.className = 'px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
+    DOM.btnCropAspectFree.className = 'px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
+    const box = cropState.cropBox;
+    box.h = box.w * (53.98 / 85.6);
+    drawCropCanvas();
+});
+
+DOM.btnCropAspectFree.addEventListener('click', () => {
+    cropState.aspect = 'free';
+    DOM.btnCropAspectFree.className = 'px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
+    DOM.btnCropAspectCr80.className = 'px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
+});
+
+DOM.btnApplyCrop.addEventListener('click', () => {
+    const box = cropState.cropBox;
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = box.w;
+    croppedCanvas.height = box.h;
+
+    const ctx = croppedCanvas.getContext('2d');
+    ctx.drawImage(cropState.img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+
+    const card = STATE.cards[cropState.cardId];
+    card.croppedCanvas = croppedCanvas;
+    card.dirty = true;
+
+    DOM.cropModal.classList.add('hidden');
+    saveHistoryState(`Recortar ${card.name}`);
+    scheduleRender();
+    showToast(`Recorte aplicado a ${card.name}`, 'success');
+});
+
+// =============================================================================
+// 14. MODAL DE CÁMARA WEB
+// =============================================================================
+
+function openCameraModal(cardId) {
+    targetCameraCard = cardId;
+    DOM.cameraModal.classList.remove('hidden');
+
+    navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+    }).then(stream => {
+        cameraStream = stream;
+        DOM.cameraVideo.srcObject = stream;
+    }).catch(err => {
+        console.error('Error abriendo cámara:', err);
+        closeCameraModal();
+        showToast('No se pudo acceder a la cámara o no se concedieron permisos.', 'error');
+    });
+}
+
+function closeCameraModal() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+    DOM.cameraModal.classList.add('hidden');
+}
+
+function captureCameraPhoto() {
+    if (!DOM.cameraVideo.srcObject) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = DOM.cameraVideo.videoWidth || 1280;
+    canvas.height = DOM.cameraVideo.videoHeight || 720;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(DOM.cameraVideo, 0, 0, canvas.width, canvas.height);
+
+    const img = new Image();
+    img.onload = () => {
+        const card = STATE.cards[targetCameraCard];
+        card.rawImage = img;
+        card.croppedCanvas = null;
+        card.cachedCanvas = null;
+        card.dirty = true;
+
+        updateDropzoneUI(targetCameraCard, img.src);
+        closeCameraModal();
+        saveHistoryState(`Captura cámara ${card.name}`);
+        scheduleRender();
+        showToast(`Foto capturada para ${card.name}`, 'success');
+    };
+    img.src = canvas.toDataURL('image/jpeg', 0.95);
+}
+
+// =============================================================================
+// 15. MOTOR DE EXPORTACIÓN (PDF a 300 DPI, JPG, PNG, WebP e Impresión)
+// =============================================================================
+
+async function generateAndDownload() {
+    const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
+    if (!hasAnyImage) {
+        showToast('Por favor sube al menos una imagen de carnet antes de exportar.', 'warning');
+        return;
+    }
+
+    const format = STATE.exportFormat;
+    const dpi = STATE.exportDpi;
+
+    showLoader('Generando Documento...', `Renderizando a ${dpi} DPI en formato ${format.toUpperCase()}`);
+
+    // Asíncrono para permitir que el loader aparezca sin congelar la UI
+    setTimeout(async () => {
+        try {
+            if (format === 'pdf') {
+                await exportPDFDocument();
+            } else {
+                await exportImageDocument(format, dpi);
+            }
+
+            hideLoader();
+            triggerSuccessCelebration();
+            showToast(`¡Documento ${format.toUpperCase()} generado exitosamente!`, 'success');
+        } catch (err) {
+            console.error('Error al exportar:', err);
+            hideLoader();
+            showToast('Ocurrió un error al generar el archivo. Inténtalo de nuevo.', 'error');
+        }
+    }, 120);
+}
+
+async function exportPDFDocument() {
+    const { jsPDF } = window.jspdf;
+    const orientation = STATE.paper.orientation === 'portrait' ? 'p' : 'l';
+    const format = STATE.paper.size === 'letter' ? 'letter' : 'a4';
+
+    const pdf = new jsPDF({
+        orientation: orientation,
+        unit: 'mm',
+        format: format,
+        compress: true
+    });
+
+    const mmToPx = 300 / 25.4; // 300 DPI para alta fidelidad
+    const highResCanvasWidth = STATE.paper.widthMm * mmToPx;
+    const highResCanvasHeight = STATE.paper.heightMm * mmToPx;
+
+    const instances = getCardInstances(mmToPx, highResCanvasWidth, highResCanvasHeight);
+
+    for (const inst of instances) {
+        const card = inst.card;
+        if (card.dirty || !card.cachedCanvas) {
+            processCardImage(card);
+        }
+
+        // Crear versión de alta resolución con bordes redondeados
+        const roundedCanvas = createRoundedExportCanvas(card, inst.wMm, inst.hMm, mmToPx);
+        const imgData = roundedCanvas.toDataURL('image/jpeg', 0.92);
+
+        // Agregar directamente a las coordenadas exactas en milímetros
+        pdf.addImage(imgData, 'JPEG', inst.xMm, inst.yMm, inst.wMm, inst.hMm);
+
+        // Líneas de corte con tijeras si está activo
+        if (STATE.layout.showCutLines) {
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(0.2);
+            pdf.setLineDashPattern([1.5, 1.5], 0);
+            pdf.rect(inst.xMm - 0.6, inst.yMm - 0.6, inst.wMm + 1.2, inst.hMm + 1.2);
+        }
+    }
+
+    const timestamp = getFormattedTimestamp();
+    const filename = `Carnet_Cardify_${STATE.paper.size.toUpperCase()}_${timestamp}.pdf`;
+    pdf.save(filename);
+}
+
+async function exportImageDocument(format, dpi) {
+    const mmToPx = dpi / 25.4;
+    const widthPx = Math.round(STATE.paper.widthMm * mmToPx);
+    const heightPx = Math.round(STATE.paper.heightMm * mmToPx);
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = widthPx;
+    exportCanvas.height = heightPx;
+    const ctx = exportCanvas.getContext('2d');
+
+    // Fondo blanco nítido
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, widthPx, heightPx);
+
+    const instances = getCardInstances(mmToPx, widthPx, heightPx);
+
+    for (const inst of instances) {
+        drawCardInstance(ctx, inst, mmToPx);
+    }
+
+    // Convertir a blob de forma optimizada
+    const mimeType = format === 'png' ? 'image/png' : (format === 'webp' ? 'image/webp' : 'image/jpeg');
+    const quality = format === 'png' ? 1.0 : 0.93;
+
+    return new Promise((resolve) => {
+        exportCanvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const timestamp = getFormattedTimestamp();
+            a.download = `Carnet_Cardify_${dpi}DPI_${timestamp}.${format}`;
+            a.href = url;
+            a.click();
+            URL.revokeObjectURL(url);
+            resolve();
+        }, mimeType, quality);
+    });
+}
+
+function createRoundedExportCanvas(card, wMm, hMm, mmToPx) {
+    const canvas = document.createElement('canvas');
+    const width = Math.round(wMm * mmToPx);
+    const height = Math.round(hMm * mmToPx);
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    const r = Math.round(card.borderRadiusMm * mmToPx);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.beginPath();
+    drawRoundedRectPath(ctx, 0, 0, width, height, r);
+    ctx.clip();
+    ctx.drawImage(card.cachedCanvas, 0, 0, width, height);
+    ctx.restore();
+
+    if (STATE.layout.showBorder) {
+        ctx.strokeStyle = 'rgba(200, 200, 200, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        drawRoundedRectPath(ctx, 0, 0, width, height, r);
+        ctx.stroke();
+    }
+
+    return canvas;
+}
+
+async function directPrintDocument() {
+    showLoader('Preparando impresión...', 'Generando hoja a tamaño real');
+
+    setTimeout(() => {
+        const mmToPx = 300 / 25.4;
+        const widthPx = Math.round(STATE.paper.widthMm * mmToPx);
+        const heightPx = Math.round(STATE.paper.heightMm * mmToPx);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = widthPx;
+        canvas.height = heightPx;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, widthPx, heightPx);
+
+        const instances = getCardInstances(mmToPx, widthPx, heightPx);
+        for (const inst of instances) {
+            drawCardInstance(ctx, inst, mmToPx);
+        }
+
+        DOM.printImg.src = canvas.toDataURL('image/png', 1.0);
+        DOM.printArea.classList.remove('hidden');
+
+        hideLoader();
+        window.print();
+        DOM.printArea.classList.add('hidden');
     }, 100);
 }
 
-function exportToPDF(quality) {
+async function copyToClipboard() {
     try {
-        const isCompressed = quality === 'compressed';
-        
-        // Crear nuevo documento PDF en formato A4 (210 x 297 mm)
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4',
-            compress: isCompressed
-        });
+        const mmToPx = 200 / 25.4;
+        const widthPx = Math.round(STATE.paper.widthMm * mmToPx);
+        const heightPx = Math.round(STATE.paper.heightMm * mmToPx);
 
-        // Dimensiones A4 en mm
-        const pageWidth = 210;
-        const pageHeight = 297;
-        const margin = 10;
-        const contentWidth = pageWidth - (margin * 2);
-        
-        // Calcular altura para cada imagen (mitad de la página menos márgenes)
-        const imageHeight = (pageHeight - (margin * 3)) / 2;
-
-        // Función para redimensionar imagen manteniendo proporción
-        function resizeImageToFit(img, maxWidth, maxHeight) {
-            const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-            return {
-                width: img.width * ratio,
-                height: img.height * ratio
-            };
-        }
-
-        // Obtener valores de los controles
-        const frenteScaleValue = parseFloat(frenteScale.value) / 100;
-        const frenteXOffset = parseFloat(frenteX.value);
-        const frenteYOffset = parseFloat(frenteY.value);
-        const dorsoScaleValue = parseFloat(dorsoScale.value) / 100;
-        const dorsoXOffset = parseFloat(dorsoX.value);
-        const dorsoYOffset = parseFloat(dorsoY.value);
-
-        // Crear imágenes con esquinas redondeadas según calidad
-        const frenteRounded = isCompressed 
-            ? createRoundedImageCompressed(frenteImage, 70)
-            : createRoundedImageHighQuality(frenteImage, 70);
-        const dorsoRounded = isCompressed 
-            ? createRoundedImageCompressed(dorsoImage, 70)
-            : createRoundedImageHighQuality(dorsoImage, 70);
-
-        // Procesar imagen del frente con escala personalizada
-        let frenteSize = resizeImageToFit(frenteImage, contentWidth, imageHeight);
-        frenteSize.width *= frenteScaleValue;
-        frenteSize.height *= frenteScaleValue;
-        const frenteXPos = margin + (contentWidth - frenteSize.width) / 2 + frenteXOffset;
-        const frenteYPos = margin + frenteYOffset;
-
-        // Procesar imagen del dorso con escala personalizada
-        let dorsoSize = resizeImageToFit(dorsoImage, contentWidth, imageHeight);
-        dorsoSize.width *= dorsoScaleValue;
-        dorsoSize.height *= dorsoScaleValue;
-        const dorsoXPos = margin + (contentWidth - dorsoSize.width) / 2 + dorsoXOffset;
-        const dorsoYPos = margin + imageHeight + margin + dorsoYOffset;
-
-        // Agregar imágenes con esquinas redondeadas al PDF
-        const imageFormat = isCompressed ? 'JPEG' : 'PNG';
-        pdf.addImage(frenteRounded, imageFormat, frenteXPos, frenteYPos, frenteSize.width, frenteSize.height);
-        pdf.addImage(dorsoRounded, imageFormat, dorsoXPos, dorsoYPos, dorsoSize.width, dorsoSize.height);
-
-        // Generar nombre de archivo con timestamp
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        const qualityLabel = isCompressed ? '_optimizado' : '_alta_calidad';
-        const filename = `carnet${qualityLabel}_${timestamp}.pdf`;
-
-        // Descargar el PDF
-        pdf.save(filename);
-        
-        // Ocultar loader y mostrar mensaje de éxito
-        hideLoader();
-        showStatus('¡PDF generado y descargado exitosamente!', 'success');
-        convertBtn.disabled = false;
-        
-    } catch (error) {
-        console.error('Error al generar PDF:', error);
-        hideLoader();
-        showStatus('Error al generar el PDF. Inténtalo de nuevo.', 'error');
-        convertBtn.disabled = false;
-    }
-}
-
-function exportToImage(format, quality) {
-    try {
-        const isCompressed = quality === 'compressed';
-        
-        // Obtener valores de los controles
-        const frenteScaleValue = parseFloat(frenteScale.value) / 100;
-        const frenteXOffset = parseFloat(frenteX.value) * 3.78; // Convertir mm a px aprox
-        const frenteYOffset = parseFloat(frenteY.value) * 3.78;
-        const dorsoScaleValue = parseFloat(dorsoScale.value) / 100;
-        const dorsoXOffset = parseFloat(dorsoX.value) * 3.78;
-        const dorsoYOffset = parseFloat(dorsoY.value) * 3.78;
-
-        // Crear canvas para la imagen combinada (A4 en píxeles: 794 x 1123)
         const canvas = document.createElement('canvas');
+        canvas.width = widthPx;
+        canvas.height = heightPx;
         const ctx = canvas.getContext('2d');
-        canvas.width = 794;
-        canvas.height = 1123;
-        
-        // Fondo blanco
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Crear imágenes con esquinas redondeadas según calidad
-        const frenteRounded = isCompressed 
-            ? createRoundedImageCompressed(frenteImage, 70)
-            : createRoundedImageHighQuality(frenteImage, 70);
-        const dorsoRounded = isCompressed 
-            ? createRoundedImageCompressed(dorsoImage, 70)
-            : createRoundedImageHighQuality(dorsoImage, 70);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, widthPx, heightPx);
 
-        // Cargar las imágenes procesadas
-        const frenteImgElement = new Image();
-        const dorsoImgElement = new Image();
-        
-        let loadedCount = 0;
-        
-        function checkBothLoaded() {
-            loadedCount++;
-            if (loadedCount === 2) {
-                // Calcular dimensiones y posiciones
-                const margin = 38; // 10mm en px
-                const contentWidth = canvas.width - (margin * 2);
-                const imageHeight = (canvas.height - (margin * 3)) / 2;
-                
-                // Frente
-                const frenteRatio = Math.min(contentWidth / frenteImgElement.width, imageHeight / frenteImgElement.height);
-                let frenteW = frenteImgElement.width * frenteRatio * frenteScaleValue;
-                let frenteH = frenteImgElement.height * frenteRatio * frenteScaleValue;
-                const frenteX = margin + (contentWidth - frenteW) / 2 + frenteXOffset;
-                const frenteY = margin + frenteYOffset;
-                
-                // Dorso
-                const dorsoRatio = Math.min(contentWidth / dorsoImgElement.width, imageHeight / dorsoImgElement.height);
-                let dorsoW = dorsoImgElement.width * dorsoRatio * dorsoScaleValue;
-                let dorsoH = dorsoImgElement.height * dorsoRatio * dorsoScaleValue;
-                const dorsoX = margin + (contentWidth - dorsoW) / 2 + dorsoXOffset;
-                const dorsoY = margin + imageHeight + margin + dorsoYOffset;
-                
-                // Dibujar en el canvas
-                ctx.drawImage(frenteImgElement, frenteX, frenteY, frenteW, frenteH);
-                ctx.drawImage(dorsoImgElement, dorsoX, dorsoY, dorsoW, dorsoH);
-                
-                // Descargar imagen
-                const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
-                const imageQuality = isCompressed ? 0.85 : 1.0;
-                const dataURL = canvas.toDataURL(mimeType, imageQuality);
-                
-                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-                const qualityLabel = isCompressed ? '_optimizado' : '_alta_calidad';
-                const filename = `carnet${qualityLabel}_${timestamp}.${format}`;
-                
-                // Crear link de descarga
-                const link = document.createElement('a');
-                link.download = filename;
-                link.href = dataURL;
-                link.click();
-                
-                // Ocultar loader y mostrar mensaje de éxito
-                hideLoader();
-                showStatus(`¡Imagen ${format.toUpperCase()} generada y descargada exitosamente!`, 'success');
-                convertBtn.disabled = false;
-            }
+        const instances = getCardInstances(mmToPx, widthPx, heightPx);
+        for (const inst of instances) {
+            drawCardInstance(ctx, inst, mmToPx);
         }
-        
-        frenteImgElement.onload = checkBothLoaded;
-        dorsoImgElement.onload = checkBothLoaded;
-        frenteImgElement.src = frenteRounded;
-        dorsoImgElement.src = dorsoRounded;
-        
-    } catch (error) {
-        console.error('Error al generar imagen:', error);
-        hideLoader();
-        showStatus('Error al generar la imagen. Inténtalo de nuevo.', 'error');
-        convertBtn.disabled = false;
+
+        canvas.toBlob(async (blob) => {
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+            ]);
+            showToast('¡Hoja copiada al portapapeles! Puedes pegarla en Word o WhatsApp.', 'success');
+        });
+    } catch (err) {
+        console.error('Error al copiar al portapapeles:', err);
+        showToast('No se pudo copiar al portapapeles. Es posible que el navegador no lo soporte.', 'warning');
     }
 }
 
-// Función para limpiar las imágenes (opcional)
-function clearImages() {
-    frenteImage = null;
-    dorsoImage = null;
-    
-    frentePreview.classList.add('hidden');
-    dorsoPreview.classList.add('hidden');
-    frentePlaceholder.classList.remove('hidden');
-    dorsoPlaceholder.classList.remove('hidden');
-    
-    frenteInput.value = '';
-    dorsoInput.value = '';
-    
-    checkIfCanConvert();
+// =============================================================================
+// 16. NOTIFICACIONES TOAST, LOADERS Y CELEBRACIÓN
+// =============================================================================
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    const colors = {
+        success: 'bg-emerald-600 text-white shadow-emerald-500/20',
+        error: 'bg-red-600 text-white shadow-red-500/20',
+        warning: 'bg-amber-500 text-white shadow-amber-500/20',
+        info: 'bg-slate-900 dark:bg-slate-800 text-white shadow-slate-900/20'
+    };
+
+    toast.className = `${colors[type] || colors.info} px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+    toast.innerHTML = `
+        <span>${message}</span>
+    `;
+
+    DOM.toastContainer.appendChild(toast);
+
+    // Animación de entrada
+    requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+    });
+
+    // Auto eliminar
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+    }, 3200);
+}
+
+function showLoader(title, subtitle) {
+    DOM.loaderTitle.textContent = title || 'Procesando...';
+    DOM.loaderSubtitle.textContent = subtitle || 'Por favor espera';
+    DOM.loaderOverlay.classList.remove('hidden');
+}
+
+function hideLoader() {
+    DOM.loaderOverlay.classList.add('hidden');
+}
+
+function triggerSuccessCelebration() {
+    if (typeof confetti === 'function') {
+        confetti({
+            particleCount: 65,
+            spread: 55,
+            origin: { y: 0.75 }
+        });
+    }
+}
+
+function getFormattedTimestamp() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
