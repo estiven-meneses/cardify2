@@ -27,6 +27,7 @@ const FACTORY_DEFAULTS = {
             name: 'Frente',
             rawImage: null,
             croppedCanvas: null,
+            cropRect: null,
             cachedCanvas: null,
             widthMm: 85.6,
             heightMm: 53.98,
@@ -47,6 +48,7 @@ const FACTORY_DEFAULTS = {
             name: 'Dorso',
             rawImage: null,
             croppedCanvas: null,
+            cropRect: null,
             cachedCanvas: null,
             widthMm: 85.6,
             heightMm: 53.98,
@@ -147,6 +149,7 @@ const DOM = {
     cardXNum: document.getElementById('card-x-num'),
     cardYRange: document.getElementById('card-y-range'),
     cardYNum: document.getElementById('card-y-num'),
+    btnAlignCenterBoth: document.getElementById('btn-align-center-both'),
     btnAlignCenterX: document.getElementById('btn-align-center-x'),
     btnAlignCenterY: document.getElementById('btn-align-center-y'),
     btnCopyToOther: document.getElementById('btn-copy-to-other'),
@@ -194,6 +197,7 @@ const DOM = {
     btnQuickScaleDown: document.getElementById('btn-quick-scale-down'),
     btnQuickScaleUp: document.getElementById('btn-quick-scale-up'),
     btnQuickRotate: document.getElementById('btn-quick-rotate'),
+    btnQuickCrop: document.getElementById('btn-quick-crop'),
     btnQuickCenter: document.getElementById('btn-quick-center'),
     btnQuickToSettings: document.getElementById('btn-quick-to-settings'),
     viewportContainer: document.getElementById('viewport-container'),
@@ -210,8 +214,11 @@ const DOM = {
     btnApplyCrop: document.getElementById('btn-apply-crop'),
     btnCropAspectFree: document.getElementById('btn-crop-aspect-free'),
     btnCropAspectCr80: document.getElementById('btn-crop-aspect-cr80'),
+    btnCropRotate: document.getElementById('btn-crop-rotate'),
+    btnCropAutoDetect: document.getElementById('btn-crop-auto-detect'),
     cameraModal: document.getElementById('camera-modal'),
     cameraVideo: document.getElementById('camera-video'),
+    cameraGuideBox: document.getElementById('camera-guide-box'),
     btnSwitchCamera: document.getElementById('btn-switch-camera'),
     btnCameraUseNative: document.getElementById('btn-camera-use-native'),
     btnCloseCamera: document.getElementById('btn-close-camera'),
@@ -782,18 +789,18 @@ function setupEventListeners() {
         });
     }
 
+    if (DOM.btnQuickCrop) {
+        DOM.btnQuickCrop.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (STATE.selectedCardId) openCropModal(STATE.selectedCardId);
+        });
+    }
+
     if (DOM.btnQuickCenter) {
         DOM.btnQuickCenter.addEventListener('click', (e) => {
             e.stopPropagation();
             if (STATE.selectedCardId) {
-                const c = STATE.cards[STATE.selectedCardId];
-                c.xMm = 0;
-                if (STATE.syncCards) {
-                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
-                    STATE.cards[otherId].xMm = 0;
-                }
-                syncControlsFromActiveCard();
-                scheduleRender();
+                centerCard(STATE.selectedCardId);
             }
         });
     }
@@ -911,6 +918,7 @@ function removeCard(cardId) {
     const card = STATE.cards[cardId];
     card.rawImage = null;
     card.croppedCanvas = null;
+    card.cropRect = null;
     card.cachedCanvas = null;
     card.dirty = true;
 
@@ -966,6 +974,7 @@ function swapCards() {
 
     const tempRaw = f.rawImage;
     const tempCropped = f.croppedCanvas;
+    const tempCropRect = f.cropRect;
     const tempRotation = f.rotation;
     const tempFilter = f.filter;
     const tempBrightness = f.brightness;
@@ -975,6 +984,7 @@ function swapCards() {
 
     f.rawImage = d.rawImage;
     f.croppedCanvas = d.croppedCanvas;
+    f.cropRect = d.cropRect;
     f.rotation = d.rotation;
     f.filter = d.filter;
     f.brightness = d.brightness;
@@ -985,6 +995,7 @@ function swapCards() {
 
     d.rawImage = tempRaw;
     d.croppedCanvas = tempCropped;
+    d.cropRect = tempCropRect;
     d.rotation = tempRotation;
     d.filter = tempFilter;
     d.brightness = tempBrightness;
@@ -1175,6 +1186,25 @@ function syncControlsFromActiveCard() {
     updateDefaultConfigBadge();
 }
 
+function centerCard(cardId) {
+    if (!cardId || !STATE.cards[cardId]) return;
+
+    const targetCard = STATE.cards[cardId];
+    targetCard.xMm = 0;
+    targetCard.yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[cardId].yMm);
+
+    if (STATE.syncCards) {
+        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
+        STATE.cards[otherId].xMm = 0;
+        STATE.cards[otherId].yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[otherId].yMm);
+    }
+
+    syncControlsFromActiveCard();
+    saveHistoryState(`Centrar ${targetCard.name}`);
+    scheduleRender();
+    showToast(`Carnet centrado en posición óptima (X: 0, Y: ${targetCard.yMm}mm)`, 'success');
+}
+
 function setupCardControls() {
     // Escala
     const onScaleChange = (val) => {
@@ -1213,6 +1243,12 @@ function setupCardControls() {
     });
 
     // Alineaciones
+    if (DOM.btnAlignCenterBoth) {
+        DOM.btnAlignCenterBoth.addEventListener('click', () => {
+            centerCard(STATE.activeCardId);
+        });
+    }
+
     DOM.btnAlignCenterX.addEventListener('click', () => {
         STATE.cards[STATE.activeCardId].xMm = 0;
         if (STATE.syncCards) {
@@ -1225,7 +1261,13 @@ function setupCardControls() {
     });
 
     DOM.btnAlignCenterY.addEventListener('click', () => {
-        STATE.cards[STATE.activeCardId].yMm = 0;
+        const id = STATE.activeCardId;
+        const targetY = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[id].yMm);
+        STATE.cards[id].yMm = targetY;
+        if (STATE.syncCards) {
+            const otherId = id === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[otherId].yMm);
+        }
         syncControlsFromActiveCard();
         saveHistoryState('Centrar Verticalmente');
         scheduleRender();
@@ -2243,39 +2285,57 @@ function updateHistoryButtons() {
 }
 
 // =============================================================================
-// 15. MODAL DE RECORTE (CROP TOOL)
+// 15. MODAL DE RECORTE INTERACTIVO (CROP TOOL MULTI-TÁCTIL)
 // =============================================================================
 
 let cropState = {
     cardId: 'frente',
-    img: null,
-    aspect: 'free',
-    cropBox: { x: 20, y: 20, w: 200, h: 140 }
+    sourceImg: null,
+    aspect: 'cr80', // 'cr80' | 'free'
+    cropBox: { x: 20, y: 20, w: 200, h: 140 },
+    dragHandle: null, // null | 'move' | 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w'
+    startPointer: { x: 0, y: 0 },
+    startBox: { x: 0, y: 0, w: 0, h: 0 }
 };
 
 function openCropModal(cardId) {
     const card = STATE.cards[cardId];
-    if (!card.rawImage) return;
+    if (!card || (!card.rawImage && !card.croppedCanvas)) {
+        showToast('Carga o escanea una imagen primero para recortarla.', 'warning');
+        return;
+    }
 
     cropState.cardId = cardId;
-    cropState.img = card.croppedCanvas || card.rawImage;
+    // Preferir siempre la imagen original sin recortar para permitir ampliar o reencuadrar
+    cropState.sourceImg = card.rawImage || card.croppedCanvas;
 
     DOM.cropModal.classList.remove('hidden');
 
     const canvas = DOM.cropCanvas;
-    const ctx = canvas.getContext('2d');
-    canvas.width = cropState.img.width;
-    canvas.height = cropState.img.height;
-    ctx.drawImage(cropState.img, 0, 0);
+    canvas.width = cropState.sourceImg.width;
+    canvas.height = cropState.sourceImg.height;
 
-    const w = canvas.width * 0.8;
-    const h = w * (54 / 85.6);
-    cropState.cropBox = {
-        x: (canvas.width - w) / 2,
-        y: (canvas.height - h) / 2,
-        w: w,
-        h: h
-    };
+    // Si ya existía un recorte previo para esta tarjeta, restablecerlo como base
+    if (card.cropRect && card.cropRect.w > 20 && card.cropRect.h > 20 &&
+        card.cropRect.x + card.cropRect.w <= canvas.width &&
+        card.cropRect.y + card.cropRect.h <= canvas.height) {
+        cropState.cropBox = { ...card.cropRect };
+    } else {
+        // En caso contrario, encuadre estándar CR80 centrado
+        const ratio = 85.6 / 53.98;
+        let w = canvas.width * 0.84;
+        let h = w / ratio;
+        if (h > canvas.height * 0.88) {
+            h = canvas.height * 0.84;
+            w = h * ratio;
+        }
+        cropState.cropBox = {
+            x: (canvas.width - w) / 2,
+            y: (canvas.height - h) / 2,
+            w: w,
+            h: h
+        };
+    }
 
     drawCropCanvas();
 }
@@ -2286,19 +2346,25 @@ function drawCropCanvas() {
     const box = cropState.cropBox;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(cropState.img, 0, 0);
+    if (cropState.sourceImg) {
+        ctx.drawImage(cropState.sourceImg, 0, 0);
+    }
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(0, 0, canvas.width, box.y);
-    ctx.fillRect(0, box.y + box.h, canvas.width, canvas.height - (box.y + box.h));
-    ctx.fillRect(0, box.y, box.x, box.h);
-    ctx.fillRect(box.x + box.w, box.y, canvas.width - (box.x + box.w), box.h);
+    // 1. Fondo oscurecido exterior (viñeta de enfoque)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+    ctx.fillRect(0, 0, canvas.width, Math.max(0, box.y));
+    ctx.fillRect(0, box.y + box.h, canvas.width, Math.max(0, canvas.height - (box.y + box.h)));
+    ctx.fillRect(0, box.y, Math.max(0, box.x), box.h);
+    ctx.fillRect(box.x + box.w, box.y, Math.max(0, canvas.width - (box.x + box.w)), box.h);
 
+    // 2. Borde exterior brillante
+    const strokeW = Math.max(2, Math.round(canvas.width * 0.0028));
     ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = strokeW;
     ctx.strokeRect(box.x, box.y, box.w, box.h);
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    // 3. Regla de tercios (guías internas sutiles)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(box.x + box.w / 3, box.y);
@@ -2310,47 +2376,481 @@ function drawCropCanvas() {
     ctx.moveTo(box.x, box.y + (box.h * 2) / 3);
     ctx.lineTo(box.x + box.w, box.y + (box.h * 2) / 3);
     ctx.stroke();
+
+    // 4. Tiradores circulares de esquina táctiles
+    const handleR = Math.max(8, Math.round(canvas.width * 0.013));
+    const corners = [
+        { x: box.x, y: box.y },
+        { x: box.x + box.w, y: box.y },
+        { x: box.x + box.w, y: box.y + box.h },
+        { x: box.x, y: box.y + box.h }
+    ];
+
+    corners.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, handleR, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = Math.max(2.5, handleR * 0.3);
+        ctx.stroke();
+    });
+
+    // 5. Tiradores laterales en modo libre
+    if (cropState.aspect === 'free') {
+        const sides = [
+            { x: box.x + box.w / 2, y: box.y },
+            { x: box.x + box.w / 2, y: box.y + box.h },
+            { x: box.x, y: box.y + box.h / 2 },
+            { x: box.x + box.w, y: box.y + box.h / 2 }
+        ];
+        const sideR = Math.max(6, handleR * 0.7);
+        sides.forEach(pt => {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, sideR, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = Math.max(2, sideR * 0.3);
+            ctx.stroke();
+        });
+    }
+
+    // 6. Etiqueta informativa de tamaño
+    const label = `${Math.round(box.w)} × ${Math.round(box.h)} px ${cropState.aspect === 'cr80' ? '(CR80)' : ''}`;
+    const fontSize = Math.max(11, Math.round(canvas.width * 0.017));
+    ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+    const textW = ctx.measureText(label).width;
+    const tagX = box.x + 8;
+    const tagY = box.y + box.h - 8;
+    if (tagY > box.y + 24) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(tagX - 4, tagY - fontSize - 2, textW + 8, fontSize + 6);
+        ctx.fillStyle = '#60a5fa';
+        ctx.fillText(label, tagX, tagY);
+    }
 }
 
+function getCropPointerCanvasCoords(e) {
+    const canvas = DOM.cropCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / Math.max(1, rect.width);
+    const scaleY = canvas.height / Math.max(1, rect.height);
+    return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+    };
+}
+
+function getCropHandleAt(px, py) {
+    const canvas = DOM.cropCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const box = cropState.cropBox;
+    const screenScale = canvas.width / Math.max(1, rect.width);
+    const hitR = Math.max(28, 32 * screenScale);
+
+    if (Math.hypot(px - box.x, py - box.y) <= hitR) return 'nw';
+    if (Math.hypot(px - (box.x + box.w), py - box.y) <= hitR) return 'ne';
+    if (Math.hypot(px - (box.x + box.w), py - (box.y + box.h)) <= hitR) return 'se';
+    if (Math.hypot(px - box.x, py - (box.y + box.h)) <= hitR) return 'sw';
+
+    if (cropState.aspect === 'free') {
+        if (Math.abs(py - box.y) <= hitR && px >= box.x && px <= box.x + box.w) return 'n';
+        if (Math.abs(py - (box.y + box.h)) <= hitR && px >= box.x && px <= box.x + box.w) return 's';
+        if (Math.abs(px - box.x) <= hitR && py >= box.y && py <= box.y + box.h) return 'w';
+        if (Math.abs(px - (box.x + box.w)) <= hitR && py >= box.y && py <= box.y + box.h) return 'e';
+    }
+
+    if (px >= box.x && px <= box.x + box.w && py >= box.y && py <= box.y + box.h) {
+        return 'move';
+    }
+
+    return null;
+}
+
+function updateCropCursor(handle) {
+    const canvas = DOM.cropCanvas;
+    if (!canvas) return;
+    switch (handle) {
+        case 'move': canvas.style.cursor = 'move'; break;
+        case 'nw':
+        case 'se': canvas.style.cursor = 'nwse-resize'; break;
+        case 'ne':
+        case 'sw': canvas.style.cursor = 'nesw-resize'; break;
+        case 'n':
+        case 's': canvas.style.cursor = 'ns-resize'; break;
+        case 'e':
+        case 'w': canvas.style.cursor = 'ew-resize'; break;
+        default: canvas.style.cursor = 'crosshair'; break;
+    }
+}
+
+function onCropPointerDown(e) {
+    e.preventDefault();
+    const pt = getCropPointerCanvasCoords(e);
+    const handle = getCropHandleAt(pt.x, pt.y);
+    if (!handle) return;
+
+    cropState.dragHandle = handle;
+    cropState.startPointer = { x: pt.x, y: pt.y };
+    cropState.startBox = { ...cropState.cropBox };
+    try { DOM.cropCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+}
+
+function onCropPointerMove(e) {
+    const pt = getCropPointerCanvasCoords(e);
+    if (!cropState.dragHandle) {
+        const handle = getCropHandleAt(pt.x, pt.y);
+        updateCropCursor(handle);
+        return;
+    }
+
+    e.preventDefault();
+    const dx = pt.x - cropState.startPointer.x;
+    const dy = pt.y - cropState.startPointer.y;
+    const sb = cropState.startBox;
+    const cw = DOM.cropCanvas.width;
+    const ch = DOM.cropCanvas.height;
+    const isCr80 = cropState.aspect === 'cr80';
+    const ratio = 85.6 / 53.98;
+    const minW = Math.max(30, cw * 0.05);
+    const minH = Math.max(20, ch * 0.05);
+
+    let { x, y, w, h } = sb;
+
+    switch (cropState.dragHandle) {
+        case 'move': {
+            x = Math.max(0, Math.min(cw - w, sb.x + dx));
+            y = Math.max(0, Math.min(ch - h, sb.y + dy));
+            break;
+        }
+        case 'se': {
+            w = Math.max(minW, Math.min(cw - sb.x, sb.w + dx));
+            if (isCr80) {
+                h = w / ratio;
+                if (sb.y + h > ch) {
+                    h = ch - sb.y;
+                    w = h * ratio;
+                }
+            } else {
+                h = Math.max(minH, Math.min(ch - sb.y, sb.h + dy));
+            }
+            break;
+        }
+        case 'sw': {
+            let targetW = Math.max(minW, sb.w - dx);
+            let targetX = sb.x + (sb.w - targetW);
+            if (targetX < 0) {
+                targetW = sb.x + sb.w;
+                targetX = 0;
+            }
+            w = targetW;
+            x = targetX;
+            if (isCr80) {
+                h = w / ratio;
+                if (sb.y + h > ch) {
+                    h = ch - sb.y;
+                    w = h * ratio;
+                    x = sb.x + (sb.w - w);
+                }
+            } else {
+                h = Math.max(minH, Math.min(ch - sb.y, sb.h + dy));
+            }
+            break;
+        }
+        case 'ne': {
+            w = Math.max(minW, Math.min(cw - sb.x, sb.w + dx));
+            if (isCr80) {
+                h = w / ratio;
+                y = sb.y + (sb.h - h);
+                if (y < 0) {
+                    h = sb.y + sb.h;
+                    y = 0;
+                    w = h * ratio;
+                }
+            } else {
+                let targetH = Math.max(minH, sb.h - dy);
+                let targetY = sb.y + (sb.h - targetH);
+                if (targetY < 0) {
+                    targetH = sb.y + sb.h;
+                    targetY = 0;
+                }
+                h = targetH;
+                y = targetY;
+            }
+            break;
+        }
+        case 'nw': {
+            let targetW = Math.max(minW, sb.w - dx);
+            let targetX = sb.x + (sb.w - targetW);
+            if (targetX < 0) {
+                targetW = sb.x + sb.w;
+                targetX = 0;
+            }
+            w = targetW;
+            x = targetX;
+            if (isCr80) {
+                h = w / ratio;
+                y = sb.y + (sb.h - h);
+                if (y < 0) {
+                    h = sb.y + sb.h;
+                    y = 0;
+                    w = h * ratio;
+                    x = sb.x + (sb.w - w);
+                }
+            } else {
+                let targetH = Math.max(minH, sb.h - dy);
+                let targetY = sb.y + (sb.h - targetH);
+                if (targetY < 0) {
+                    targetH = sb.y + sb.h;
+                    targetY = 0;
+                }
+                h = targetH;
+                y = targetY;
+            }
+            break;
+        }
+        case 'n': {
+            if (!isCr80) {
+                let targetH = Math.max(minH, sb.h - dy);
+                let targetY = sb.y + (sb.h - targetH);
+                if (targetY < 0) { targetH = sb.y + sb.h; targetY = 0; }
+                h = targetH; y = targetY;
+            }
+            break;
+        }
+        case 's': {
+            if (!isCr80) {
+                h = Math.max(minH, Math.min(ch - sb.y, sb.h + dy));
+            }
+            break;
+        }
+        case 'e': {
+            if (!isCr80) {
+                w = Math.max(minW, Math.min(cw - sb.x, sb.w + dx));
+            }
+            break;
+        }
+        case 'w': {
+            if (!isCr80) {
+                let targetW = Math.max(minW, sb.w - dx);
+                let targetX = sb.x + (sb.w - targetW);
+                if (targetX < 0) { targetW = sb.x + sb.w; targetX = 0; }
+                w = targetW; x = targetX;
+            }
+            break;
+        }
+    }
+
+    cropState.cropBox = { x, y, w, h };
+    drawCropCanvas();
+}
+
+function onCropPointerUp(e) {
+    if (cropState.dragHandle) {
+        cropState.dragHandle = null;
+        try { DOM.cropCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        updateCropCursor(null);
+        drawCropCanvas();
+    }
+}
+
+function rotateCropImage() {
+    if (!cropState.sourceImg) return;
+    const src = cropState.sourceImg;
+    const rotCanvas = document.createElement('canvas');
+    rotCanvas.width = src.height;
+    rotCanvas.height = src.width;
+    const rCtx = rotCanvas.getContext('2d');
+    rCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+    rCtx.rotate(90 * Math.PI / 180);
+    rCtx.drawImage(src, -src.width / 2, -src.height / 2);
+
+    const rotatedImg = new Image();
+    rotatedImg.onload = () => {
+        cropState.sourceImg = rotatedImg;
+        const canvas = DOM.cropCanvas;
+        canvas.width = rotatedImg.width;
+        canvas.height = rotatedImg.height;
+
+        const ratio = 85.6 / 53.98;
+        let w = canvas.width * 0.84;
+        let h = cropState.aspect === 'cr80' ? (w / ratio) : (canvas.height * 0.84);
+        if (h > canvas.height * 0.88) {
+            h = canvas.height * 0.84;
+            w = h * ratio;
+        }
+        cropState.cropBox = {
+            x: (canvas.width - w) / 2,
+            y: (canvas.height - h) / 2,
+            w: w,
+            h: h
+        };
+        drawCropCanvas();
+        showToast('Foto rotada 90°', 'info');
+    };
+    rotatedImg.src = rotCanvas.toDataURL('image/jpeg', 0.95);
+}
+
+function detectDocumentBounds() {
+    if (!cropState.sourceImg) return;
+    const canvas = DOM.cropCanvas;
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    // Canvas de muestreo ligero para detección de contornos instantánea
+    const sw = 240;
+    const sh = Math.round(sw * (ch / cw));
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = sw;
+    sampleCanvas.height = sh;
+    const sCtx = sampleCanvas.getContext('2d');
+    sCtx.drawImage(cropState.sourceImg, 0, 0, sw, sh);
+
+    const imgData = sCtx.getImageData(0, 0, sw, sh);
+    const data = imgData.data;
+
+    const lum = new Uint8Array(sw * sh);
+    for (let i = 0; i < data.length; i += 4) {
+        lum[i / 4] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
+    }
+
+    // Calcular luminancia de borde (fondo / mesa de apoyo)
+    let borderSum = 0, borderCount = 0;
+    for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+            if (x < 6 || x >= sw - 6 || y < 6 || y >= sh - 6) {
+                borderSum += lum[y * sw + x];
+                borderCount++;
+            }
+        }
+    }
+    const borderAvg = borderSum / Math.max(1, borderCount);
+
+    let minX = sw, maxX = 0, minY = sh, maxY = 0;
+    const threshold = 20;
+
+    for (let y = 6; y < sh - 6; y++) {
+        for (let x = 6; x < sw - 6; x++) {
+            if (Math.abs(lum[y * sw + x] - borderAvg) > threshold) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    const scaleX = cw / sw;
+    const scaleY = ch / sh;
+    let detectedW = (maxX - minX) * scaleX;
+    let detectedH = (maxY - minY) * scaleY;
+
+    if (detectedW > cw * 0.25 && detectedH > ch * 0.25 && minX < maxX && minY < maxY) {
+        let boxX = minX * scaleX;
+        let boxY = minY * scaleY;
+
+        if (cropState.aspect === 'cr80') {
+            const ratio = 85.6 / 53.98;
+            detectedH = detectedW / ratio;
+            if (boxY + detectedH > ch) {
+                detectedH = ch - boxY;
+                detectedW = detectedH * ratio;
+            }
+        }
+
+        cropState.cropBox = {
+            x: Math.max(0, Math.min(cw - detectedW, boxX)),
+            y: Math.max(0, Math.min(ch - detectedH, boxY)),
+            w: detectedW,
+            h: detectedH
+        };
+        showToast('🎯 Contorno de carnet detectado', 'success');
+    } else {
+        const ratio = 85.6 / 53.98;
+        const defaultW = cw * 0.84;
+        const defaultH = defaultW / ratio;
+        cropState.cropBox = {
+            x: (cw - defaultW) / 2,
+            y: (ch - defaultH) / 2,
+            w: defaultW,
+            h: defaultH
+        };
+        showToast('Encuadre estándar CR80 centrado', 'info');
+    }
+
+    drawCropCanvas();
+}
+
+function applyCroppedResult() {
+    const box = cropState.cropBox;
+    if (!cropState.sourceImg || box.w <= 5 || box.h <= 5) return;
+
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = Math.round(box.w);
+    croppedCanvas.height = Math.round(box.h);
+
+    const ctx = croppedCanvas.getContext('2d');
+    ctx.drawImage(
+        cropState.sourceImg,
+        box.x, box.y, box.w, box.h,
+        0, 0, croppedCanvas.width, croppedCanvas.height
+    );
+
+    const card = STATE.cards[cropState.cardId];
+    card.croppedCanvas = croppedCanvas;
+    card.rawImage = cropState.sourceImg;
+    card.cropRect = { ...box };
+    card.cachedCanvas = null;
+    card.dirty = true;
+
+    // Actualizar proporción de la tarjeta según el recorte
+    card.widthMm = 85.6;
+    card.heightMm = 85.6 * (box.h / box.w);
+
+    DOM.cropModal.classList.add('hidden');
+    updateDropzoneUI(cropState.cardId, croppedCanvas.toDataURL('image/jpeg', 0.92));
+    saveHistoryState(`Recortar ${card.name}`);
+    scheduleRender();
+    showToast(`Recorte aplicado a ${card.name}`, 'success');
+}
+
+// Eventos del modal de recorte
 DOM.btnCloseCrop.addEventListener('click', () => DOM.cropModal.classList.add('hidden'));
 DOM.btnCancelCrop.addEventListener('click', () => DOM.cropModal.classList.add('hidden'));
 
+if (DOM.btnCropRotate) DOM.btnCropRotate.addEventListener('click', rotateCropImage);
+if (DOM.btnCropAutoDetect) DOM.btnCropAutoDetect.addEventListener('click', detectDocumentBounds);
+
 DOM.btnCropAspectCr80.addEventListener('click', () => {
     cropState.aspect = 'cr80';
-    DOM.btnCropAspectCr80.className = 'px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
-    DOM.btnCropAspectFree.className = 'px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
+    DOM.btnCropAspectCr80.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
+    DOM.btnCropAspectFree.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200';
     const box = cropState.cropBox;
-    box.h = box.w * (53.98 / 85.6);
+    const ratio = 85.6 / 53.98;
+    box.h = box.w / ratio;
+    if (box.y + box.h > DOM.cropCanvas.height) {
+        box.y = Math.max(0, DOM.cropCanvas.height - box.h);
+    }
     drawCropCanvas();
 });
 
 DOM.btnCropAspectFree.addEventListener('click', () => {
     cropState.aspect = 'free';
-    DOM.btnCropAspectFree.className = 'px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
-    DOM.btnCropAspectCr80.className = 'px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
+    DOM.btnCropAspectFree.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold shadow-sm flex items-center gap-1';
+    DOM.btnCropAspectCr80.className = 'min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200';
+    drawCropCanvas();
 });
 
-DOM.btnApplyCrop.addEventListener('click', () => {
-    const box = cropState.cropBox;
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = box.w;
-    croppedCanvas.height = box.h;
+DOM.cropCanvas.addEventListener('pointerdown', onCropPointerDown);
+DOM.cropCanvas.addEventListener('pointermove', onCropPointerMove);
+DOM.cropCanvas.addEventListener('pointerup', onCropPointerUp);
+DOM.cropCanvas.addEventListener('pointercancel', onCropPointerUp);
 
-    const ctx = croppedCanvas.getContext('2d');
-    ctx.drawImage(cropState.img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
-
-    const card = STATE.cards[cropState.cardId];
-    card.croppedCanvas = croppedCanvas;
-    card.dirty = true;
-
-    DOM.cropModal.classList.add('hidden');
-    saveHistoryState(`Recortar ${card.name}`);
-    scheduleRender();
-    showToast(`Recorte aplicado a ${card.name}`, 'success');
-});
+DOM.btnApplyCrop.addEventListener('click', applyCroppedResult);
 
 // =============================================================================
-// 16. MODAL DE CÁMARA (Visor en Vivo + Alternar Trasera/Frontal)
+// 16. MODAL DE CÁMARA (Escaneo Inteligente con Guía Exacta CR80 y Recorte Automático)
 // =============================================================================
 
 function openCameraModal(cardId) {
@@ -2398,34 +2898,112 @@ function closeCameraModal() {
 }
 
 function captureCameraPhoto() {
-    if (!DOM.cameraVideo.srcObject) return;
+    const video = DOM.cameraVideo;
+    if (!video || !video.srcObject) return;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = DOM.cameraVideo.videoWidth || 1280;
-    canvas.height = DOM.cameraVideo.videoHeight || 720;
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+    if (!vw || !vh) return;
 
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(DOM.cameraVideo, 0, 0, canvas.width, canvas.height);
+    // 1. Guardar la captura completa de alta resolución para preservarla en rawImage
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = vw;
+    fullCanvas.height = vh;
+    const fullCtx = fullCanvas.getContext('2d');
+    fullCtx.drawImage(video, 0, 0, vw, vh);
 
-    const img = new Image();
-    img.onload = () => {
+    // 2. Mapeo matemático exacto de la guía verde en pantalla a los píxeles reales del sensor de video
+    let cropX = 0, cropY = 0, cropW = vw, cropH = vh;
+    const guideBox = DOM.cameraGuideBox || document.getElementById('camera-guide-box');
+
+    if (guideBox) {
+        const vRect = video.getBoundingClientRect();
+        const gRect = guideBox.getBoundingClientRect();
+
+        // El video usa CSS object-cover (escala preservando proporción y centrando)
+        const scale = Math.max(vRect.width / vw, vRect.height / vh);
+        const renderedW = vw * scale;
+        const renderedH = vh * scale;
+        const offsetX = (vRect.width - renderedW) / 2;
+        const offsetY = (vRect.height - renderedH) / 2;
+
+        const guideLeftInRendered = (gRect.left - vRect.left) - offsetX;
+        const guideTopInRendered = (gRect.top - vRect.top) - offsetY;
+
+        cropX = guideLeftInRendered / scale;
+        cropY = guideTopInRendered / scale;
+        cropW = gRect.width / scale;
+        cropH = gRect.height / scale;
+
+        // Margen de seguridad del 2% para evitar cortar bordes finos o texto
+        const padW = cropW * 0.02;
+        const padH = cropH * 0.02;
+        cropX = Math.max(0, cropX - padW);
+        cropY = Math.max(0, cropY - padH);
+        cropW = Math.min(vw - cropX, cropW + padW * 2);
+        cropH = Math.min(vh - cropY, cropH + padH * 2);
+    } else {
+        // Fallback: centrar relación CR80
+        const ratio = 85.6 / 53.98;
+        cropW = vw * 0.82;
+        cropH = cropW / ratio;
+        cropX = (vw - cropW) / 2;
+        cropY = (vh - cropH) / 2;
+    }
+
+    // 3. Crear canvas recortado con precisión
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = Math.round(cropW);
+    croppedCanvas.height = Math.round(cropH);
+    const cropCtx = croppedCanvas.getContext('2d');
+    cropCtx.drawImage(
+        fullCanvas,
+        cropX, cropY, cropW, cropH,
+        0, 0, croppedCanvas.width, croppedCanvas.height
+    );
+
+    // 4. Asignar al estado con los parámetros predeterminados solicitados por el usuario
+    const fullImg = new Image();
+    fullImg.onload = () => {
         const card = STATE.cards[targetCameraCard];
-        card.rawImage = img;
-        card.croppedCanvas = null;
+        card.rawImage = fullImg;
+        card.croppedCanvas = croppedCanvas;
+        card.cropRect = { x: cropX, y: cropY, w: cropW, h: cropH };
         card.cachedCanvas = null;
         card.dirty = true;
 
-        updateDropzoneUI(targetCameraCard, img.src);
+        // Dimensiones estándar CR80 proporcionales
+        card.widthMm = 85.6;
+        card.heightMm = 85.6 * (cropH / cropW);
+
+        // Parámetros por defecto preferidos: Escala 150%, Radio 6mm, Centrado en X e Y
+        card.scale = FACTORY_DEFAULTS.cards[targetCameraCard].scale; // 150%
+        card.borderRadiusMm = FACTORY_DEFAULTS.cards[targetCameraCard].borderRadiusMm; // 6mm
+        card.xMm = 0;
+        card.yMm = (STATE.layout.mode === 'single' ? 0 : FACTORY_DEFAULTS.cards[targetCameraCard].yMm);
+
+        if (STATE.syncCards) {
+            const otherId = targetCameraCard === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].scale = card.scale;
+            STATE.cards[otherId].borderRadiusMm = card.borderRadiusMm;
+            STATE.cards[otherId].xMm = 0;
+        }
+
+        updateDropzoneUI(targetCameraCard, croppedCanvas.toDataURL('image/jpeg', 0.92));
+        setActiveTab(targetCameraCard);
+        STATE.selectedCardId = targetCameraCard;
+        updateSelectedCardUI();
+
         closeCameraModal();
-        saveHistoryState(`Captura cámara ${card.name}`);
+        saveHistoryState(`Foto escaneada ${card.name}`);
         scheduleRender();
-        showToast(`Foto capturada para ${card.name}`, 'success');
+        showToast(`Documento escaneado y centrado para ${card.name}`, 'success');
 
         if (window.innerWidth < 1024) {
             setMobileView('canvas');
         }
     };
-    img.src = canvas.toDataURL('image/jpeg', 0.95);
+    fullImg.src = fullCanvas.toDataURL('image/jpeg', 0.95);
 }
 
 // =============================================================================
