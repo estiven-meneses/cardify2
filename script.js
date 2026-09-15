@@ -255,6 +255,9 @@ const DOM = {
     btnCloseCamera: document.getElementById('btn-close-camera'),
     btnCancelCamera: document.getElementById('btn-cancel-camera'),
     btnSnapCamera: document.getElementById('btn-snap-camera'),
+    bannerScanDorso: document.getElementById('banner-scan-dorso'),
+    btnBannerScanDorso: document.getElementById('btn-banner-scan-dorso'),
+    btnBannerDismissDorso: document.getElementById('btn-banner-dismiss-dorso'),
     loaderOverlay: document.getElementById('loader-overlay'),
     loaderTitle: document.getElementById('loader-title'),
     loaderSubtitle: document.getElementById('loader-subtitle'),
@@ -324,7 +327,7 @@ document.addEventListener('gesturechange', (e) => e.preventDefault());
 document.addEventListener('gestureend', (e) => e.preventDefault());
 
 // =============================================================================
-// 4. RESPONSIVE Y VISTA MÓVIL (Edge-to-Edge)
+// 4. RESPONSIVE Y VISTA MÓVIL (Edge-to-Edge con Lienzo en Vivo Continuo)
 // =============================================================================
 
 function setupResponsiveMobile() {
@@ -332,29 +335,48 @@ function setupResponsiveMobile() {
     if (isMobile) {
         setMobileView(STATE.mobileView);
     } else {
-        // En escritorio, ambos paneles siempre visibles
+        // En escritorio, ambos paneles siempre visibles en paralelo
         DOM.panelControls.style.display = 'flex';
         DOM.panelCanvas.style.display = 'flex';
+        DOM.panelCanvas.classList.remove('mobile-compact-view');
+        DOM.viewportContainer.classList.remove('compact-mobile-viewport');
+        resizeCanvasViewport();
     }
 }
 
 function setMobileView(view) {
     STATE.mobileView = view;
     const isMobile = window.innerWidth < 1024;
-    if (!isMobile) return;
+    if (!isMobile) {
+        DOM.panelControls.style.display = 'flex';
+        DOM.panelCanvas.style.display = 'flex';
+        DOM.panelCanvas.classList.remove('mobile-compact-view');
+        DOM.viewportContainer.classList.remove('compact-mobile-viewport');
+        return;
+    }
 
     if (view === 'canvas') {
+        // Modo Hoja Completa: Lienzo a pantalla completa para manipulación directa
         DOM.panelCanvas.style.display = 'flex';
         DOM.panelControls.style.display = 'none';
+        DOM.panelCanvas.classList.remove('mobile-compact-view');
+        DOM.viewportContainer.classList.remove('compact-mobile-viewport');
+
         DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
         DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
         resizeCanvasViewport();
         scheduleRender();
     } else {
-        DOM.panelCanvas.style.display = 'none';
+        // Modo Ajustes (En Vivo): El lienzo se mantiene visible arriba para ver cambios en tiempo real
+        DOM.panelCanvas.style.display = 'flex';
         DOM.panelControls.style.display = 'flex';
+        DOM.panelCanvas.classList.add('mobile-compact-view');
+        DOM.viewportContainer.classList.add('compact-mobile-viewport');
+
         DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
         DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
+        resizeCanvasViewport();
+        scheduleRender();
     }
 }
 
@@ -740,6 +762,19 @@ function setupEventListeners() {
         });
     }
 
+    // Banner Prompt para Dorso Automático
+    if (DOM.btnBannerScanDorso) {
+        DOM.btnBannerScanDorso.addEventListener('click', () => {
+            dismissDorsoPrompt();
+            handleCameraTrigger('dorso');
+        });
+    }
+    if (DOM.btnBannerDismissDorso) {
+        DOM.btnBannerDismissDorso.addEventListener('click', () => {
+            dismissDorsoPrompt();
+        });
+    }
+
     // Swap & Demos
     DOM.btnSwapCards.addEventListener('click', swapCards);
     DOM.btnLoadDemo.addEventListener('click', loadDemoCards);
@@ -963,31 +998,7 @@ function loadFileIntoCard(file, cardId) {
     reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-            const card = STATE.cards[cardId];
-            card.rawImage = img;
-            card.croppedCanvas = null;
-            card.cachedCanvas = null;
-            card.dirty = true;
-
-            const aspect = img.width / img.height;
-            if (aspect >= 1) {
-                card.widthMm = 85.6;
-                card.heightMm = 85.6 / aspect;
-            } else {
-                card.heightMm = 85.6;
-                card.widthMm = 85.6 * aspect;
-            }
-
-            updateDropzoneUI(cardId, img.src);
-            setActiveTab(cardId);
-            saveHistoryState(`Cargar ${card.name}`);
-            scheduleRender();
-            showToast(`${card.name} cargado correctamente`, 'success');
-
-            // En móvil, cambiar a la vista de la hoja para ver el resultado
-            if (window.innerWidth < 1024) {
-                setMobileView('canvas');
-            }
+            autoProcessCardFromImage(cardId, img);
         };
         img.src = e.target.result;
     };
@@ -3752,6 +3763,131 @@ function closeCameraModal() {
     DOM.cameraModal.classList.add('hidden');
 }
 
+function autoProcessCardFromImage(cardId, sourceImg) {
+    if (!sourceImg) return;
+
+    // 1. Configurar estado temporal de recorte para análisis
+    cropState.cardId = cardId;
+    cropState.sourceImg = sourceImg;
+    cropState.cachedRotatedImg = sourceImg;
+    cropState.fineAngle = 0;
+    cropState.rotation90 = 0;
+
+    const cw = sourceImg.width;
+    const ch = sourceImg.height;
+
+    // Asegurar tamaño base en canvas de recorte
+    DOM.cropCanvas.width = cw;
+    DOM.cropCanvas.height = ch;
+
+    // 2. Detección automática inteligente de las 4 esquinas de perspectiva
+    detectDocumentQuad(false);
+    const qp = cropState.quadPoints;
+
+    // 3. Rectificar perspectiva a rectángulo plano perpendicular CR80 (85.6 x 53.98)
+    const wTop = Math.hypot(qp.tr.x - qp.tl.x, qp.tr.y - qp.tl.y);
+    const wBot = Math.hypot(qp.br.x - qp.bl.x, qp.br.y - qp.bl.y);
+    const hLeft = Math.hypot(qp.bl.x - qp.tl.x, qp.bl.y - qp.tl.y);
+    const hRight = Math.hypot(qp.br.x - qp.tr.x, qp.br.y - qp.tr.y);
+
+    const avgW = Math.max(120, Math.round((wTop + wBot) / 2));
+    const avgH = Math.max(80, Math.round((hLeft + hRight) / 2));
+
+    const cr80Ratio = 85.6 / 53.98;
+    const isHorizontal = avgW >= avgH;
+
+    let outW, outH;
+    if (isHorizontal) {
+        outW = Math.max(600, avgW);
+        outH = Math.round(outW / cr80Ratio);
+    } else {
+        outH = Math.max(600, avgH);
+        outW = Math.round(outH / cr80Ratio);
+    }
+
+    const unwarpedCanvas = warpQuadToRectangle(sourceImg, qp, outW, outH);
+
+    // 4. Asignar los valores predeterminados exactos solicitados por el usuario
+    const card = STATE.cards[cardId];
+    card.rawImage = sourceImg;
+    card.croppedCanvas = unwarpedCanvas;
+    card.cropRect = { ...cropState.cropBox };
+    card.cropQuad = {
+        tl: { ...qp.tl },
+        tr: { ...qp.tr },
+        br: { ...qp.br },
+        bl: { ...qp.bl }
+    };
+    card.cropRotation90 = 0;
+    card.cropFineAngle = 0;
+    card.rotation = 0;
+
+    // Dimensiones proporcionales CR80
+    card.widthMm = 85.6;
+    card.heightMm = 85.6 * (unwarpedCanvas.height / unwarpedCanvas.width);
+
+    // Ajustes automáticos preferidos:
+    card.scale = 150; // 150% de tamaño
+    card.borderRadiusMm = 6; // 6 mm de esquinas redondeadas
+    card.xMm = 0; // Centrado exacto en eje X
+
+    // Centrado en eje Y:
+    if (STATE.layout.mode === 'single') {
+        card.yMm = 0;
+    } else {
+        card.yMm = (cardId === 'frente') ? 21 : -8; // Frente arriba (+21), Dorso abajo (-8)
+    }
+
+    card.filter = 'normal';
+    card.brightness = 0;
+    card.contrast = 0;
+    card.cachedCanvas = null;
+    card.dirty = true;
+
+    // Sincronizar escala y radio a la otra cara si está vinculado
+    if (STATE.syncCards) {
+        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
+        STATE.cards[otherId].scale = 150;
+        STATE.cards[otherId].borderRadiusMm = 6;
+        STATE.cards[otherId].xMm = 0;
+    }
+
+    // 5. Actualizar interfaz y renderizar
+    updateDropzoneUI(cardId, unwarpedCanvas.toDataURL('image/jpeg', 0.94));
+    setActiveTab(cardId);
+    STATE.selectedCardId = cardId;
+    updateSelectedCardUI();
+
+    saveHistoryState(`Auto-escaneo ${card.name} (150% CR80 centrado)`);
+    scheduleRender();
+
+    showToast(`✨ ${card.name} enderezado y centrado al 150% automáticamente`, 'success');
+
+    // En móvil, cambiar a la vista de la hoja para ver el resultado
+    if (window.innerWidth < 1024) {
+        setMobileView('canvas');
+    }
+
+    // 6. Si fue el frente y el dorso aún está vacío, sugerir de inmediato escanear el dorso
+    if (cardId === 'frente' && !STATE.cards.dorso.rawImage) {
+        setTimeout(() => {
+            showDorsoPrompt();
+        }, 900);
+    }
+}
+
+function showDorsoPrompt() {
+    if (DOM.bannerScanDorso) {
+        DOM.bannerScanDorso.classList.remove('hidden');
+    }
+}
+
+function dismissDorsoPrompt() {
+    if (DOM.bannerScanDorso) {
+        DOM.bannerScanDorso.classList.add('hidden');
+    }
+}
+
 function captureCameraPhoto() {
     const video = DOM.cameraVideo;
     if (!video || !video.srcObject) return;
@@ -3760,7 +3896,7 @@ function captureCameraPhoto() {
     const vh = video.videoHeight || 720;
     if (!vw || !vh) return;
 
-    // 1. Guardar la captura completa de alta resolución para preservarla en rawImage
+    // 1. Captura en resolución nativa completa
     const fullCanvas = document.createElement('canvas');
     fullCanvas.width = vw;
     fullCanvas.height = vh;
@@ -3769,23 +3905,10 @@ function captureCameraPhoto() {
     fullCtx.imageSmoothingQuality = 'high';
     fullCtx.drawImage(video, 0, 0, vw, vh);
 
-    const fullImg = new Image();
-    fullImg.onload = () => {
-        const card = STATE.cards[targetCameraCard];
-        card.rawImage = fullImg;
-        card.cachedCanvas = null;
-        card.dirty = true;
+    closeCameraModal();
 
-        // Cerrar cámara y abrir AUTOMÁTICAMENTE el estudio de perspectiva con esquinas detectadas
-        closeCameraModal();
-        openCropModal(targetCameraCard, { autoDetect: true, defaultMode: 'quad' });
-        showToast('📸 Foto capturada: ajusta las 4 esquinas si lo deseas y confirma.', 'info');
-
-        if (window.innerWidth < 1024) {
-            setMobileView('canvas');
-        }
-    };
-    fullImg.src = fullCanvas.toDataURL('image/jpeg', 0.96);
+    // 2. Procesar 100% AUTOMÁTICO: Recorte, homografía CR80, 150% y centrado X/Y
+    autoProcessCardFromImage(targetCameraCard, fullCanvas);
 }
 
 // =============================================================================
