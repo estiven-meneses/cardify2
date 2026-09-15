@@ -1,13 +1,13 @@
 /**
- * CARDIFY 2.0 - Motor de Renderizado, Manipulación Directa y Exportación
- * Desarrollado con HTML5 Canvas 60 FPS, jsPDF, Web APIs y soporte HiDPI.
+ * CARDIFY 2.1 PRO - Motor de Renderizado, Manipulación Directa y Exportación
+ * Optimizado para Smartphones, Cámara Nativa, Sincronización de Carnets y Exportación Limpia.
  */
 
 // =============================================================================
-// 1. ESTADO GLOBAL DE LA APLICACIÓN (Single Source of Truth)
+// 1. ESTADO GLOBAL DE LA APLICACIÓN
 // =============================================================================
 
-const STATE = {
+const FACTORY_DEFAULTS = {
     paper: {
         size: 'a4', // 'a4' | 'letter'
         orientation: 'portrait', // 'portrait' | 'landscape'
@@ -17,9 +17,10 @@ const STATE = {
     layout: {
         mode: 'both', // 'both' | 'front-only' | 'back-only' | 'multi-2' | 'multi-4'
         arrange: 'vertical', // 'vertical' | 'horizontal'
-        showCutLines: true,
-        showBorder: true,
+        showCutLines: false, // APAGADO por defecto para evitar rayas entrecortadas
+        showBorder: false,   // APAGADO por defecto para bordes 100% limpios
     },
+    syncCards: true, // Sincronización automática de tamaño y filtros entre caras
     cards: {
         frente: {
             id: 'frente',
@@ -32,13 +33,13 @@ const STATE = {
             xMm: 0,
             yMm: 45,
             scale: 70, // %
-            rotation: 0, // 0, 90, 180, 270
+            rotation: 0,
             flipH: false,
             flipV: false,
             borderRadiusMm: 3.5,
-            filter: 'normal', // 'normal' | 'scan' | 'bw'
-            brightness: 0, // -50 to 50
-            contrast: 0, // -50 to 50
+            filter: 'normal',
+            brightness: 0,
+            contrast: 0,
             dirty: true,
         },
         dorso: {
@@ -62,14 +63,18 @@ const STATE = {
             dirty: true,
         }
     },
-    activeCardId: 'frente', // Pestaña de edición activa ('frente' | 'dorso')
-    selectedCardId: null,   // Card seleccionada en canvas
-    snapEnabled: true,
-    zoom: 1.0,
     exportFormat: 'pdf',
     exportDpi: 300,
-    theme: 'light',
 };
+
+// Estado mutable actual
+const STATE = JSON.parse(JSON.stringify(FACTORY_DEFAULTS));
+STATE.activeCardId = 'frente';
+STATE.selectedCardId = null;
+STATE.snapEnabled = true;
+STATE.zoom = 1.0;
+STATE.theme = 'light';
+STATE.mobileView = 'canvas'; // 'canvas' | 'controls'
 
 // Historial para Deshacer / Rehacer
 const HISTORY = {
@@ -85,19 +90,29 @@ const HISTORY = {
 
 const DOM = {
     // Header & Globales
+    btnSaveDefaults: document.getElementById('btn-save-defaults'),
     btnLoadDemo: document.getElementById('btn-load-demo'),
     btnEmptyDemo: document.getElementById('btn-empty-demo'),
-    btnShortcuts: document.getElementById('btn-shortcuts'),
     btnThemeToggle: document.getElementById('btn-theme-toggle'),
     themeIconDark: document.getElementById('theme-icon-dark'),
     themeIconLight: document.getElementById('theme-icon-light'),
     btnResetAll: document.getElementById('btn-reset-all'),
+
+    // Mobile View Switcher
+    mobileTabCanvas: document.getElementById('mobile-tab-canvas'),
+    mobileTabControls: document.getElementById('mobile-tab-controls'),
+    panelControls: document.getElementById('panel-controls'),
+    panelCanvas: document.getElementById('panel-canvas'),
 
     // Dropzones & Carga
     dropzoneFrente: document.getElementById('dropzone-frente'),
     dropzoneDorso: document.getElementById('dropzone-dorso'),
     frenteInput: document.getElementById('frente-input'),
     dorsoInput: document.getElementById('dorso-input'),
+    frenteCameraInput: document.getElementById('frente-camera-input'),
+    dorsoCameraInput: document.getElementById('dorso-camera-input'),
+    btnNativeCamFrente: document.getElementById('btn-native-cam-frente'),
+    btnNativeCamDorso: document.getElementById('btn-native-cam-dorso'),
     frentePreviewWrap: document.getElementById('frente-preview-wrap'),
     dorsoPreviewWrap: document.getElementById('dorso-preview-wrap'),
     frentePlaceholder: document.getElementById('frente-placeholder'),
@@ -125,7 +140,8 @@ const DOM = {
     checkCutLines: document.getElementById('check-cut-lines'),
     checkCardBorder: document.getElementById('check-card-border'),
 
-    // Pestañas de Ajustes
+    // Sincronización y Pestañas de Ajustes
+    checkSyncCards: document.getElementById('check-sync-cards'),
     tabBtnFrente: document.getElementById('tab-btn-frente'),
     tabBtnDorso: document.getElementById('tab-btn-dorso'),
     btnApplyCr80: document.getElementById('btn-apply-cr80'),
@@ -138,7 +154,7 @@ const DOM = {
     cardYNum: document.getElementById('card-y-num'),
     btnAlignCenterX: document.getElementById('btn-align-center-x'),
     btnAlignCenterY: document.getElementById('btn-align-center-y'),
-    btnAlignMatch: document.getElementById('btn-align-match'),
+    btnCopyToOther: document.getElementById('btn-copy-to-other'),
     cardRadiusRange: document.getElementById('card-radius-range'),
     cornerRadiusLabel: document.getElementById('corner-radius-label'),
     filterPresetBtns: document.querySelectorAll('.filter-preset-btn'),
@@ -153,7 +169,7 @@ const DOM = {
     btnDirectPrint: document.getElementById('btn-direct-print'),
     btnCopyClipboard: document.getElementById('btn-copy-clipboard'),
 
-    // Canvas & Herramientas Flotantes
+    // Canvas Toolbar
     btnUndo: document.getElementById('btn-undo'),
     btnRedo: document.getElementById('btn-redo'),
     selectedCardIndicator: document.getElementById('selected-card-indicator'),
@@ -167,7 +183,7 @@ const DOM = {
     emptyState: document.getElementById('empty-state'),
     sheetInfoBadge: document.getElementById('sheet-info-badge'),
 
-    // Modales & Overlays
+    // Modales
     cropModal: document.getElementById('crop-modal'),
     cropCanvas: document.getElementById('crop-canvas'),
     btnCloseCrop: document.getElementById('btn-close-crop'),
@@ -177,11 +193,11 @@ const DOM = {
     btnCropAspectCr80: document.getElementById('btn-crop-aspect-cr80'),
     cameraModal: document.getElementById('camera-modal'),
     cameraVideo: document.getElementById('camera-video'),
+    btnSwitchCamera: document.getElementById('btn-switch-camera'),
+    btnCameraUseNative: document.getElementById('btn-camera-use-native'),
     btnCloseCamera: document.getElementById('btn-close-camera'),
     btnCancelCamera: document.getElementById('btn-cancel-camera'),
     btnSnapCamera: document.getElementById('btn-snap-camera'),
-    shortcutsModal: document.getElementById('shortcuts-modal'),
-    btnCloseShortcuts: document.getElementById('btn-close-shortcuts'),
     loaderOverlay: document.getElementById('loader-overlay'),
     loaderTitle: document.getElementById('loader-title'),
     loaderSubtitle: document.getElementById('loader-subtitle'),
@@ -190,22 +206,20 @@ const DOM = {
     printImg: document.getElementById('print-img')
 };
 
-// Canvas Context & Engine Variables
 const previewCtx = DOM.previewCanvas.getContext('2d');
 let renderScheduled = false;
 let cameraStream = null;
 let targetCameraCard = 'frente';
+let cameraFacingMode = 'environment'; // 'environment' (trasera) o 'user' (frontal)
 
-// Estado de interacción en Canvas
 const INTERACTION = {
     isDragging: false,
     isResizing: false,
-    resizeHandle: null, // 'tl', 'tr', 'bl', 'br'
+    resizeHandle: null,
     dragStart: { x: 0, y: 0 },
     cardInitialPos: { x: 0, y: 0 },
     cardInitialScale: 70,
-    hoverCard: null,
-    activeSnapLines: [], // [{ orientation: 'v'|'h', posMm: number, label: string }]
+    activeSnapLines: [],
 };
 
 // =============================================================================
@@ -214,21 +228,121 @@ const INTERACTION = {
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    loadCustomDefaults(); // Carga las preferencias guardadas del usuario
     setupPaperDimensions();
     setupEventListeners();
     updateUIFromState();
+    setupResponsiveMobile();
     resizeCanvasViewport();
     saveHistoryState('Inicial');
     scheduleRender();
 });
 
 window.addEventListener('resize', () => {
+    setupResponsiveMobile();
     resizeCanvasViewport();
     scheduleRender();
 });
 
 // =============================================================================
-// 4. GESTIÓN DE TEMA OSCURO / CLARO
+// 4. RESPONSIVE Y VISTA MÓVIL (Edge-to-Edge)
+// =============================================================================
+
+function setupResponsiveMobile() {
+    const isMobile = window.innerWidth < 1024;
+    if (isMobile) {
+        setMobileView(STATE.mobileView);
+    } else {
+        // En escritorio, ambos paneles siempre visibles
+        DOM.panelControls.style.display = 'flex';
+        DOM.panelCanvas.style.display = 'flex';
+    }
+}
+
+function setMobileView(view) {
+    STATE.mobileView = view;
+    const isMobile = window.innerWidth < 1024;
+    if (!isMobile) return;
+
+    if (view === 'canvas') {
+        DOM.panelCanvas.style.display = 'flex';
+        DOM.panelControls.style.display = 'none';
+        DOM.mobileTabCanvas.className = 'py-1 px-2.5 rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center gap-1 font-bold';
+        DOM.mobileTabControls.className = 'py-1 px-2.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center gap-1';
+        resizeCanvasViewport();
+        scheduleRender();
+    } else {
+        DOM.panelCanvas.style.display = 'none';
+        DOM.panelControls.style.display = 'flex';
+        DOM.mobileTabControls.className = 'py-1 px-2.5 rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center gap-1 font-bold';
+        DOM.mobileTabCanvas.className = 'py-1 px-2.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center gap-1';
+    }
+}
+
+// =============================================================================
+// 5. GESTIÓN DE CONFIGURACIÓN PREDETERMINADA PERSONALIZADA (⭐ Favoritos)
+// =============================================================================
+
+function saveCustomDefaults() {
+    const customConfig = {
+        paper: STATE.paper,
+        layout: STATE.layout,
+        syncCards: STATE.syncCards,
+        cards: {
+            frente: {
+                scale: STATE.cards.frente.scale,
+                xMm: STATE.cards.frente.xMm,
+                yMm: STATE.cards.frente.yMm,
+                borderRadiusMm: STATE.cards.frente.borderRadiusMm,
+                filter: STATE.cards.frente.filter,
+                brightness: STATE.cards.frente.brightness,
+                contrast: STATE.cards.frente.contrast,
+            },
+            dorso: {
+                scale: STATE.cards.dorso.scale,
+                xMm: STATE.cards.dorso.xMm,
+                yMm: STATE.cards.dorso.yMm,
+                borderRadiusMm: STATE.cards.dorso.borderRadiusMm,
+                filter: STATE.cards.dorso.filter,
+                brightness: STATE.cards.dorso.brightness,
+                contrast: STATE.cards.dorso.contrast,
+            }
+        },
+        exportFormat: STATE.exportFormat,
+        exportDpi: STATE.exportDpi
+    };
+
+    localStorage.setItem('cardify-custom-defaults', JSON.stringify(customConfig));
+    triggerSuccessCelebration();
+    showToast('⭐ ¡Configuración guardada como tu predeterminada! Se aplicará cada vez que abras Cardify.', 'success');
+}
+
+function loadCustomDefaults() {
+    try {
+        const saved = localStorage.getItem('cardify-custom-defaults');
+        if (!saved) return;
+        const config = JSON.parse(saved);
+
+        if (config.paper) Object.assign(STATE.paper, config.paper);
+        if (config.layout) Object.assign(STATE.layout, config.layout);
+        if (config.syncCards !== undefined) STATE.syncCards = config.syncCards;
+        if (config.exportFormat) STATE.exportFormat = config.exportFormat;
+        if (config.exportDpi) STATE.exportDpi = config.exportDpi;
+
+        if (config.cards) {
+            ['frente', 'dorso'].forEach(key => {
+                if (config.cards[key]) {
+                    Object.assign(STATE.cards[key], config.cards[key]);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('No se pudo cargar configuración personalizada:', e);
+    }
+}
+
+// =============================================================================
+// 6. GESTIÓN DE TEMA
 // =============================================================================
 
 function initTheme() {
@@ -258,7 +372,7 @@ function toggleTheme() {
 }
 
 // =============================================================================
-// 5. PAPEL Y DIMENSIONES
+// 7. PAPEL Y DIMENSIONES
 // =============================================================================
 
 function setupPaperDimensions() {
@@ -278,21 +392,41 @@ function setupPaperDimensions() {
 }
 
 // =============================================================================
-// 6. EVENT LISTENERS
+// 8. EVENT LISTENERS
 // =============================================================================
 
 function setupEventListeners() {
-    // Tema & Header
+    // Header & Mobile Switcher
     DOM.btnThemeToggle.addEventListener('click', toggleTheme);
     DOM.btnResetAll.addEventListener('click', resetAllDefaults);
-    DOM.btnShortcuts.addEventListener('click', () => DOM.shortcutsModal.classList.remove('hidden'));
-    DOM.btnCloseShortcuts.addEventListener('click', () => DOM.shortcutsModal.classList.add('hidden'));
+    DOM.btnSaveDefaults.addEventListener('click', saveCustomDefaults);
+    DOM.mobileTabCanvas.addEventListener('click', () => setMobileView('canvas'));
+    DOM.mobileTabControls.addEventListener('click', () => setMobileView('controls'));
 
     // Carga de Archivos
     setupDropzone(DOM.dropzoneFrente, DOM.frenteInput, 'frente');
     setupDropzone(DOM.dropzoneDorso, DOM.dorsoInput, 'dorso');
 
-    // Botones de Acción de Imágenes
+    // Cámara Móvil Nativa (capture="environment")
+    DOM.btnNativeCamFrente.addEventListener('click', (e) => {
+        e.stopPropagation();
+        DOM.frenteCameraInput.click();
+    });
+    DOM.frenteCameraInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) loadFileIntoCard(file, 'frente');
+    });
+
+    DOM.btnNativeCamDorso.addEventListener('click', (e) => {
+        e.stopPropagation();
+        DOM.dorsoCameraInput.click();
+    });
+    DOM.dorsoCameraInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) loadFileIntoCard(file, 'dorso');
+    });
+
+    // Acciones de Tarjetas
     DOM.btnRotateFrente.addEventListener('click', (e) => { e.stopPropagation(); rotateCard('frente', 90); });
     DOM.btnRotateDorso.addEventListener('click', (e) => { e.stopPropagation(); rotateCard('dorso', 90); });
     DOM.btnRemoveFrente.addEventListener('click', (e) => { e.stopPropagation(); removeCard('frente'); });
@@ -300,19 +434,31 @@ function setupEventListeners() {
     DOM.btnCropFrente.addEventListener('click', (e) => { e.stopPropagation(); openCropModal('frente'); });
     DOM.btnCropDorso.addEventListener('click', (e) => { e.stopPropagation(); openCropModal('dorso'); });
 
-    // Cámara
+    // Cámara Web en Vivo
     DOM.btnCameraFrente.addEventListener('click', () => openCameraModal('frente'));
     DOM.btnCameraDorso.addEventListener('click', () => openCameraModal('dorso'));
     DOM.btnCloseCamera.addEventListener('click', closeCameraModal);
     DOM.btnCancelCamera.addEventListener('click', closeCameraModal);
     DOM.btnSnapCamera.addEventListener('click', captureCameraPhoto);
+    DOM.btnSwitchCamera.addEventListener('click', switchCameraFacingMode);
+    DOM.btnCameraUseNative.addEventListener('click', () => {
+        closeCameraModal();
+        if (targetCameraCard === 'frente') DOM.frenteCameraInput.click();
+        else DOM.dorsoCameraInput.click();
+    });
 
     // Swap & Demos
     DOM.btnSwapCards.addEventListener('click', swapCards);
     DOM.btnLoadDemo.addEventListener('click', loadDemoCards);
     DOM.btnEmptyDemo.addEventListener('click', loadDemoCards);
 
-    // Configuración de Papel y Plantilla
+    // Sincronización Automática
+    DOM.checkSyncCards.addEventListener('change', (e) => {
+        STATE.syncCards = e.target.checked;
+        showToast(STATE.syncCards ? '🔗 Ajustes sincronizados entre caras' : 'Ajustes independientes activados', 'info');
+    });
+
+    // Plantilla y Papel
     DOM.layoutModeSelect.addEventListener('change', (e) => {
         STATE.layout.mode = e.target.value;
         saveHistoryState('Modo de Caras');
@@ -333,13 +479,8 @@ function setupEventListeners() {
         scheduleRender();
     });
 
-    DOM.btnOrientPortrait.addEventListener('click', () => {
-        setOrientation('portrait');
-    });
-
-    DOM.btnOrientLandscape.addEventListener('click', () => {
-        setOrientation('landscape');
-    });
+    DOM.btnOrientPortrait.addEventListener('click', () => setOrientation('portrait'));
+    DOM.btnOrientLandscape.addEventListener('click', () => setOrientation('landscape'));
 
     DOM.checkCutLines.addEventListener('change', (e) => {
         STATE.layout.showCutLines = e.target.checked;
@@ -351,12 +492,12 @@ function setupEventListeners() {
         scheduleRender();
     });
 
-    // Pestañas de Ajustes
+    // Pestañas y Controles de Tarjeta
     DOM.tabBtnFrente.addEventListener('click', () => setActiveTab('frente'));
     DOM.tabBtnDorso.addEventListener('click', () => setActiveTab('dorso'));
     DOM.btnApplyCr80.addEventListener('click', applyCr80Preset);
+    DOM.btnCopyToOther.addEventListener('click', copyActiveCardSettingsToOther);
 
-    // Sliders e Inputs de Ajuste de la Tarjeta Activa
     setupCardControls();
 
     // Exportación
@@ -374,16 +515,14 @@ function setupEventListeners() {
     DOM.btnZoomOut.addEventListener('click', () => changeZoom(-0.15));
     DOM.btnZoomFit.addEventListener('click', fitZoomToContainer);
 
-    // Canvas Pointer Events para manipulación directa
     setupCanvasPointerEvents();
 
-    // Atajos de Teclado Globales y Pegar desde Portapapeles
     window.addEventListener('paste', handleGlobalPaste);
     window.addEventListener('keydown', handleGlobalKeydown);
 }
 
 // =============================================================================
-// 7. CARGA DE ARCHIVOS Y DROPZONE
+// 9. CARGA DE ARCHIVOS
 // =============================================================================
 
 function setupDropzone(dropzoneEl, inputEl, cardId) {
@@ -414,7 +553,7 @@ function setupDropzone(dropzoneEl, inputEl, cardId) {
 
 function loadFileIntoCard(file, cardId) {
     if (!file.type.startsWith('image/')) {
-        showToast('Por favor selecciona un archivo de imagen válido (PNG, JPG, WebP).', 'warning');
+        showToast('Por favor selecciona una imagen válida.', 'warning');
         return;
     }
 
@@ -428,7 +567,6 @@ function loadFileIntoCard(file, cardId) {
             card.cachedCanvas = null;
             card.dirty = true;
 
-            // Calcular relación de aspecto
             const aspect = img.width / img.height;
             if (aspect >= 1) {
                 card.widthMm = 85.6;
@@ -438,12 +576,16 @@ function loadFileIntoCard(file, cardId) {
                 card.widthMm = 85.6 * aspect;
             }
 
-            // Actualizar vista previa en el panel
             updateDropzoneUI(cardId, img.src);
             setActiveTab(cardId);
             saveHistoryState(`Cargar ${card.name}`);
             scheduleRender();
-            showToast(`${card.name} cargado exitosamente`, 'success');
+            showToast(`${card.name} cargado correctamente`, 'success');
+
+            // En móvil, cambiar a la vista de la hoja para ver el resultado
+            if (window.innerWidth < 1024) {
+                setMobileView('canvas');
+            }
         };
         img.src = e.target.result;
     };
@@ -498,8 +640,6 @@ function rotateCard(cardId, angleDeg = 90) {
     if (!card.rawImage) return;
 
     card.rotation = (card.rotation + angleDeg) % 360;
-    
-    // Invertir ancho y alto si rota 90 o 270 grados
     if (angleDeg === 90 || angleDeg === 270) {
         const temp = card.widthMm;
         card.widthMm = card.heightMm;
@@ -507,9 +647,22 @@ function rotateCard(cardId, angleDeg = 90) {
     }
 
     card.dirty = true;
+
+    // Si la sincronización está activa, rotar también la otra cara
+    if (STATE.syncCards) {
+        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
+        const otherCard = STATE.cards[otherId];
+        if (otherCard.rawImage) {
+            otherCard.rotation = card.rotation;
+            otherCard.widthMm = card.widthMm;
+            otherCard.heightMm = card.heightMm;
+            otherCard.dirty = true;
+        }
+    }
+
     saveHistoryState(`Rotar ${card.name} ${angleDeg}°`);
     scheduleRender();
-    showToast(`${card.name} rotado a ${card.rotation}°`, 'info');
+    showToast(`${card.name} rotado`, 'info');
 }
 
 function swapCards() {
@@ -518,7 +671,6 @@ function swapCards() {
         return;
     }
 
-    // Intercambiar propiedades de imagen y ajustes visuales
     const f = STATE.cards.frente;
     const d = STATE.cards.dorso;
 
@@ -560,7 +712,7 @@ function swapCards() {
 }
 
 function loadDemoCards() {
-    showLoader('Cargando carnets de muestra...', 'Preparando recursos de alta calidad');
+    showLoader('Cargando ejemplo...', 'Preparando muestra de carnet');
 
     const img1 = new Image();
     const img2 = new Image();
@@ -570,7 +722,6 @@ function loadDemoCards() {
         loaded++;
         if (loaded === 2) {
             hideLoader();
-            // Asignar frente
             STATE.cards.frente.rawImage = img1;
             STATE.cards.frente.croppedCanvas = null;
             STATE.cards.frente.cachedCanvas = null;
@@ -581,7 +732,6 @@ function loadDemoCards() {
             STATE.cards.frente.yMm = 45;
             STATE.cards.frente.dirty = true;
 
-            // Asignar dorso
             STATE.cards.dorso.rawImage = img2;
             STATE.cards.dorso.croppedCanvas = null;
             STATE.cards.dorso.cachedCanvas = null;
@@ -598,14 +748,18 @@ function loadDemoCards() {
 
             saveHistoryState('Cargar Carnet de Muestra');
             scheduleRender();
-            showToast('¡Carnet de demostración cargado!', 'success');
+            showToast('¡Carnets de muestra cargados!', 'success');
+
+            if (window.innerWidth < 1024) {
+                setMobileView('canvas');
+            }
         }
     };
 
     img1.onload = checkComplete;
     img2.onload = checkComplete;
-    img1.onerror = () => { hideLoader(); showToast('No se pudo cargar la imagen de muestra', 'error'); };
-    img2.onerror = () => { hideLoader(); showToast('No se pudo cargar la imagen de muestra', 'error'); };
+    img1.onerror = () => { hideLoader(); showToast('Error al cargar la imagen', 'error'); };
+    img2.onerror = () => { hideLoader(); showToast('Error al cargar la imagen', 'error'); };
 
     img1.src = 'recursos/carnet confa 1.png';
     img2.src = 'recursos/carnet confa 2.png';
@@ -616,7 +770,6 @@ function handleGlobalPaste(e) {
     for (const item of items) {
         if (item.type.indexOf('image') !== -1) {
             const blob = item.getAsFile();
-            // Decidir a qué tarjeta asignarlo
             if (!STATE.cards.frente.rawImage) {
                 loadFileIntoCard(blob, 'frente');
             } else if (!STATE.cards.dorso.rawImage) {
@@ -624,14 +777,12 @@ function handleGlobalPaste(e) {
             } else {
                 loadFileIntoCard(blob, STATE.activeCardId);
             }
-            showToast('Imagen pegada desde el portapapeles', 'info');
             break;
         }
     }
 }
 
 function handleGlobalKeydown(e) {
-    // Deshacer / Rehacer
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -644,11 +795,10 @@ function handleGlobalKeydown(e) {
         return;
     }
 
-    // Movimiento fino con flechas
     if (STATE.selectedCardId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
         const card = STATE.cards[STATE.selectedCardId];
-        const step = e.shiftKey ? 5 : 1; // 1mm o 5mm
+        const step = e.shiftKey ? 5 : 1;
         if (e.key === 'ArrowUp') card.yMm -= step;
         if (e.key === 'ArrowDown') card.yMm += step;
         if (e.key === 'ArrowLeft') card.xMm -= step;
@@ -659,7 +809,6 @@ function handleGlobalKeydown(e) {
         return;
     }
 
-    // Suprimir / Delete
     if (STATE.selectedCardId && (e.key === 'Delete' || e.key === 'Backspace')) {
         if (document.activeElement.tagName !== 'INPUT') {
             removeCard(STATE.selectedCardId);
@@ -668,17 +817,17 @@ function handleGlobalKeydown(e) {
 }
 
 // =============================================================================
-// 8. CONTROLES Y PESTAÑAS DE AJUSTE
+// 10. CONTROLES Y SINCRONIZACIÓN REACTIVA
 // =============================================================================
 
 function setActiveTab(cardId) {
     STATE.activeCardId = cardId;
     if (cardId === 'frente') {
-        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
-        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
+        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
+        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
     } else {
-        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
-        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
+        DOM.tabBtnDorso.className = 'flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
+        DOM.tabBtnFrente.className = 'flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all';
     }
 
     syncControlsFromActiveCard();
@@ -699,101 +848,87 @@ function syncControlsFromActiveCard() {
     DOM.cardBrightnessRange.value = card.brightness;
     DOM.cardContrastRange.value = card.contrast;
 
-    // Dimensiones reales en mm calculadas
     const currentW = (card.widthMm * card.scale / 100).toFixed(1);
     const currentH = (card.heightMm * card.scale / 100).toFixed(1);
     DOM.activeCardDimensions.textContent = `(${currentW} × ${currentH} mm)`;
 
-    // Resaltar preset de filtro activo
     DOM.filterPresetBtns.forEach(btn => {
         if (btn.dataset.filter === card.filter) {
-            btn.className = 'filter-preset-btn py-1 px-1.5 text-xs font-medium rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+            btn.className = 'filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
         } else {
-            btn.className = 'filter-preset-btn py-1 px-1.5 text-xs font-medium rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200';
+            btn.className = 'filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
         }
     });
 
-    // Indicador en barra flotante
     DOM.selectedCardIndicator.textContent = STATE.selectedCardId 
         ? `Editando ${STATE.cards[STATE.selectedCardId].name}` 
-        : 'Selecciona o arrastra un carnet';
+        : 'Arrastra para mover';
 }
 
 function setupCardControls() {
     // Escala
-    DOM.cardScaleRange.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        DOM.cardScaleNum.value = val;
+    const onScaleChange = (val) => {
         STATE.cards[STATE.activeCardId].scale = val;
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].scale = val;
+        }
         syncControlsFromActiveCard();
         scheduleRender();
-    });
-    DOM.cardScaleNum.addEventListener('input', (e) => {
-        const val = Math.min(180, Math.max(30, parseFloat(e.target.value) || 70));
-        DOM.cardScaleRange.value = val;
-        STATE.cards[STATE.activeCardId].scale = val;
-        syncControlsFromActiveCard();
-        scheduleRender();
-    });
+    };
+
+    DOM.cardScaleRange.addEventListener('input', (e) => onScaleChange(parseFloat(e.target.value)));
+    DOM.cardScaleNum.addEventListener('input', (e) => onScaleChange(Math.min(180, Math.max(30, parseFloat(e.target.value) || 70))));
 
     // Posición X
-    DOM.cardXRange.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        DOM.cardXNum.value = val;
+    const onXChange = (val) => {
         STATE.cards[STATE.activeCardId].xMm = val;
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].xMm = val;
+        }
         scheduleRender();
-    });
-    DOM.cardXNum.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value) || 0;
-        DOM.cardXRange.value = val;
-        STATE.cards[STATE.activeCardId].xMm = val;
-        scheduleRender();
-    });
+    };
+    DOM.cardXRange.addEventListener('input', (e) => onXChange(parseFloat(e.target.value)));
+    DOM.cardXNum.addEventListener('input', (e) => onXChange(parseFloat(e.target.value) || 0));
 
     // Posición Y
     DOM.cardYRange.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        DOM.cardYNum.value = val;
-        STATE.cards[STATE.activeCardId].yMm = val;
+        STATE.cards[STATE.activeCardId].yMm = parseFloat(e.target.value);
         scheduleRender();
     });
     DOM.cardYNum.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value) || 0;
-        DOM.cardYRange.value = val;
-        STATE.cards[STATE.activeCardId].yMm = val;
+        STATE.cards[STATE.activeCardId].yMm = parseFloat(e.target.value) || 0;
         scheduleRender();
     });
 
     // Alineaciones
     DOM.btnAlignCenterX.addEventListener('click', () => {
         STATE.cards[STATE.activeCardId].xMm = 0;
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].xMm = 0;
+        }
         syncControlsFromActiveCard();
-        saveHistoryState(`Centrar Horiz. ${STATE.cards[STATE.activeCardId].name}`);
+        saveHistoryState('Centrar Horizontalmente');
         scheduleRender();
     });
+
     DOM.btnAlignCenterY.addEventListener('click', () => {
         STATE.cards[STATE.activeCardId].yMm = 0;
         syncControlsFromActiveCard();
-        saveHistoryState(`Centrar Vert. ${STATE.cards[STATE.activeCardId].name}`);
+        saveHistoryState('Centrar Verticalmente');
         scheduleRender();
-    });
-    DOM.btnAlignMatch.addEventListener('click', () => {
-        const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-        const other = STATE.cards[otherId];
-        const current = STATE.cards[STATE.activeCardId];
-        current.scale = other.scale;
-        current.xMm = other.xMm;
-        current.borderRadiusMm = other.borderRadiusMm;
-        syncControlsFromActiveCard();
-        saveHistoryState('Igualar con otro carnet');
-        scheduleRender();
-        showToast('Dimensiones igualadas con el otro carnet', 'info');
     });
 
     // Esquinas Redondeadas
     DOM.cardRadiusRange.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         STATE.cards[STATE.activeCardId].borderRadiusMm = val;
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].borderRadiusMm = val;
+        }
         DOM.cornerRadiusLabel.textContent = `${val} mm`;
         scheduleRender();
     });
@@ -805,6 +940,13 @@ function setupCardControls() {
             const card = STATE.cards[STATE.activeCardId];
             card.filter = filterMode;
             card.dirty = true;
+
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].filter = filterMode;
+                STATE.cards[otherId].dirty = true;
+            }
+
             syncControlsFromActiveCard();
             saveHistoryState(`Filtro ${filterMode}`);
             scheduleRender();
@@ -814,18 +956,45 @@ function setupCardControls() {
     // Brillo y Contraste
     DOM.cardBrightnessRange.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
-        const card = STATE.cards[STATE.activeCardId];
-        card.brightness = val;
-        card.dirty = true;
+        STATE.cards[STATE.activeCardId].brightness = val;
+        STATE.cards[STATE.activeCardId].dirty = true;
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].brightness = val;
+            STATE.cards[otherId].dirty = true;
+        }
         scheduleRender();
     });
+
     DOM.cardContrastRange.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
-        const card = STATE.cards[STATE.activeCardId];
-        card.contrast = val;
-        card.dirty = true;
+        STATE.cards[STATE.activeCardId].contrast = val;
+        STATE.cards[STATE.activeCardId].dirty = true;
+        if (STATE.syncCards) {
+            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+            STATE.cards[otherId].contrast = val;
+            STATE.cards[otherId].dirty = true;
+        }
         scheduleRender();
     });
+}
+
+function copyActiveCardSettingsToOther() {
+    const current = STATE.cards[STATE.activeCardId];
+    const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+    const other = STATE.cards[otherId];
+
+    other.scale = current.scale;
+    other.xMm = current.xMm;
+    other.borderRadiusMm = current.borderRadiusMm;
+    other.filter = current.filter;
+    other.brightness = current.brightness;
+    other.contrast = current.contrast;
+    other.dirty = true;
+
+    saveHistoryState(`Copiar ajustes a ${other.name}`);
+    scheduleRender();
+    showToast(`Ajustes copiados de ${current.name} a ${other.name}`, 'success');
 }
 
 function applyCr80Preset() {
@@ -833,9 +1002,18 @@ function applyCr80Preset() {
     card.widthMm = 85.6;
     card.heightMm = 53.98;
     card.scale = 100;
-    card.borderRadiusMm = 3.18; // Radio estándar de tarjeta plástica
+    card.borderRadiusMm = 3.18;
+
+    if (STATE.syncCards) {
+        const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+        STATE.cards[otherId].widthMm = 85.6;
+        STATE.cards[otherId].heightMm = 53.98;
+        STATE.cards[otherId].scale = 100;
+        STATE.cards[otherId].borderRadiusMm = 3.18;
+    }
+
     syncControlsFromActiveCard();
-    saveHistoryState('Aplicar Tamaño Estándar CR80');
+    saveHistoryState('Aplicar Estándar CR80');
     scheduleRender();
     showToast('Ajustado a tamaño estándar de tarjeta de crédito (CR80)', 'success');
 }
@@ -845,11 +1023,11 @@ function setOrientation(orientation) {
     STATE.paper.orientation = orientation;
 
     if (orientation === 'portrait') {
-        DOM.btnOrientPortrait.className = 'py-1 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300';
-        DOM.btnOrientLandscape.className = 'py-1 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900';
+        DOM.btnOrientPortrait.className = 'py-0.5 text-xs font-semibold rounded bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300';
+        DOM.btnOrientLandscape.className = 'py-0.5 text-xs font-semibold rounded text-slate-600 dark:text-slate-400';
     } else {
-        DOM.btnOrientLandscape.className = 'py-1 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300';
-        DOM.btnOrientPortrait.className = 'py-1 text-xs font-semibold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900';
+        DOM.btnOrientLandscape.className = 'py-0.5 text-xs font-semibold rounded bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-300';
+        DOM.btnOrientPortrait.className = 'py-0.5 text-xs font-semibold rounded text-slate-600 dark:text-slate-400';
     }
 
     setupPaperDimensions();
@@ -859,35 +1037,34 @@ function setOrientation(orientation) {
 }
 
 function resetAllDefaults() {
-    STATE.cards.frente.scale = 70;
-    STATE.cards.frente.xMm = 0;
-    STATE.cards.frente.yMm = 45;
-    STATE.cards.frente.rotation = 0;
-    STATE.cards.frente.borderRadiusMm = 3.5;
-    STATE.cards.frente.filter = 'normal';
-    STATE.cards.frente.brightness = 0;
-    STATE.cards.frente.contrast = 0;
-    STATE.cards.frente.dirty = true;
+    // Si tiene favoritos guardados, preguntar o restaurar fábrica
+    const hasCustom = !!localStorage.getItem('cardify-custom-defaults');
+    if (hasCustom) {
+        localStorage.removeItem('cardify-custom-defaults');
+        showToast('Configuración personalizada borrada. Restaurado a valores de fábrica.', 'info');
+    }
 
-    STATE.cards.dorso.scale = 70;
-    STATE.cards.dorso.xMm = 0;
-    STATE.cards.dorso.yMm = 5;
-    STATE.cards.dorso.rotation = 0;
-    STATE.cards.dorso.borderRadiusMm = 3.5;
-    STATE.cards.dorso.filter = 'normal';
-    STATE.cards.dorso.brightness = 0;
-    STATE.cards.dorso.contrast = 0;
-    STATE.cards.dorso.dirty = true;
+    Object.assign(STATE.paper, FACTORY_DEFAULTS.paper);
+    Object.assign(STATE.layout, FACTORY_DEFAULTS.layout);
+    STATE.syncCards = FACTORY_DEFAULTS.syncCards;
 
-    STATE.layout.mode = 'both';
-    STATE.layout.arrange = 'vertical';
-    STATE.layout.showCutLines = true;
-    STATE.layout.showBorder = true;
+    ['frente', 'dorso'].forEach(k => {
+        Object.assign(STATE.cards[k], {
+            scale: FACTORY_DEFAULTS.cards[k].scale,
+            xMm: FACTORY_DEFAULTS.cards[k].xMm,
+            yMm: FACTORY_DEFAULTS.cards[k].yMm,
+            rotation: 0,
+            borderRadiusMm: 3.5,
+            filter: 'normal',
+            brightness: 0,
+            contrast: 0,
+            dirty: true
+        });
+    });
 
     updateUIFromState();
     saveHistoryState('Restablecer todo');
     scheduleRender();
-    showToast('Ajustes restablecidos a valores por defecto', 'info');
 }
 
 function updateUIFromState() {
@@ -896,22 +1073,21 @@ function updateUIFromState() {
     DOM.paperSizeSelect.value = STATE.paper.size;
     DOM.checkCutLines.checked = STATE.layout.showCutLines;
     DOM.checkCardBorder.checked = STATE.layout.showBorder;
+    DOM.checkSyncCards.checked = STATE.syncCards;
     setActiveTab(STATE.activeCardId);
 }
 
 // =============================================================================
-// 9. PROCESAMIENTO DE IMAGEN & FILTROS (Offscreen Canvas Caching)
+// 11. PROCESAMIENTO DE IMAGEN (Offscreen Cache)
 // =============================================================================
 
 function processCardImage(card) {
     const sourceImg = card.croppedCanvas || card.rawImage;
     if (!sourceImg) return null;
 
-    // Crear canvas offscreen
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
-    // Manejar rotación en el tamaño del canvas
     const isSideways = card.rotation === 90 || card.rotation === 270;
     const srcW = sourceImg.width;
     const srcH = sourceImg.height;
@@ -926,7 +1102,6 @@ function processCardImage(card) {
     ctx.drawImage(sourceImg, -srcW / 2, -srcH / 2, srcW, srcH);
     ctx.restore();
 
-    // Aplicar filtros a nivel de píxeles si es necesario
     if (card.filter !== 'normal' || card.brightness !== 0 || card.contrast !== 0) {
         applyPixelFilters(ctx, canvas.width, canvas.height, card.filter, card.brightness, card.contrast);
     }
@@ -946,30 +1121,23 @@ function applyPixelFilters(ctx, width, height, filterType, brightness, contrast)
         let g = d[i + 1];
         let b = d[i + 2];
 
-        // Filtros de modo
         if (filterType === 'bw') {
-            // Escala de grises con luminancia oficial
             const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            // Mayor contraste para fotocopia
             const enhanced = gray > 140 ? Math.min(255, gray * 1.15) : Math.max(0, gray * 0.85);
             r = g = b = enhanced;
         } else if (filterType === 'scan') {
-            // Realce de documento / nitidez de texto
             const lum = 0.299 * r + 0.587 * g + 0.114 * b;
             if (lum > 180) {
-                // Blanquear fondo sucio
-                r = Math.min(255, r * 1.1);
-                g = Math.min(255, g * 1.1);
-                b = Math.min(255, b * 1.1);
-            } else if (lum < 90) {
-                // Oscurecer texto
-                r = Math.max(0, r * 0.85);
-                g = Math.max(0, g * 0.85);
-                b = Math.max(0, b * 0.85);
+                r = Math.min(255, r * 1.08);
+                g = Math.min(255, g * 1.08);
+                b = Math.min(255, b * 1.08);
+            } else if (lum < 95) {
+                r = Math.max(0, r * 0.88);
+                g = Math.max(0, g * 0.88);
+                b = Math.max(0, b * 0.88);
             }
         }
 
-        // Brillo y Contraste
         if (brightness !== 0) {
             r += brightness * 2;
             g += brightness * 2;
@@ -991,7 +1159,7 @@ function applyPixelFilters(ctx, width, height, filterType, brightness, contrast)
 }
 
 // =============================================================================
-// 10. MOTOR DE RENDERIZADO CANVAS A 60 FPS
+// 12. MOTOR DE RENDERIZADO CANVAS A 60 FPS
 // =============================================================================
 
 function scheduleRender() {
@@ -1003,21 +1171,24 @@ function scheduleRender() {
 
 function resizeCanvasViewport() {
     const container = DOM.viewportContainer;
-    const availWidth = container.clientWidth - 48;
-    const availHeight = container.clientHeight - 48;
+    const isMobile = window.innerWidth < 640;
+    
+    // En móviles, maximizar el espacio útil sin márgenes muertos
+    const paddingX = isMobile ? 8 : 24;
+    const paddingY = isMobile ? 8 : 24;
+    const availWidth = container.clientWidth - paddingX;
+    const availHeight = container.clientHeight - paddingY;
 
     const sheetAspect = STATE.paper.heightMm / STATE.paper.widthMm;
 
-    // Ajustar zoom inicial o tamaño
-    let displayWidth = Math.min(availWidth, 420);
+    let displayWidth = isMobile ? availWidth : Math.min(availWidth, 420);
     let displayHeight = displayWidth * sheetAspect;
 
-    if (displayHeight > availHeight && availHeight > 300) {
+    if (displayHeight > availHeight && availHeight > 250) {
         displayHeight = availHeight;
         displayWidth = displayHeight / sheetAspect;
     }
 
-    // HiDPI / Retina Display Scaling
     const dpr = window.devicePixelRatio || 1;
     DOM.previewCanvas.width = displayWidth * STATE.zoom * dpr;
     DOM.previewCanvas.height = displayHeight * STATE.zoom * dpr;
@@ -1038,27 +1209,21 @@ function renderLoop() {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // Fondo blanco de hoja A4 / Carta
+    // Fondo blanco puro de la hoja
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Calcular factor de escala mm a píxeles
     const mmToPx = canvasWidth / STATE.paper.widthMm;
-
-    // Calcular instancias de tarjetas según el modo de plantilla
     const cardInstances = getCardInstances(mmToPx, canvasWidth, canvasHeight);
 
-    // Dibujar cada carnet
     for (const inst of cardInstances) {
         drawCardInstance(ctx, inst, mmToPx);
     }
 
-    // Dibujar guías magnéticas de alineación si están activas
     if (INTERACTION.isDragging && INTERACTION.activeSnapLines.length > 0) {
         drawSnapLines(ctx, canvasWidth, canvasHeight, mmToPx);
     }
 
-    // Dibujar caja de selección y manijas si hay tarjeta seleccionada
     if (STATE.selectedCardId) {
         const selectedInst = cardInstances.find(i => i.card.id === STATE.selectedCardId);
         if (selectedInst) {
@@ -1081,7 +1246,6 @@ function getCardInstances(mmToPx, canvasWidth, canvasHeight) {
 
     if (mode === 'both') {
         if (arrange === 'vertical') {
-            // Frente arriba, dorso abajo
             if (f.rawImage) {
                 const wMm = f.widthMm * (f.scale / 100);
                 const hMm = f.heightMm * (f.scale / 100);
@@ -1097,19 +1261,18 @@ function getCardInstances(mmToPx, canvasWidth, canvasHeight) {
                 instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
             }
         } else {
-            // Horizontal / Lado a lado
             const halfW = paperW / 2;
             if (f.rawImage) {
                 const wMm = f.widthMm * (f.scale / 100);
                 const hMm = f.heightMm * (f.scale / 100);
-                const xMm = (halfW - wMm) / 2 + f.xMm + 5;
+                const xMm = (halfW - wMm) / 2 + f.xMm + 4;
                 const yMm = (paperH - hMm) / 2 + f.yMm;
                 instances.push({ card: f, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
             }
             if (d.rawImage) {
                 const wMm = d.widthMm * (d.scale / 100);
                 const hMm = d.heightMm * (d.scale / 100);
-                const xMm = halfW + (halfW - wMm) / 2 + d.xMm - 5;
+                const xMm = halfW + (halfW - wMm) / 2 + d.xMm - 4;
                 const yMm = (paperH - hMm) / 2 + d.yMm;
                 instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
             }
@@ -1131,7 +1294,6 @@ function getCardInstances(mmToPx, canvasWidth, canvasHeight) {
             instances.push({ card: d, xMm, yMm, wMm, hMm, pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx });
         }
     } else if (mode === 'multi-2') {
-        // 2 copias del juego frente/dorso
         const halfH = paperH / 2;
         [0, halfH].forEach((offsetY) => {
             if (f.rawImage) {
@@ -1150,7 +1312,6 @@ function getCardInstances(mmToPx, canvasWidth, canvasHeight) {
             }
         });
     } else if (mode === 'multi-4') {
-        // 4 copias tipo cuadrícula 2x2
         const colW = paperW / 2;
         const rowH = paperH / 2;
         [
@@ -1188,7 +1349,7 @@ function drawCardInstance(ctx, inst, mmToPx) {
     const h = inst.pxH;
     const r = card.borderRadiusMm * mmToPx;
 
-    // Líneas guía de corte con tijera si está activo
+    // Solo dibujar líneas de corte si está EXPLÍCITAMENTE activado por el usuario
     if (STATE.layout.showCutLines) {
         ctx.save();
         ctx.strokeStyle = '#94a3b8';
@@ -1198,7 +1359,7 @@ function drawCardInstance(ctx, inst, mmToPx) {
         ctx.restore();
     }
 
-    // Dibujar tarjeta con esquinas redondeadas
+    // Dibujar tarjeta con esquinas redondeadas limpias
     ctx.save();
     ctx.beginPath();
     drawRoundedRectPath(ctx, x, y, w, h, r);
@@ -1206,10 +1367,10 @@ function drawCardInstance(ctx, inst, mmToPx) {
     ctx.drawImage(img, x, y, w, h);
     ctx.restore();
 
-    // Borde sutil
+    // Solo dibujar borde sutil si está EXPLÍCITAMENTE activado
     if (STATE.layout.showBorder) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(203, 213, 225, 0.9)';
+        ctx.strokeStyle = 'rgba(203, 213, 225, 0.8)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         drawRoundedRectPath(ctx, x, y, w, h, r);
@@ -1239,14 +1400,12 @@ function drawSelectionBox(ctx, inst) {
     const h = inst.pxH;
 
     ctx.save();
-    // Línea de selección azul
     ctx.strokeStyle = '#2563eb';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
     ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
     ctx.setLineDash([]);
 
-    // 4 Manijas en las esquinas
     const handleSize = 8;
     ctx.fillStyle = '#2563eb';
     ctx.strokeStyle = '#ffffff';
@@ -1263,7 +1422,6 @@ function drawSelectionBox(ctx, inst) {
         ctx.fillRect(hPos.x - handleSize / 2, hPos.y - handleSize / 2, handleSize, handleSize);
         ctx.strokeRect(hPos.x - handleSize / 2, hPos.y - handleSize / 2, handleSize, handleSize);
     }
-
     ctx.restore();
 }
 
@@ -1301,7 +1459,7 @@ function updateEmptyStateVisibility() {
 }
 
 // =============================================================================
-// 11. MANIPULACIÓN DIRECTA EN EL CANVAS (Drag, Resize & Snap)
+// 13. MANIPULACIÓN DIRECTA EN EL CANVAS
 // =============================================================================
 
 function setupCanvasPointerEvents() {
@@ -1312,7 +1470,6 @@ function setupCanvasPointerEvents() {
         const mmToPx = (canvas.width / (window.devicePixelRatio || 1)) / STATE.paper.widthMm;
         const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
 
-        // 1. Probar si hizo clic en una manija de resize de la tarjeta seleccionada
         if (STATE.selectedCardId) {
             const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
             if (selectedInst) {
@@ -1328,7 +1485,6 @@ function setupCanvasPointerEvents() {
             }
         }
 
-        // 2. Probar si hizo clic sobre una tarjeta
         let clickedInst = null;
         for (let i = instances.length - 1; i >= 0; i--) {
             const inst = instances[i];
@@ -1348,9 +1504,8 @@ function setupCanvasPointerEvents() {
             canvas.setPointerCapture(e.pointerId);
             scheduleRender();
         } else {
-            // Clic en el fondo vacío -> deseleccionar
             STATE.selectedCardId = null;
-            DOM.selectedCardIndicator.textContent = 'Selecciona o arrastra un carnet';
+            DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
             scheduleRender();
         }
     });
@@ -1361,20 +1516,22 @@ function setupCanvasPointerEvents() {
         const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
 
         if (INTERACTION.isResizing) {
-            // Lógica de redimensionamiento directo
             const deltaX = coords.x - INTERACTION.dragStart.x;
             const deltaMm = deltaX / mmToPx;
             const card = STATE.cards[STATE.selectedCardId];
             const scaleChange = (deltaMm / (card.widthMm / 100));
 
             card.scale = Math.min(180, Math.max(30, Math.round(INTERACTION.cardInitialScale + scaleChange)));
+            if (STATE.syncCards) {
+                const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].scale = card.scale;
+            }
             syncControlsFromActiveCard();
             scheduleRender();
             return;
         }
 
         if (INTERACTION.isDragging) {
-            // Lógica de arrastre y reposicionamiento
             const deltaX = (coords.x - INTERACTION.dragStart.x) / mmToPx;
             const deltaY = (coords.y - INTERACTION.dragStart.y) / mmToPx;
             const card = STATE.cards[STATE.selectedCardId];
@@ -1382,16 +1539,13 @@ function setupCanvasPointerEvents() {
             let newX = Math.round(INTERACTION.cardInitialPos.x + deltaX);
             let newY = Math.round(INTERACTION.cardInitialPos.y + deltaY);
 
-            // Guías magnéticas de Snap
             INTERACTION.activeSnapLines = [];
             if (STATE.snapEnabled) {
-                // Snap al centro horizontal de la hoja (xMm = 0)
                 if (Math.abs(newX) <= 2) {
                     newX = 0;
                     INTERACTION.activeSnapLines.push({ orientation: 'v', posMm: STATE.paper.widthMm / 2 });
                 }
 
-                // Snap al otro carnet si existe
                 const otherCard = STATE.activeCardId === 'frente' ? STATE.cards.dorso : STATE.cards.frente;
                 if (otherCard && otherCard.rawImage) {
                     if (Math.abs(newX - otherCard.xMm) <= 2) {
@@ -1404,12 +1558,16 @@ function setupCanvasPointerEvents() {
             card.xMm = Math.min(100, Math.max(-100, newX));
             card.yMm = Math.min(100, Math.max(-100, newY));
 
+            if (STATE.syncCards) {
+                const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].xMm = card.xMm;
+            }
+
             syncControlsFromActiveCard();
             scheduleRender();
             return;
         }
 
-        // Cambio de cursor según hover
         if (STATE.selectedCardId) {
             const selectedInst = instances.find(i => i.card.id === STATE.selectedCardId);
             if (selectedInst) {
@@ -1473,8 +1631,8 @@ function hitTestHandles(x, y, inst) {
 function toggleSnap() {
     STATE.snapEnabled = !STATE.snapEnabled;
     DOM.btnToggleSnap.className = STATE.snapEnabled
-        ? 'p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80'
-        : 'p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800';
+        ? 'p-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80'
+        : 'p-1 rounded text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800';
     showToast(STATE.snapEnabled ? 'Guías magnéticas activadas' : 'Guías magnéticas desactivadas', 'info');
 }
 
@@ -1493,7 +1651,7 @@ function fitZoomToContainer() {
 }
 
 // =============================================================================
-// 12. HISTORIAL: UNDO / REDO
+// 14. HISTORIAL: UNDO / REDO
 // =============================================================================
 
 function saveHistoryState(actionName) {
@@ -1502,6 +1660,7 @@ function saveHistoryState(actionName) {
     const snapshot = JSON.stringify({
         paper: STATE.paper,
         layout: STATE.layout,
+        syncCards: STATE.syncCards,
         cards: {
             frente: { ...STATE.cards.frente, rawImage: null, croppedCanvas: null, cachedCanvas: null },
             dorso: { ...STATE.cards.dorso, rawImage: null, croppedCanvas: null, cachedCanvas: null }
@@ -1553,8 +1712,8 @@ function redo() {
 function applySnapshot(snap) {
     Object.assign(STATE.paper, snap.paper);
     Object.assign(STATE.layout, snap.layout);
+    if (snap.syncCards !== undefined) STATE.syncCards = snap.syncCards;
 
-    // Conservar imágenes originales pero restaurar parámetros numéricos
     ['frente', 'dorso'].forEach(key => {
         const currentCard = STATE.cards[key];
         const snapCard = snap.cards[key];
@@ -1580,13 +1739,13 @@ function updateHistoryButtons() {
 }
 
 // =============================================================================
-// 13. MODAL DE RECORTE (CROP TOOL)
+// 15. MODAL DE RECORTE (CROP TOOL)
 // =============================================================================
 
 let cropState = {
     cardId: 'frente',
     img: null,
-    aspect: 'free', // 'free' | 'cr80'
+    aspect: 'free',
     cropBox: { x: 20, y: 20, w: 200, h: 140 }
 };
 
@@ -1605,7 +1764,6 @@ function openCropModal(cardId) {
     canvas.height = cropState.img.height;
     ctx.drawImage(cropState.img, 0, 0);
 
-    // Inicializar caja de recorte centrada
     const w = canvas.width * 0.8;
     const h = w * (54 / 85.6);
     cropState.cropBox = {
@@ -1626,19 +1784,16 @@ function drawCropCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(cropState.img, 0, 0);
 
-    // Oscurecer área fuera del recorte
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(0, 0, canvas.width, box.y);
     ctx.fillRect(0, box.y + box.h, canvas.width, canvas.height - (box.y + box.h));
     ctx.fillRect(0, box.y, box.x, box.h);
     ctx.fillRect(box.x + box.w, box.y, canvas.width - (box.x + box.w), box.h);
 
-    // Borde de la caja de recorte
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 3;
     ctx.strokeRect(box.x, box.y, box.w, box.h);
 
-    // Cuadrícula de tercios
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -1658,8 +1813,8 @@ DOM.btnCancelCrop.addEventListener('click', () => DOM.cropModal.classList.add('h
 
 DOM.btnCropAspectCr80.addEventListener('click', () => {
     cropState.aspect = 'cr80';
-    DOM.btnCropAspectCr80.className = 'px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
-    DOM.btnCropAspectFree.className = 'px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
+    DOM.btnCropAspectCr80.className = 'px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
+    DOM.btnCropAspectFree.className = 'px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
     const box = cropState.cropBox;
     box.h = box.w * (53.98 / 85.6);
     drawCropCanvas();
@@ -1667,8 +1822,8 @@ DOM.btnCropAspectCr80.addEventListener('click', () => {
 
 DOM.btnCropAspectFree.addEventListener('click', () => {
     cropState.aspect = 'free';
-    DOM.btnCropAspectFree.className = 'px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
-    DOM.btnCropAspectCr80.className = 'px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
+    DOM.btnCropAspectFree.className = 'px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium';
+    DOM.btnCropAspectCr80.className = 'px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-medium';
 });
 
 DOM.btnApplyCrop.addEventListener('click', () => {
@@ -1691,23 +1846,43 @@ DOM.btnApplyCrop.addEventListener('click', () => {
 });
 
 // =============================================================================
-// 14. MODAL DE CÁMARA WEB
+// 16. MODAL DE CÁMARA (Visor en Vivo + Alternar Trasera/Frontal)
 // =============================================================================
 
 function openCameraModal(cardId) {
     targetCameraCard = cardId;
     DOM.cameraModal.classList.remove('hidden');
+    startCameraStream();
+}
 
-    navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-    }).then(stream => {
+function startCameraStream() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+
+    const constraints = {
+        video: {
+            facingMode: cameraFacingMode,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        }
+    };
+
+    navigator.mediaDevices.getUserMedia(constraints).then(stream => {
         cameraStream = stream;
         DOM.cameraVideo.srcObject = stream;
     }).catch(err => {
         console.error('Error abriendo cámara:', err);
         closeCameraModal();
-        showToast('No se pudo acceder a la cámara o no se concedieron permisos.', 'error');
+        showToast('No se pudo acceder a la cámara o no diste permiso.', 'warning');
     });
+}
+
+function switchCameraFacingMode() {
+    cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    showToast(cameraFacingMode === 'environment' ? 'Cámara Trasera activa' : 'Cámara Frontal activa', 'info');
+    startCameraStream();
 }
 
 function closeCameraModal() {
@@ -1741,12 +1916,16 @@ function captureCameraPhoto() {
         saveHistoryState(`Captura cámara ${card.name}`);
         scheduleRender();
         showToast(`Foto capturada para ${card.name}`, 'success');
+
+        if (window.innerWidth < 1024) {
+            setMobileView('canvas');
+        }
     };
     img.src = canvas.toDataURL('image/jpeg', 0.95);
 }
 
 // =============================================================================
-// 15. MOTOR DE EXPORTACIÓN (PDF a 300 DPI, JPG, PNG, WebP e Impresión)
+// 17. MOTOR DE EXPORTACIÓN (Sin bordes ni rayas entrecortadas)
 // =============================================================================
 
 async function generateAndDownload() {
@@ -1761,7 +1940,6 @@ async function generateAndDownload() {
 
     showLoader('Generando Documento...', `Renderizando a ${dpi} DPI en formato ${format.toUpperCase()}`);
 
-    // Asíncrono para permitir que el loader aparezca sin congelar la UI
     setTimeout(async () => {
         try {
             if (format === 'pdf') {
@@ -1772,11 +1950,11 @@ async function generateAndDownload() {
 
             hideLoader();
             triggerSuccessCelebration();
-            showToast(`¡Documento ${format.toUpperCase()} generado exitosamente!`, 'success');
+            showToast(`¡Documento ${format.toUpperCase()} descargado exitosamente!`, 'success');
         } catch (err) {
             console.error('Error al exportar:', err);
             hideLoader();
-            showToast('Ocurrió un error al generar el archivo. Inténtalo de nuevo.', 'error');
+            showToast('Ocurrió un error al generar el archivo.', 'error');
         }
     }, 120);
 }
@@ -1793,7 +1971,7 @@ async function exportPDFDocument() {
         compress: true
     });
 
-    const mmToPx = 300 / 25.4; // 300 DPI para alta fidelidad
+    const mmToPx = 300 / 25.4;
     const highResCanvasWidth = STATE.paper.widthMm * mmToPx;
     const highResCanvasHeight = STATE.paper.heightMm * mmToPx;
 
@@ -1805,19 +1983,19 @@ async function exportPDFDocument() {
             processCardImage(card);
         }
 
-        // Crear versión de alta resolución con bordes redondeados
+        // Crear versión limpia de alta resolución
         const roundedCanvas = createRoundedExportCanvas(card, inst.wMm, inst.hMm, mmToPx);
-        const imgData = roundedCanvas.toDataURL('image/jpeg', 0.92);
+        const imgData = roundedCanvas.toDataURL('image/jpeg', 0.94);
 
-        // Agregar directamente a las coordenadas exactas en milímetros
         pdf.addImage(imgData, 'JPEG', inst.xMm, inst.yMm, inst.wMm, inst.hMm);
 
-        // Líneas de corte con tijeras si está activo
+        // Solo si el usuario explícitamente activó líneas de corte
         if (STATE.layout.showCutLines) {
-            pdf.setDrawColor(180, 180, 180);
+            pdf.setDrawColor(190, 190, 190);
             pdf.setLineWidth(0.2);
             pdf.setLineDashPattern([1.5, 1.5], 0);
-            pdf.rect(inst.xMm - 0.6, inst.yMm - 0.6, inst.wMm + 1.2, inst.hMm + 1.2);
+            pdf.rect(inst.xMm - 0.5, inst.yMm - 0.5, inst.wMm + 1.0, inst.hMm + 1.0);
+            pdf.setLineDashPattern([], 0); // Restaurar inmediatamente
         }
     }
 
@@ -1836,7 +2014,7 @@ async function exportImageDocument(format, dpi) {
     exportCanvas.height = heightPx;
     const ctx = exportCanvas.getContext('2d');
 
-    // Fondo blanco nítido
+    // Fondo blanco puro sin artefactos
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, widthPx, heightPx);
 
@@ -1846,9 +2024,8 @@ async function exportImageDocument(format, dpi) {
         drawCardInstance(ctx, inst, mmToPx);
     }
 
-    // Convertir a blob de forma optimizada
     const mimeType = format === 'png' ? 'image/png' : (format === 'webp' ? 'image/webp' : 'image/jpeg');
-    const quality = format === 'png' ? 1.0 : 0.93;
+    const quality = format === 'png' ? 1.0 : 0.94;
 
     return new Promise((resolve) => {
         exportCanvas.toBlob((blob) => {
@@ -1884,6 +2061,7 @@ function createRoundedExportCanvas(card, wMm, hMm, mmToPx) {
     ctx.drawImage(card.cachedCanvas, 0, 0, width, height);
     ctx.restore();
 
+    // Solo si el usuario explícitamente marcó 'borde sutil'
     if (STATE.layout.showBorder) {
         ctx.strokeStyle = 'rgba(200, 200, 200, 0.8)';
         ctx.lineWidth = 1;
@@ -1948,40 +2126,36 @@ async function copyToClipboard() {
             await navigator.clipboard.write([
                 new ClipboardItem({ 'image/png': blob })
             ]);
-            showToast('¡Hoja copiada al portapapeles! Puedes pegarla en Word o WhatsApp.', 'success');
+            showToast('¡Hoja copiada al portapapeles!', 'success');
         });
     } catch (err) {
         console.error('Error al copiar al portapapeles:', err);
-        showToast('No se pudo copiar al portapapeles. Es posible que el navegador no lo soporte.', 'warning');
+        showToast('No se pudo copiar al portapapeles en este navegador.', 'warning');
     }
 }
 
 // =============================================================================
-// 16. NOTIFICACIONES TOAST, LOADERS Y CELEBRACIÓN
+// 18. NOTIFICACIONES, LOADERS Y CELEBRACIÓN
 // =============================================================================
 
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     const colors = {
-        success: 'bg-emerald-600 text-white shadow-emerald-500/20',
-        error: 'bg-red-600 text-white shadow-red-500/20',
-        warning: 'bg-amber-500 text-white shadow-amber-500/20',
-        info: 'bg-slate-900 dark:bg-slate-800 text-white shadow-slate-900/20'
+        success: 'bg-emerald-600 text-white shadow-emerald-500/25',
+        error: 'bg-red-600 text-white shadow-red-500/25',
+        warning: 'bg-amber-500 text-white shadow-amber-500/25',
+        info: 'bg-slate-900 dark:bg-slate-800 text-white shadow-slate-900/25'
     };
 
-    toast.className = `${colors[type] || colors.info} px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
-    toast.innerHTML = `
-        <span>${message}</span>
-    `;
+    toast.className = `${colors[type] || colors.info} px-3.5 py-2 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+    toast.innerHTML = `<span>${message}</span>`;
 
     DOM.toastContainer.appendChild(toast);
 
-    // Animación de entrada
     requestAnimationFrame(() => {
         toast.classList.remove('translate-y-2', 'opacity-0');
     });
 
-    // Auto eliminar
     setTimeout(() => {
         toast.classList.add('opacity-0', 'translate-y-2');
         setTimeout(() => toast.remove(), 300);
@@ -2001,8 +2175,8 @@ function hideLoader() {
 function triggerSuccessCelebration() {
     if (typeof confetti === 'function') {
         confetti({
-            particleCount: 65,
-            spread: 55,
+            particleCount: 60,
+            spread: 50,
             origin: { y: 0.75 }
         });
     }
