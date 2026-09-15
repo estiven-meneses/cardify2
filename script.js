@@ -285,15 +285,15 @@ function setMobileView(view) {
     if (view === 'canvas') {
         DOM.panelCanvas.style.display = 'flex';
         DOM.panelControls.style.display = 'none';
-        DOM.mobileTabCanvas.className = 'py-1 px-2.5 rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center gap-1 font-bold';
-        DOM.mobileTabControls.className = 'py-1 px-2.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center gap-1';
+        DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
+        DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
         resizeCanvasViewport();
         scheduleRender();
     } else {
         DOM.panelCanvas.style.display = 'none';
         DOM.panelControls.style.display = 'flex';
-        DOM.mobileTabControls.className = 'py-1 px-2.5 rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center gap-1 font-bold';
-        DOM.mobileTabCanvas.className = 'py-1 px-2.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center gap-1';
+        DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
+        DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
     }
 }
 
