@@ -981,7 +981,10 @@ function loadDemoCards() {
 
             updateDropzoneUI('frente', img1.src);
             updateDropzoneUI('dorso', img2.src);
+            updateEmptyStateVisibility();
+            STATE.selectedCardId = 'frente';
             setActiveTab('frente');
+            syncControlsFromActiveCard();
 
             saveHistoryState('Cargar Carnet de Muestra');
             scheduleRender();
@@ -995,11 +998,11 @@ function loadDemoCards() {
 
     img1.onload = checkComplete;
     img2.onload = checkComplete;
-    img1.onerror = () => { hideLoader(); showToast('Error al cargar la imagen', 'error'); };
-    img2.onerror = () => { hideLoader(); showToast('Error al cargar la imagen', 'error'); };
+    img1.onerror = () => { hideLoader(); showToast('Error al cargar la imagen de frente', 'error'); };
+    img2.onerror = () => { hideLoader(); showToast('Error al cargar la imagen de dorso', 'error'); };
 
-    img1.src = 'recursos/carnet confa 1.png';
-    img2.src = 'recursos/carnet confa 2.png';
+    img1.src = encodeURI('recursos/carnet confa 1.png');
+    img2.src = encodeURI('recursos/carnet confa 2.png');
 }
 
 function handleGlobalPaste(e) {
@@ -1082,7 +1085,7 @@ function syncControlsFromActiveCard() {
     DOM.cardYNum.value = card.yMm;
     DOM.cardRadiusRange.value = card.borderRadiusMm;
     if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = card.borderRadiusMm;
-    DOM.cornerRadiusLabel.textContent = `${card.borderRadiusMm} mm`;
+    if (DOM.cornerRadiusLabel) DOM.cornerRadiusLabel.textContent = `${card.borderRadiusMm} mm`;
     DOM.cardBrightnessRange.value = card.brightness;
     if (DOM.cardBrightnessNum) DOM.cardBrightnessNum.value = card.brightness;
     DOM.cardContrastRange.value = card.contrast;
@@ -1199,7 +1202,7 @@ function setupCardControls() {
             STATE.cards[otherId].borderRadiusMm = val;
         }
         if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = val;
-        DOM.cornerRadiusLabel.textContent = `${val} mm`;
+        if (DOM.cornerRadiusLabel) DOM.cornerRadiusLabel.textContent = `${val} mm`;
         scheduleRender();
     });
 
@@ -1212,7 +1215,7 @@ function setupCardControls() {
                 STATE.cards[otherId].borderRadiusMm = val;
             }
             DOM.cardRadiusRange.value = val;
-            DOM.cornerRadiusLabel.textContent = `${val} mm`;
+            if (DOM.cornerRadiusLabel) DOM.cornerRadiusLabel.textContent = `${val} mm`;
             scheduleRender();
         });
     }
