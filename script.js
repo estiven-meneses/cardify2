@@ -153,7 +153,6 @@ const DOM = {
     cardRadiusRange: document.getElementById('card-radius-range'),
     cardRadiusNum: document.getElementById('card-radius-num'),
     btnResetRadius: document.getElementById('btn-reset-radius'),
-    cornerRadiusLabel: document.getElementById('corner-radius-label'),
     filterPresetBtns: document.querySelectorAll('.filter-preset-btn'),
     cardBrightnessRange: document.getElementById('card-brightness-range'),
     cardBrightnessNum: document.getElementById('card-brightness-num'),
@@ -1139,7 +1138,6 @@ function syncControlsFromActiveCard() {
     DOM.cardYNum.value = card.yMm;
     DOM.cardRadiusRange.value = card.borderRadiusMm;
     if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = card.borderRadiusMm;
-    if (DOM.cornerRadiusLabel) DOM.cornerRadiusLabel.textContent = `${card.borderRadiusMm} mm`;
     DOM.cardBrightnessRange.value = card.brightness;
     if (DOM.cardBrightnessNum) DOM.cardBrightnessNum.value = card.brightness;
     DOM.cardContrastRange.value = card.contrast;
@@ -1256,7 +1254,6 @@ function setupCardControls() {
             STATE.cards[otherId].borderRadiusMm = val;
         }
         if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = val;
-        if (DOM.cornerRadiusLabel) DOM.cornerRadiusLabel.textContent = `${val} mm`;
         scheduleRender();
     });
 
@@ -1269,7 +1266,6 @@ function setupCardControls() {
                 STATE.cards[otherId].borderRadiusMm = val;
             }
             DOM.cardRadiusRange.value = val;
-            if (DOM.cornerRadiusLabel) DOM.cornerRadiusLabel.textContent = `${val} mm`;
             scheduleRender();
         });
     }
