@@ -350,33 +350,25 @@ function setMobileView(view) {
     if (!isMobile) {
         DOM.panelControls.style.display = 'flex';
         DOM.panelCanvas.style.display = 'flex';
-        DOM.panelCanvas.classList.remove('mobile-compact-view');
-        DOM.viewportContainer.classList.remove('compact-mobile-viewport');
         return;
     }
 
     if (view === 'canvas') {
-        // Modo Hoja Completa: Lienzo a pantalla completa para manipulación directa
+        // Modo Hoja Completa: Lienzo a pantalla completa, controles ocultos
         DOM.panelCanvas.style.display = 'flex';
         DOM.panelControls.style.display = 'none';
-        DOM.panelCanvas.classList.remove('mobile-compact-view');
-        DOM.viewportContainer.classList.remove('compact-mobile-viewport');
 
         DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
         DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
         resizeCanvasViewport();
         scheduleRender();
     } else {
-        // Modo Ajustes (En Vivo): El lienzo se mantiene visible arriba para ver cambios en tiempo real
-        DOM.panelCanvas.style.display = 'flex';
+        // Modo Ajustes del Carnet: Panel de controles limpio y espacioso, lienzo oculto sin superposiciones
+        DOM.panelCanvas.style.display = 'none';
         DOM.panelControls.style.display = 'flex';
-        DOM.panelCanvas.classList.add('mobile-compact-view');
-        DOM.viewportContainer.classList.add('compact-mobile-viewport');
 
         DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
         DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
-        resizeCanvasViewport();
-        scheduleRender();
     }
 }
 

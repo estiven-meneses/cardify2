@@ -226,33 +226,6 @@
                 justify-content: center;
             }
         }
-
-        /* Vista compacta de la hoja en móviles cuando se está en la pestaña de ajustes */
-        @media screen and (max-width: 1023px) {
-            #panel-canvas.mobile-compact-view {
-                flex: none !important;
-                position: sticky;
-                top: 0;
-                z-index: 25;
-                width: 100% !important;
-                height: auto !important;
-                order: -1;
-                margin-bottom: 6px;
-                padding-bottom: 2px;
-            }
-            #panel-canvas.mobile-compact-view #viewport-container {
-                height: 220px !important;
-                min-height: 190px !important;
-                max-height: 240px !important;
-                padding: 6px !important;
-            }
-            #panel-canvas.mobile-compact-view > div:first-child {
-                display: none; /* Oculta la barra secundaria de zoom para dar máximo espacio al lienzo en vivo */
-            }
-            #panel-canvas.mobile-compact-view #canvas-quick-bar {
-                display: none !important;
-            }
-        }
     </style>
 </head>
 <body class="h-full bg-slate-100 text-slate-800 dark:bg-dark-bg dark:text-slate-100 flex flex-col transition-colors duration-200 antialiased font-sans overflow-x-hidden">
@@ -321,11 +294,11 @@
             <div class="grid grid-cols-2 lg:hidden w-full bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl shadow-inner border border-slate-200/60 dark:border-slate-700/60 gap-1">
                 <button id="mobile-tab-canvas" class="py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                    <span>Hoja Completa</span>
+                    <span>Hoja (Lienzo)</span>
                 </button>
                 <button id="mobile-tab-controls" class="py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                    <span>Ajustes (En Vivo)</span>
+                    <span>Ajustes del Carnet</span>
                 </button>
             </div>
 
