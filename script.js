@@ -156,10 +156,27 @@ const DOM = {
     btnAlignCenterY: document.getElementById('btn-align-center-y'),
     btnCopyToOther: document.getElementById('btn-copy-to-other'),
     cardRadiusRange: document.getElementById('card-radius-range'),
+    cardRadiusNum: document.getElementById('card-radius-num'),
+    btnResetRadius: document.getElementById('btn-reset-radius'),
     cornerRadiusLabel: document.getElementById('corner-radius-label'),
     filterPresetBtns: document.querySelectorAll('.filter-preset-btn'),
     cardBrightnessRange: document.getElementById('card-brightness-range'),
+    cardBrightnessNum: document.getElementById('card-brightness-num'),
+    btnResetBrightness: document.getElementById('btn-reset-brightness'),
     cardContrastRange: document.getElementById('card-contrast-range'),
+    cardContrastNum: document.getElementById('card-contrast-num'),
+    btnResetContrast: document.getElementById('btn-reset-contrast'),
+    cardRotationLabel: document.getElementById('card-rotation-label'),
+    btnRotateActive90: document.getElementById('btn-rotate-active-90'),
+    btnFlipH: document.getElementById('btn-flip-h'),
+    btnFlipV: document.getElementById('btn-flip-v'),
+    btnResetActiveCard: document.getElementById('btn-reset-active-card'),
+
+    // Plantilla Predeterminada
+    btnSaveCustomTemplate: document.getElementById('btn-save-custom-template'),
+    btnLoadCustomTemplate: document.getElementById('btn-load-custom-template'),
+    btnRestoreFactoryTemplate: document.getElementById('btn-restore-factory-template'),
+    defaultConfigBadge: document.getElementById('default-config-badge'),
 
     // Exportación
     exportFormatSelect: document.getElementById('export-format-select'),
@@ -169,7 +186,7 @@ const DOM = {
     btnDirectPrint: document.getElementById('btn-direct-print'),
     btnCopyClipboard: document.getElementById('btn-copy-clipboard'),
 
-    // Canvas Toolbar
+    // Canvas Toolbar & Quick Bar
     btnUndo: document.getElementById('btn-undo'),
     btnRedo: document.getElementById('btn-redo'),
     selectedCardIndicator: document.getElementById('selected-card-indicator'),
@@ -178,6 +195,14 @@ const DOM = {
     btnZoomIn: document.getElementById('btn-zoom-in'),
     btnZoomFit: document.getElementById('btn-zoom-fit'),
     zoomLevelLabel: document.getElementById('zoom-level-label'),
+    canvasQuickBar: document.getElementById('canvas-quick-bar'),
+    quickCardBadge: document.getElementById('quick-card-badge'),
+    quickScaleLabel: document.getElementById('quick-scale-label'),
+    btnQuickScaleDown: document.getElementById('btn-quick-scale-down'),
+    btnQuickScaleUp: document.getElementById('btn-quick-scale-up'),
+    btnQuickRotate: document.getElementById('btn-quick-rotate'),
+    btnQuickCenter: document.getElementById('btn-quick-center'),
+    btnQuickToSettings: document.getElementById('btn-quick-to-settings'),
     viewportContainer: document.getElementById('viewport-container'),
     previewCanvas: document.getElementById('preview-canvas'),
     emptyState: document.getElementById('empty-state'),
@@ -249,9 +274,12 @@ let lastTouchEndTime = 0;
 document.addEventListener('touchend', (e) => {
     const now = Date.now();
     if (now - lastTouchEndTime <= 300) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.closest('input, select, textarea'))) {
+            return;
+        }
         e.preventDefault();
         if (e.target) {
-            const clickable = e.target.closest('button, a, label, select');
+            const clickable = e.target.closest('button, a, label');
             if (clickable) clickable.click();
         }
     }
@@ -301,6 +329,19 @@ function setMobileView(view) {
 // 5. GESTIÓN DE CONFIGURACIÓN PREDETERMINADA PERSONALIZADA (⭐ Favoritos)
 // =============================================================================
 
+function updateDefaultConfigBadge() {
+    const hasCustom = !!localStorage.getItem('cardify-custom-defaults');
+    if (DOM.defaultConfigBadge) {
+        if (hasCustom) {
+            DOM.defaultConfigBadge.textContent = 'Personalizada ⭐';
+            DOM.defaultConfigBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+        } else {
+            DOM.defaultConfigBadge.textContent = 'Fábrica';
+            DOM.defaultConfigBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+        }
+    }
+}
+
 function saveCustomDefaults() {
     const customConfig = {
         paper: STATE.paper,
@@ -315,6 +356,9 @@ function saveCustomDefaults() {
                 filter: STATE.cards.frente.filter,
                 brightness: STATE.cards.frente.brightness,
                 contrast: STATE.cards.frente.contrast,
+                rotation: STATE.cards.frente.rotation || 0,
+                flipH: !!STATE.cards.frente.flipH,
+                flipV: !!STATE.cards.frente.flipV,
             },
             dorso: {
                 scale: STATE.cards.dorso.scale,
@@ -324,6 +368,9 @@ function saveCustomDefaults() {
                 filter: STATE.cards.dorso.filter,
                 brightness: STATE.cards.dorso.brightness,
                 contrast: STATE.cards.dorso.contrast,
+                rotation: STATE.cards.dorso.rotation || 0,
+                flipH: !!STATE.cards.dorso.flipH,
+                flipV: !!STATE.cards.dorso.flipV,
             }
         },
         exportFormat: STATE.exportFormat,
@@ -331,8 +378,9 @@ function saveCustomDefaults() {
     };
 
     localStorage.setItem('cardify-custom-defaults', JSON.stringify(customConfig));
+    updateDefaultConfigBadge();
     triggerSuccessCelebration();
-    showToast('⭐ ¡Configuración guardada como tu predeterminada! Se aplicará cada vez que abras Cardify.', 'success');
+    showToast('⭐ ¡Configuración guardada como tu plantilla predeterminada!', 'success');
 }
 
 function loadCustomDefaults() {
@@ -354,9 +402,101 @@ function loadCustomDefaults() {
                 }
             });
         }
+        updateDefaultConfigBadge();
     } catch (e) {
         console.warn('No se pudo cargar configuración personalizada:', e);
     }
+}
+
+function restoreFactoryDefaults() {
+    localStorage.removeItem('cardify-custom-defaults');
+    STATE.paper = JSON.parse(JSON.stringify(FACTORY_DEFAULTS.paper));
+    STATE.layout = JSON.parse(JSON.stringify(FACTORY_DEFAULTS.layout));
+    STATE.syncCards = FACTORY_DEFAULTS.syncCards;
+    
+    ['frente', 'dorso'].forEach(id => {
+        const f = FACTORY_DEFAULTS.cards[id];
+        STATE.cards[id].scale = f.scale;
+        STATE.cards[id].xMm = f.xMm;
+        STATE.cards[id].yMm = f.yMm;
+        STATE.cards[id].borderRadiusMm = f.borderRadiusMm;
+        STATE.cards[id].filter = f.filter;
+        STATE.cards[id].brightness = f.brightness;
+        STATE.cards[id].contrast = f.contrast;
+        STATE.cards[id].rotation = 0;
+        STATE.cards[id].flipH = false;
+        STATE.cards[id].flipV = false;
+        STATE.cards[id].dirty = true;
+    });
+
+    updateDefaultConfigBadge();
+    setupPaperDimensions();
+    updateUIFromState();
+    syncControlsFromActiveCard();
+    resizeCanvasViewport();
+    scheduleRender();
+    showToast('Valores de fábrica restablecidos', 'info');
+}
+
+function flipCard(cardId, axis = 'h') {
+    const card = STATE.cards[cardId];
+    if (axis === 'h') {
+        card.flipH = !card.flipH;
+    } else {
+        card.flipV = !card.flipV;
+    }
+    card.dirty = true;
+    if (STATE.syncCards) {
+        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
+        if (axis === 'h') {
+            STATE.cards[otherId].flipH = card.flipH;
+        } else {
+            STATE.cards[otherId].flipV = card.flipV;
+        }
+        STATE.cards[otherId].dirty = true;
+    }
+    syncControlsFromActiveCard();
+    scheduleRender();
+    saveHistoryState(`Voltear ${axis.toUpperCase()} ${card.name}`);
+    showToast(`${card.name}: Volteo ${axis === 'h' ? 'Horizontal' : 'Vertical'}`, 'info');
+}
+
+function resetActiveCardAdjustments() {
+    const card = STATE.cards[STATE.activeCardId];
+    const def = FACTORY_DEFAULTS.cards[STATE.activeCardId];
+    card.scale = 70;
+    card.xMm = 0;
+    card.yMm = def.yMm;
+    card.borderRadiusMm = 3.5;
+    card.filter = 'normal';
+    card.brightness = 0;
+    card.contrast = 0;
+    card.rotation = 0;
+    card.flipH = false;
+    card.flipV = false;
+    card.dirty = true;
+
+    if (STATE.syncCards) {
+        const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+        const otherDef = FACTORY_DEFAULTS.cards[otherId];
+        const other = STATE.cards[otherId];
+        other.scale = 70;
+        other.xMm = 0;
+        other.yMm = otherDef.yMm;
+        other.borderRadiusMm = 3.5;
+        other.filter = 'normal';
+        other.brightness = 0;
+        other.contrast = 0;
+        other.rotation = 0;
+        other.flipH = false;
+        other.flipV = false;
+        other.dirty = true;
+    }
+
+    syncControlsFromActiveCard();
+    saveHistoryState(`Restablecer ${card.name}`);
+    scheduleRender();
+    showToast(`Ajustes de ${card.name} restablecidos a valores iniciales`, 'info');
 }
 
 // =============================================================================
@@ -525,13 +665,92 @@ function setupEventListeners() {
     DOM.btnDirectPrint.addEventListener('click', directPrintDocument);
     DOM.btnCopyClipboard.addEventListener('click', copyToClipboard);
 
-    // Canvas Toolbar
+    // Plantilla Predeterminada
+    if (DOM.btnSaveCustomTemplate) {
+        DOM.btnSaveCustomTemplate.addEventListener('click', saveCustomDefaults);
+    }
+    if (DOM.btnLoadCustomTemplate) {
+        DOM.btnLoadCustomTemplate.addEventListener('click', () => {
+            loadCustomDefaults();
+            updateUIFromState();
+            syncControlsFromActiveCard();
+            scheduleRender();
+            showToast('⭐ Plantilla favorita cargada con éxito', 'success');
+        });
+    }
+    if (DOM.btnRestoreFactoryTemplate) {
+        DOM.btnRestoreFactoryTemplate.addEventListener('click', restoreFactoryDefaults);
+    }
+
+    // Canvas Toolbar & Barra Rápida (Agrandar con 1 toque)
     DOM.btnUndo.addEventListener('click', undo);
     DOM.btnRedo.addEventListener('click', redo);
     DOM.btnToggleSnap.addEventListener('click', toggleSnap);
     DOM.btnZoomIn.addEventListener('click', () => changeZoom(0.15));
     DOM.btnZoomOut.addEventListener('click', () => changeZoom(-0.15));
     DOM.btnZoomFit.addEventListener('click', fitZoomToContainer);
+
+    if (DOM.btnQuickScaleDown) {
+        DOM.btnQuickScaleDown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (STATE.selectedCardId) {
+                const c = STATE.cards[STATE.selectedCardId];
+                c.scale = Math.max(30, c.scale - 5);
+                if (STATE.syncCards) {
+                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                    STATE.cards[otherId].scale = c.scale;
+                }
+                syncControlsFromActiveCard();
+                scheduleRender();
+            }
+        });
+    }
+
+    if (DOM.btnQuickScaleUp) {
+        DOM.btnQuickScaleUp.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (STATE.selectedCardId) {
+                const c = STATE.cards[STATE.selectedCardId];
+                c.scale = Math.min(180, c.scale + 5);
+                if (STATE.syncCards) {
+                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                    STATE.cards[otherId].scale = c.scale;
+                }
+                syncControlsFromActiveCard();
+                scheduleRender();
+            }
+        });
+    }
+
+    if (DOM.btnQuickRotate) {
+        DOM.btnQuickRotate.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (STATE.selectedCardId) rotateCard(STATE.selectedCardId, 90);
+        });
+    }
+
+    if (DOM.btnQuickCenter) {
+        DOM.btnQuickCenter.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (STATE.selectedCardId) {
+                const c = STATE.cards[STATE.selectedCardId];
+                c.xMm = 0;
+                if (STATE.syncCards) {
+                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                    STATE.cards[otherId].xMm = 0;
+                }
+                syncControlsFromActiveCard();
+                scheduleRender();
+            }
+        });
+    }
+
+    if (DOM.btnQuickToSettings) {
+        DOM.btnQuickToSettings.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setMobileView('controls');
+        });
+    }
 
     setupCanvasPointerEvents();
 
@@ -862,9 +1081,13 @@ function syncControlsFromActiveCard() {
     DOM.cardYRange.value = card.yMm;
     DOM.cardYNum.value = card.yMm;
     DOM.cardRadiusRange.value = card.borderRadiusMm;
+    if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = card.borderRadiusMm;
     DOM.cornerRadiusLabel.textContent = `${card.borderRadiusMm} mm`;
     DOM.cardBrightnessRange.value = card.brightness;
+    if (DOM.cardBrightnessNum) DOM.cardBrightnessNum.value = card.brightness;
     DOM.cardContrastRange.value = card.contrast;
+    if (DOM.cardContrastNum) DOM.cardContrastNum.value = card.contrast;
+    if (DOM.cardRotationLabel) DOM.cardRotationLabel.textContent = `${card.rotation || 0}°`;
 
     const currentW = (card.widthMm * card.scale / 100).toFixed(1);
     const currentH = (card.heightMm * card.scale / 100).toFixed(1);
@@ -872,15 +1095,29 @@ function syncControlsFromActiveCard() {
 
     DOM.filterPresetBtns.forEach(btn => {
         if (btn.dataset.filter === card.filter) {
-            btn.className = 'filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+            btn.className = 'filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
         } else {
-            btn.className = 'filter-preset-btn py-1 px-1 text-[11px] font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+            btn.className = 'filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
         }
     });
 
     DOM.selectedCardIndicator.textContent = STATE.selectedCardId 
         ? `Editando ${STATE.cards[STATE.selectedCardId].name}` 
         : 'Arrastra para mover';
+
+    // Barra Rápida en el Canvas para Manipulación Directa (Agrandar con 1 Tap)
+    if (DOM.canvasQuickBar) {
+        if (STATE.selectedCardId && STATE.cards[STATE.selectedCardId].rawImage) {
+            DOM.canvasQuickBar.classList.remove('hidden');
+            const selCard = STATE.cards[STATE.selectedCardId];
+            if (DOM.quickCardBadge) DOM.quickCardBadge.textContent = selCard.name;
+            if (DOM.quickScaleLabel) DOM.quickScaleLabel.textContent = `${selCard.scale}%`;
+        } else {
+            DOM.canvasQuickBar.classList.add('hidden');
+        }
+    }
+
+    updateDefaultConfigBadge();
 }
 
 function setupCardControls() {
@@ -939,7 +1176,21 @@ function setupCardControls() {
         scheduleRender();
     });
 
-    // Esquinas Redondeadas
+    // Rotación y Volteo
+    if (DOM.btnRotateActive90) {
+        DOM.btnRotateActive90.addEventListener('click', () => rotateCard(STATE.activeCardId, 90));
+    }
+    if (DOM.btnFlipH) {
+        DOM.btnFlipH.addEventListener('click', () => flipCard(STATE.activeCardId, 'h'));
+    }
+    if (DOM.btnFlipV) {
+        DOM.btnFlipV.addEventListener('click', () => flipCard(STATE.activeCardId, 'v'));
+    }
+    if (DOM.btnResetActiveCard) {
+        DOM.btnResetActiveCard.addEventListener('click', resetActiveCardAdjustments);
+    }
+
+    // Esquinas Redondeadas con Input Numérico y Reset
     DOM.cardRadiusRange.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         STATE.cards[STATE.activeCardId].borderRadiusMm = val;
@@ -947,9 +1198,37 @@ function setupCardControls() {
             const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
             STATE.cards[otherId].borderRadiusMm = val;
         }
+        if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = val;
         DOM.cornerRadiusLabel.textContent = `${val} mm`;
         scheduleRender();
     });
+
+    if (DOM.cardRadiusNum) {
+        DOM.cardRadiusNum.addEventListener('input', (e) => {
+            const val = Math.min(15, Math.max(0, parseFloat(e.target.value) || 0));
+            STATE.cards[STATE.activeCardId].borderRadiusMm = val;
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].borderRadiusMm = val;
+            }
+            DOM.cardRadiusRange.value = val;
+            DOM.cornerRadiusLabel.textContent = `${val} mm`;
+            scheduleRender();
+        });
+    }
+
+    if (DOM.btnResetRadius) {
+        DOM.btnResetRadius.addEventListener('click', () => {
+            const val = 3.5;
+            STATE.cards[STATE.activeCardId].borderRadiusMm = val;
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].borderRadiusMm = val;
+            }
+            syncControlsFromActiveCard();
+            scheduleRender();
+        });
+    }
 
     // Filtros Presets
     DOM.filterPresetBtns.forEach(btn => {
@@ -971,7 +1250,7 @@ function setupCardControls() {
         });
     });
 
-    // Brillo y Contraste
+    // Brillo con Input Numérico y Reset
     DOM.cardBrightnessRange.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
         STATE.cards[STATE.activeCardId].brightness = val;
@@ -981,9 +1260,40 @@ function setupCardControls() {
             STATE.cards[otherId].brightness = val;
             STATE.cards[otherId].dirty = true;
         }
+        if (DOM.cardBrightnessNum) DOM.cardBrightnessNum.value = val;
         scheduleRender();
     });
 
+    if (DOM.cardBrightnessNum) {
+        DOM.cardBrightnessNum.addEventListener('input', (e) => {
+            const val = Math.min(50, Math.max(-50, parseInt(e.target.value, 10) || 0));
+            STATE.cards[STATE.activeCardId].brightness = val;
+            STATE.cards[STATE.activeCardId].dirty = true;
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].brightness = val;
+                STATE.cards[otherId].dirty = true;
+            }
+            DOM.cardBrightnessRange.value = val;
+            scheduleRender();
+        });
+    }
+
+    if (DOM.btnResetBrightness) {
+        DOM.btnResetBrightness.addEventListener('click', () => {
+            STATE.cards[STATE.activeCardId].brightness = 0;
+            STATE.cards[STATE.activeCardId].dirty = true;
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].brightness = 0;
+                STATE.cards[otherId].dirty = true;
+            }
+            syncControlsFromActiveCard();
+            scheduleRender();
+        });
+    }
+
+    // Contraste con Input Numérico y Reset
     DOM.cardContrastRange.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
         STATE.cards[STATE.activeCardId].contrast = val;
@@ -993,8 +1303,38 @@ function setupCardControls() {
             STATE.cards[otherId].contrast = val;
             STATE.cards[otherId].dirty = true;
         }
+        if (DOM.cardContrastNum) DOM.cardContrastNum.value = val;
         scheduleRender();
     });
+
+    if (DOM.cardContrastNum) {
+        DOM.cardContrastNum.addEventListener('input', (e) => {
+            const val = Math.min(50, Math.max(-50, parseInt(e.target.value, 10) || 0));
+            STATE.cards[STATE.activeCardId].contrast = val;
+            STATE.cards[STATE.activeCardId].dirty = true;
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].contrast = val;
+                STATE.cards[otherId].dirty = true;
+            }
+            DOM.cardContrastRange.value = val;
+            scheduleRender();
+        });
+    }
+
+    if (DOM.btnResetContrast) {
+        DOM.btnResetContrast.addEventListener('click', () => {
+            STATE.cards[STATE.activeCardId].contrast = 0;
+            STATE.cards[STATE.activeCardId].dirty = true;
+            if (STATE.syncCards) {
+                const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].contrast = 0;
+                STATE.cards[otherId].dirty = true;
+            }
+            syncControlsFromActiveCard();
+            scheduleRender();
+        });
+    }
 }
 
 function copyActiveCardSettingsToOther() {
@@ -1189,20 +1529,21 @@ function scheduleRender() {
 
 function resizeCanvasViewport() {
     const container = DOM.viewportContainer;
-    const isMobile = window.innerWidth < 640;
+    const isMobile = window.innerWidth < 1024;
     
     // En móviles, maximizar el espacio útil sin márgenes muertos ni scroll horizontal
-    const paddingX = isMobile ? 4 : 24;
-    const paddingY = isMobile ? 4 : 24;
+    const paddingX = isMobile ? 6 : 24;
+    const paddingY = isMobile ? 6 : 24;
     const availWidth = Math.max(80, Math.min(container.clientWidth - paddingX, window.innerWidth - (isMobile ? 8 : 32)));
-    const availHeight = container.clientHeight - paddingY;
+    const availHeight = Math.max(100, container.clientHeight - paddingY);
 
     const sheetAspect = STATE.paper.heightMm / STATE.paper.widthMm;
 
-    let displayWidth = isMobile ? availWidth : Math.min(availWidth, 420);
+    let displayWidth = isMobile ? availWidth : Math.min(availWidth, 560);
     let displayHeight = displayWidth * sheetAspect;
 
-    if (displayHeight > availHeight && availHeight > 200) {
+    // Si la altura calculada excede el alto disponible en el contenedor, escalar proporcionalmente
+    if (displayHeight > availHeight && availHeight > 150) {
         displayHeight = availHeight;
         displayWidth = displayHeight / sheetAspect;
     }
@@ -1428,26 +1769,29 @@ function drawSelectionBox(ctx, inst) {
 
     ctx.save();
     ctx.strokeStyle = '#2563eb';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
-    ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
     ctx.setLineDash([]);
 
-    const handleSize = 8;
-    ctx.fillStyle = '#2563eb';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth < 1024;
+    const handleRadius = isTouch ? 9 : 6;
 
     const handles = [
-        { x: x - 3, y: y - 3 },
-        { x: x + w + 3, y: y - 3 },
-        { x: x - 3, y: y + h + 3 },
-        { x: x + w + 3, y: y + h + 3 }
+        { x: x - 2, y: y - 2 },
+        { x: x + w + 2, y: y - 2 },
+        { x: x - 2, y: y + h + 2 },
+        { x: x + w + 2, y: y + h + 2 }
     ];
 
     for (const hPos of handles) {
-        ctx.fillRect(hPos.x - handleSize / 2, hPos.y - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(hPos.x - handleSize / 2, hPos.y - handleSize / 2, handleSize, handleSize);
+        ctx.beginPath();
+        ctx.arc(hPos.x, hPos.y, handleRadius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 3;
+        ctx.stroke();
     }
     ctx.restore();
 }
@@ -1529,10 +1873,12 @@ function setupCanvasPointerEvents() {
             INTERACTION.dragStart = { x: coords.x, y: coords.y };
             INTERACTION.cardInitialPos = { x: clickedInst.card.xMm, y: clickedInst.card.yMm };
             canvas.setPointerCapture(e.pointerId);
+            syncControlsFromActiveCard();
             scheduleRender();
         } else {
             STATE.selectedCardId = null;
             DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
+            syncControlsFromActiveCard();
             scheduleRender();
         }
     });
@@ -1543,10 +1889,30 @@ function setupCanvasPointerEvents() {
         const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
 
         if (INTERACTION.isResizing) {
-            const deltaX = coords.x - INTERACTION.dragStart.x;
-            const deltaMm = deltaX / mmToPx;
+            const deltaX = (coords.x - INTERACTION.dragStart.x) / mmToPx;
+            const deltaY = (coords.y - INTERACTION.dragStart.y) / mmToPx;
             const card = STATE.cards[STATE.selectedCardId];
-            const scaleChange = (deltaMm / (card.widthMm / 100));
+
+            // Escalado intuitivo según la esquina arrastrada
+            let effectiveDelta = 0;
+            switch (INTERACTION.resizeHandle) {
+                case 'br':
+                    effectiveDelta = (deltaX + deltaY) / 2;
+                    break;
+                case 'tl':
+                    effectiveDelta = (-deltaX - deltaY) / 2;
+                    break;
+                case 'tr':
+                    effectiveDelta = (deltaX - deltaY) / 2;
+                    break;
+                case 'bl':
+                    effectiveDelta = (-deltaX + deltaY) / 2;
+                    break;
+                default:
+                    effectiveDelta = deltaX;
+            }
+
+            const scaleChange = (effectiveDelta / (card.widthMm / 100));
 
             card.scale = Math.min(180, Math.max(30, Math.round(INTERACTION.cardInitialScale + scaleChange)));
             if (STATE.syncCards) {
@@ -1610,6 +1976,44 @@ function setupCanvasPointerEvents() {
         canvas.style.cursor = isOverCard ? 'grab' : 'default';
     });
 
+    // Soporte nativo de pellizco multitáctil (Pinch-to-Resize) para agrandar en celulares
+    let pinchStartDist = 0;
+    let pinchInitialScale = 70;
+
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2 && STATE.selectedCardId) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            pinchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            pinchInitialScale = STATE.cards[STATE.selectedCardId].scale;
+        }
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && STATE.selectedCardId && pinchStartDist > 0) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            const factor = currentDist / pinchStartDist;
+            const newScale = Math.min(180, Math.max(30, Math.round(pinchInitialScale * factor)));
+            
+            const card = STATE.cards[STATE.selectedCardId];
+            card.scale = newScale;
+            if (STATE.syncCards) {
+                const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
+                STATE.cards[otherId].scale = newScale;
+            }
+            syncControlsFromActiveCard();
+            scheduleRender();
+        }
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            pinchStartDist = 0;
+        }
+    }, { passive: true });
+
     const endInteraction = (e) => {
         if (INTERACTION.isDragging || INTERACTION.isResizing) {
             INTERACTION.isDragging = false;
@@ -1639,16 +2043,19 @@ function getCanvasPointerCoords(e) {
 }
 
 function hitTestHandles(x, y, inst) {
-    const handleSize = 14;
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth < 1024;
+    // Zona de toque cómoda de 32px para dedos humanos en smartphones
+    const handleHitRadius = isTouch ? 32 : 14;
     const hList = [
-        { name: 'tl', x: inst.pxX - 3, y: inst.pxY - 3 },
-        { name: 'tr', x: inst.pxX + inst.pxW + 3, y: inst.pxY - 3 },
-        { name: 'bl', x: inst.pxX - 3, y: inst.pxY + inst.pxH + 3 },
-        { name: 'br', x: inst.pxX + inst.pxW + 3, y: inst.pxY + inst.pxH + 3 }
+        { name: 'tl', x: inst.pxX, y: inst.pxY },
+        { name: 'tr', x: inst.pxX + inst.pxW, y: inst.pxY },
+        { name: 'bl', x: inst.pxX, y: inst.pxY + inst.pxH },
+        { name: 'br', x: inst.pxX + inst.pxW, y: inst.pxY + inst.pxH }
     ];
 
     for (const h of hList) {
-        if (Math.abs(x - h.x) <= handleSize && Math.abs(y - h.y) <= handleSize) {
+        const dist = Math.hypot(x - h.x, y - h.y);
+        if (dist <= handleHitRadius) {
             return h.name;
         }
     }
