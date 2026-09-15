@@ -1529,30 +1529,46 @@ function scheduleRender() {
 
 function resizeCanvasViewport() {
     const container = DOM.viewportContainer;
+    if (!container) return;
+
     const isMobile = window.innerWidth < 1024;
     
-    // En móviles, maximizar el espacio útil sin márgenes muertos ni scroll horizontal
-    const paddingX = isMobile ? 6 : 24;
-    const paddingY = isMobile ? 6 : 24;
-    const availWidth = Math.max(80, Math.min(container.clientWidth - paddingX, window.innerWidth - (isMobile ? 8 : 32)));
-    const availHeight = Math.max(100, container.clientHeight - paddingY);
+    // Dimensiones reales disponibles del contenedor
+    const cWidth = container.clientWidth || (isMobile ? window.innerWidth - 12 : 800);
+    const cHeight = container.clientHeight || (isMobile ? window.innerHeight - 200 : 700);
+
+    const paddingX = isMobile ? 8 : 36;
+    const paddingY = isMobile ? 8 : 36;
+    const availWidth = Math.max(80, cWidth - paddingX);
+    const availHeight = Math.max(100, cHeight - paddingY);
 
     const sheetAspect = STATE.paper.heightMm / STATE.paper.widthMm;
 
-    let displayWidth = isMobile ? availWidth : Math.min(availWidth, 560);
-    let displayHeight = displayWidth * sheetAspect;
+    let displayWidth, displayHeight;
 
-    // Si la altura calculada excede el alto disponible en el contenedor, escalar proporcionalmente
-    if (displayHeight > availHeight && availHeight > 150) {
-        displayHeight = availHeight;
-        displayWidth = displayHeight / sheetAspect;
-    }
-
-    // Estricto límite en móviles para que jamás genere overflow horizontal
     if (isMobile) {
+        displayWidth = availWidth;
+        displayHeight = displayWidth * sheetAspect;
+
+        if (displayHeight > availHeight && availHeight > 150) {
+            displayHeight = availHeight;
+            displayWidth = displayHeight / sheetAspect;
+        }
+
         const maxAllowed = Math.min(container.clientWidth - 2, window.innerWidth - 6);
         if (displayWidth > maxAllowed) {
             displayWidth = maxAllowed;
+            displayHeight = displayWidth * sheetAspect;
+        }
+    } else {
+        // EN ESCRITORIO: Maximizar tamaño dentro del contenedor disponible sin tope artificial
+        // Primero ajustamos para aprovechar toda la altura disponible
+        displayHeight = availHeight;
+        displayWidth = displayHeight / sheetAspect;
+
+        // Si el ancho calculado supera el ancho disponible del contenedor, ajustar por ancho
+        if (displayWidth > availWidth) {
+            displayWidth = availWidth;
             displayHeight = displayWidth * sheetAspect;
         }
     }
