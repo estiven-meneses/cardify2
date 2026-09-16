@@ -4,13 +4,15 @@ Cardify se trabaja con **varias inteligencias artificiales en paralelo**. Cada u
 
 ## Mapa actual
 
+Los bloques 1 y 2 **ya están en `main`**. `feature/bloque-1` y `feature/bloque-2` se eliminan después del merge. A partir de ahora:
+
 | Rama | Quién | De dónde sale | Qué toca |
 |---|---|---|---|
-| `main` | Nadie trabaja aquí | — | Código estable. Solo entra trabajo **terminado** por PR. |
-| `feature/bloque-1` | IA del Bloque 1 | `origin/main` | Carga, cámara, recorte inmediato, blueprint, reset, `GEMINI.md` |
-| `feature/bloque-2` | IA del Bloque 2 | `origin/main` | Barra rápida, deselección, zoom/scroll, iconos SVG |
+| `main` | Código estable | — | La rama principal. Nadie trabaja encima sin una feature nueva. |
+| `feature/<tarea>` | Una IA por rama | `origin/main` | Solo su tarea. Nunca desde otra feature. |
 
-Si aparece un Bloque 3 (o una migración Vite), se crea **otra** rama desde `origin/main`, no desde bloque-1 ni bloque-2.
+Bloque 1 (histórico): carga, recorte inmediato, blueprint, reset.  
+Bloque 2 (histórico): barra rápida, deselección, zoom/scroll, iconos, logs, shell tipo app.
 
 ## Cómo nace una rama (obligatorio)
 

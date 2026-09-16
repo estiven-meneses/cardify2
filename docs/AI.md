@@ -59,9 +59,10 @@ Si tu tarea es de un bloque, no “aprovechas” para rehacer el otro.
 
 ## Git y dos IAs (léete `docs/BRANCHING.md`)
 
-- Una IA = una rama, siempre creada desde `origin/main`. Nunca desde la rama de la otra IA.
-- Bloque 1 → `feature/bloque-1`. Bloque 2 → `feature/bloque-2`. Nadie trabaja en `main`.
-- **Prohibido** merge/rebase entre `feature/bloque-1` y `feature/bloque-2`. El cruce es solo vía PR a `main`.
+- La rama principal es `main`. Bloques 1 y 2 ya están mezclados ahí.
+- Una IA nueva = una rama `feature/<tarea>` desde `origin/main`. Nunca desde otra feature.
+- No reutilices `feature/bloque-1` ni `feature/bloque-2` (se eliminan).
+- **Prohibido** merge/rebase entre features hermanas. El cruce es solo vía PR a `main`.
 - Si no estás en tu rama, cámbiate. No “arregles” un conflicto de la otra.
 - Commit y push **solo si lo pide**.
 - No force-push a `main` ni a la rama ajena. No `--no-verify`.

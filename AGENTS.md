@@ -11,10 +11,10 @@ Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/LOGS.md` a
 
 ## Ramas (dos IAs a la vez)
 
-- `main` no se edita. Cada IA nace de `origin/main`.
-- IA Bloque 1 → solo `feature/bloque-1`. IA Bloque 2 → solo `feature/bloque-2`.
-- Prohibido merge/rebase entre esas dos features. Integración solo por PR a `main`.
-- Si tu `git branch` no es la asignada, para y cámbiate. No resuelvas conflictos ajenos.
+- La rama principal es `main`. Los bloques 1 y 2 ya se mezclaron ahí.
+- Cada IA nueva nace de `origin/main` (`git checkout -b feature/<tarea> origin/main`).
+- No reutilices `feature/bloque-1` ni `feature/bloque-2`: esas ramas se eliminan.
+- Prohibido merge/rebase entre features hermanas. Integración solo por PR a `main`.
 
 Reglas cortas:
 
