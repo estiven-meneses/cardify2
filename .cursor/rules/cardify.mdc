@@ -5,7 +5,9 @@ alwaysApply: true
 
 # Cardify
 
-Antes de editar, lee `docs/BRANCHING.md`, `docs/AI.md` y `docs/ARCHITECTURE.md`.
+Antes de editar, lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/LOGS.md`.
+
+- Al empezar: abre `logs/local/_pending.json`. Arregla solo `pending` de tu bloque. Marca `resolved` + nota. Ignora los ya resolved.
 
 - Una IA = una rama desde `origin/main`. Bloque 1 → `feature/bloque-1`. Bloque 2 → `feature/bloque-2`. Nadie trabaja en `main`.
 - Prohibido merge/rebase entre esas dos ramas. No resuelvas conflictos de la otra IA.

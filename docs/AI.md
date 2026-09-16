@@ -16,6 +16,7 @@ Contéstales en silencio (y al usuario solo si hay duda real):
 2. ¿Otra IA o rama está tocando la misma zona? Si sí, **no la pises**. Lee `docs/BRANCHING.md`.
 3. ¿El cambio introduce un segundo botón o texto que ya existe en la misma pantalla? Si sí, no lo hagas.
 4. ¿Hace falta un framework, backend o dependencia nueva? Si no es imprescindible, no la agregues.
+5. ¿Hay ítems `pending` en `logs/local/_pending.json` de tu zona? Si sí, arréglalos y márcalos `resolved`. No toques los `resolved`.
 
 ## Estructura y orden
 
@@ -72,3 +73,4 @@ Si tu tarea es de un bloque, no “aprovechas” para rehacer el otro.
 - Reintroducir emojis o botones de ejemplo duplicados.
 - Cambiar `loadFileIntoCard` / detección de perspectiva “para limpiar”.
 - Instalar librerías grandes (React, Tailwind build, etc.) en medio de un arreglo puntual. Eso es una migración, no un parche.
+- Reinvestigar un log con `status: "resolved"`. Ya lo cerró otra IA.

@@ -303,10 +303,54 @@ const INTERACTION = {
 };
 
 // =============================================================================
+// 2B. REGISTRO DE ERRORES (local → tools/dev-server.py → logs/local)
+// =============================================================================
+
+function isLocalHost() {
+    const h = window.location.hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+}
+
+function reportClientError(payload) {
+    const body = {
+        level: payload.level || 'error',
+        message: String(payload.message || 'Error desconocido').slice(0, 2000),
+        stack: payload.stack ? String(payload.stack).slice(0, 8000) : '',
+        source: payload.source || 'client',
+        url: window.location.href,
+        userAgent: navigator.userAgent
+    };
+    const endpoint = isLocalHost() ? '/__log__' : '/api/logs';
+    try {
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            keepalive: true
+        }).catch(() => {});
+    } catch (_) {}
+}
+
+function installErrorLogger() {
+    window.addEventListener('error', (e) => {
+        const msg = e.message || (e.error && e.error.message) || 'Error de script';
+        const stack = (e.error && e.error.stack) || `${e.filename || ''}:${e.lineno || 0}`;
+        reportClientError({ level: 'error', message: msg, stack, source: 'window.onerror' });
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+        const reason = e.reason;
+        const msg = (reason && (reason.message || String(reason))) || 'Promesa rechazada';
+        const stack = (reason && reason.stack) || '';
+        reportClientError({ level: 'error', message: msg, stack, source: 'unhandledrejection' });
+    });
+}
+
+// =============================================================================
 // 3. INICIALIZACIÓN
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    installErrorLogger();
     initTheme();
     loadCustomDefaults(); // Carga las preferencias guardadas del usuario
     setupPaperDimensions();
@@ -378,8 +422,8 @@ function setMobileView(view) {
         DOM.panelCanvas.style.display = 'flex';
         DOM.panelControls.style.display = 'none';
 
-        DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
-        DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
+        DOM.mobileTabCanvas.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400';
+        DOM.mobileTabControls.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500';
         resizeCanvasViewport();
         scheduleRender();
     } else {
@@ -387,8 +431,8 @@ function setMobileView(view) {
         DOM.panelCanvas.style.display = 'none';
         DOM.panelControls.style.display = 'flex';
 
-        DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
-        DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
+        DOM.mobileTabControls.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400';
+        DOM.mobileTabCanvas.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500';
     }
 }
 
@@ -4331,6 +4375,10 @@ function showToast(message, type = 'info', iconName = null) {
 
     toast.className = `${colors[type] || colors.info} px-3.5 py-2 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
     toast.innerHTML = `${icon ? `<span class="shrink-0 inline-flex">${icon}</span>` : ''}<span>${message}</span>`;
+
+    if (type === 'error' || type === 'warning') {
+        reportClientError({ level: type, message, source: 'toast' });
+    }
 
     DOM.toastContainer.appendChild(toast);
 

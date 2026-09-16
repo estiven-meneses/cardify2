@@ -1,6 +1,13 @@
 # AGENTS.md — Cardify
 
-Lee `docs/BRANCHING.md`, `docs/AI.md` y `docs/ARCHITECTURE.md` antes de editar.
+Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/LOGS.md` antes de editar.
+
+## Logs (obligatorio al empezar)
+
+- Lee `logs/local/_pending.json` (o los `logs/local/AAAA-MM-DD.json` con `status: "pending"`).
+- Si hay errores pendientes de tu zona, corrígelos.
+- Al terminar, marca `status: "resolved"` + `resolvedNote`. No re-revises los resolved.
+- No marques resolved un bug del otro bloque.
 
 ## Ramas (dos IAs a la vez)
 
