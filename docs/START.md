@@ -34,6 +34,39 @@ Después: `git branch --show-current` = `feature/<id>`. Si no, para.
 
 Si el repo está sucio con trabajo de otra IA: **no lo limpies**. Usa tu worktree.
 
+## Sincroniza con `main` (obligatorio, y no solo al empezar)
+
+`main` se mueve mientras trabajas: otra IA puede haber mezclado ahí hace diez
+minutos. Si no traes esos cambios, tu rama se aleja y el conflicto crece.
+
+Trae `main` a **tu** rama en estos tres momentos:
+
+1. Al empezar cada chat, antes de editar nada.
+2. Antes de commitear.
+3. Cuando Estiven diga que otra IA ya mezcló.
+
+```bash
+git fetch origin
+git merge origin/main      # desde tu worktree, con tu rama activa
+```
+
+Reglas de la sincronización:
+
+- La dirección es siempre `main` -> tu rama. **Nunca** al revés sin que
+  Estiven pida la mezcla.
+- Esto **no** contradice "nunca mezcles otra feature": `origin/main` sí,
+  `origin/feature/<otra-ia>` no. Sigue prohibido.
+- Si hay conflicto, resuelves **solo tu zona**. Lo de otra IA se queda como
+  viene de `main`. Si el conflicto cae fuera de tu zona, para y pregunta.
+- Si no tienes nada que commitear todavía, `git merge --ff-only origin/main`
+  te avisa si te desviaste sin querer.
+
+Comprobar si estás atrasado, sin mezclar nada:
+
+```bash
+git log --oneline HEAD..origin/main    # vacío = estás al día
+```
+
 ## Al terminar un arreglo (sin mezclar)
 
 - Commit y push de **tu** rama solo si Estiven lo pide.
@@ -42,7 +75,12 @@ Si el repo está sucio con trabajo de otra IA: **no lo limpies**. Usa tu worktre
 
 ## Cuando Estiven pide mezclar a main
 
-Una sola IA lo hace (la que él nombre):
+Una sola IA lo hace (la que él nombre).
+
+> **El bloque de limpieza de abajo borra ramas y worktrees de todas las IAs,
+> y con ellos cualquier trabajo sin commitear.** Córrelo solo cuando Estiven
+> diga "mezcla a main", nunca por iniciativa propia ni "de paso". Ya borró
+> trabajo ajeno dos veces por ejecutarse sin que lo pidieran.
 
 ```bash
 git fetch origin
