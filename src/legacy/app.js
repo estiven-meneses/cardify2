@@ -5844,3 +5844,13 @@ function getFormattedTimestamp() {
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
+
+// -----------------------------------------------------------------------------
+// Puente de la migracion a modulos ES. Ver la nota en i18n.js.
+// Estas cuatro las invoca i18n.js tras cambiar de idioma, con `typeof === function`:
+// sin exponerlas, cambiar idioma dejaria de refrescar la UI en silencio.
+// -----------------------------------------------------------------------------
+window.updateUIFromState = updateUIFromState;
+window.updatePaperThemeUI = updatePaperThemeUI;
+window.updateDefaultConfigBadge = updateDefaultConfigBadge;
+window.scheduleRender = scheduleRender;
