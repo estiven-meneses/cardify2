@@ -68,6 +68,7 @@ const FACTORY_DEFAULTS = {
     exportFormat: 'pdf',
     exportDpi: 300,
     exportLight: false,
+    exportName: '',
 };
 
 // Estado mutable actual
@@ -208,6 +209,7 @@ const DOM = {
     exportDpiSelect: document.getElementById('export-dpi-select'),
     exportDpiWrap: document.getElementById('export-dpi-wrap'),
     exportFields: document.getElementById('export-fields'),
+    exportFilename: document.getElementById('export-filename'),
     checkExportLight: document.getElementById('check-export-light'),
     btnGenerateDownload: document.getElementById('btn-generate-download'),
     btnGenerateText: document.getElementById('btn-generate-text'),
@@ -373,6 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCustomDefaults(); // Carga las preferencias guardadas del usuario
     setupPaperDimensions();
     setupEventListeners();
+    setupSheetZoomWheel();
     updateUIFromState();
     setupResponsiveMobile();
     resizeCanvasViewport();
@@ -932,6 +935,11 @@ function setupEventListeners() {
         DOM.checkExportLight.addEventListener('change', (e) => {
             STATE.exportLight = e.target.checked;
             updateExportOptionsUI();
+        });
+    }
+    if (DOM.exportFilename) {
+        DOM.exportFilename.addEventListener('input', (e) => {
+            STATE.exportName = e.target.value;
         });
     }
     DOM.btnGenerateDownload.addEventListener('click', generateAndDownload);
@@ -1502,6 +1510,18 @@ function handleGlobalKeydown(e) {
         return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === '-')) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+        e.preventDefault();
+        changeZoom(e.key === '-' ? -0.1 : 0.1);
+        return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+        e.preventDefault();
+        resetZoomTo100();
+        return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -2023,6 +2043,7 @@ function updateUIFromState() {
     if (DOM.exportFormatSelect) DOM.exportFormatSelect.value = STATE.exportFormat;
     if (DOM.exportDpiSelect) DOM.exportDpiSelect.value = String(STATE.exportDpi);
     if (DOM.checkExportLight) DOM.checkExportLight.checked = !!STATE.exportLight;
+    if (DOM.exportFilename) DOM.exportFilename.value = STATE.exportName || '';
     updateExportOptionsUI();
     setActiveTab(STATE.activeCardId);
     syncControlsFromActiveCard();
@@ -2236,13 +2257,17 @@ function resizeCanvasViewport() {
 
     const isMobile = window.innerWidth < 1024;
     const measureEl = getViewportScroller() || container;
-    
-    // Dimensiones reales disponibles del contenedor
+
     const cWidth = measureEl.clientWidth || container.clientWidth || (isMobile ? window.innerWidth - 12 : 800);
     const cHeight = measureEl.clientHeight || container.clientHeight || (isMobile ? window.innerHeight - 200 : 700);
 
-    const paddingX = isMobile ? 8 : 36;
-    const paddingY = isMobile ? 8 : 36;
+    const toolbar = document.getElementById('canvas-toolbar');
+    const footer = document.getElementById('canvas-footer');
+    const toolbarH = toolbar ? Math.ceil(toolbar.getBoundingClientRect().height) : (isMobile ? 40 : 44);
+    const footerVisible = footer && getComputedStyle(footer).display !== 'none';
+    const footerH = footerVisible ? Math.ceil(footer.getBoundingClientRect().height) : (isMobile ? 40 : 36);
+    const paddingX = isMobile ? 20 : 28;
+    const paddingY = toolbarH + footerH + (isMobile ? 28 : 32);
     const availWidth = Math.max(80, cWidth - paddingX);
     const availHeight = Math.max(100, cHeight - paddingY);
 
@@ -3006,26 +3031,28 @@ function setupCanvasPointerEvents() {
     // Soporte nativo de pellizco multitáctil (Pinch-to-Resize) para agrandar en celulares
     let pinchStartDist = 0;
     let pinchInitialScale = { frente: 70, dorso: 70 };
+    let pinchInitialZoom = 1;
 
     canvas.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2 && STATE.selectedCardId) {
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            pinchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            pinchInitialScale = {
-                frente: STATE.cards.frente.scale,
-                dorso: STATE.cards.dorso.scale
-            };
-        }
+        if (e.touches.length !== 2) return;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        pinchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        pinchInitialScale = {
+            frente: STATE.cards.frente.scale,
+            dorso: STATE.cards.dorso.scale
+        };
+        pinchInitialZoom = STATE.zoom;
     }, { passive: true });
 
     canvas.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && STATE.selectedCardId && pinchStartDist > 0) {
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-            const factor = currentDist / pinchStartDist;
+        if (e.touches.length !== 2 || pinchStartDist <= 0) return;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const factor = currentDist / pinchStartDist;
 
+        if (STATE.selectedCardId) {
             if (STATE.selectedCardId === 'both') {
                 STATE.cards.frente.scale = Math.min(180, Math.max(30, Math.round(pinchInitialScale.frente * factor)));
                 STATE.cards.dorso.scale = Math.min(180, Math.max(30, Math.round(pinchInitialScale.dorso * factor)));
@@ -3041,7 +3068,13 @@ function setupCanvasPointerEvents() {
             }
             syncControlsFromActiveCard();
             scheduleRender();
+            return;
         }
+
+        STATE.zoom = Math.min(3, Math.max(0.4, +(pinchInitialZoom * factor).toFixed(2)));
+        updateZoomLabel();
+        resizeCanvasViewport();
+        scheduleRender();
     }, { passive: true });
 
     canvas.addEventListener('touchend', (e) => {
@@ -3199,19 +3232,34 @@ function toggleSnap() {
     showToast(STATE.snapEnabled ? 'Guías magnéticas activadas' : 'Guías magnéticas desactivadas', 'info');
 }
 
+function updateZoomLabel() {
+    if (DOM.zoomLevelLabel) DOM.zoomLevelLabel.textContent = `${Math.round(STATE.zoom * 100)}%`;
+}
+
+function setupSheetZoomWheel() {
+    const scroller = getViewportScroller();
+    if (!scroller || scroller.dataset.zoomWheel === '1') return;
+    scroller.dataset.zoomWheel = '1';
+    scroller.addEventListener('wheel', (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        changeZoom(e.deltaY > 0 ? -0.1 : 0.1);
+    }, { passive: false });
+}
+
 function changeZoom(delta) {
-    STATE.zoom = Math.min(2.5, Math.max(0.4, +(STATE.zoom + delta).toFixed(2)));
-    DOM.zoomLevelLabel.textContent = `${Math.round(STATE.zoom * 100)}%`;
+    STATE.zoom = Math.min(3, Math.max(0.4, +(STATE.zoom + delta).toFixed(2)));
+    updateZoomLabel();
     resizeCanvasViewport();
     scheduleRender();
 }
 
 function resetZoomTo100() {
     STATE.zoom = 1.0;
-    if (DOM.zoomLevelLabel) DOM.zoomLevelLabel.textContent = '100%';
+    updateZoomLabel();
     resizeCanvasViewport();
     scheduleRender();
-    showToast('Zoom restablecido al 100%', 'info');
+    showToast('Zoom al 100%', 'info');
 }
 
 function toggleCanvasFullscreen(forceState) {
@@ -3228,10 +3276,16 @@ function toggleCanvasFullscreen(forceState) {
         DOM.zoomFitLabel.textContent = isFullscreen ? 'Restaurar' : 'Maximizar';
     }
     if (DOM.btnZoomFit) {
-        DOM.btnZoomFit.title = isFullscreen ? 'Restaurar vista normal (Esc)' : 'Expandir hoja a pantalla completa';
+        DOM.btnZoomFit.title = isFullscreen ? 'Restaurar vista y zoom al 100%' : 'Expandir hoja a pantalla completa';
     }
 
-    showToast(isFullscreen ? 'Modo hoja completa activado (Esc para salir)' : 'Vista normal restaurada', 'info');
+    if (!isFullscreen) {
+        STATE.zoom = 1.0;
+        updateZoomLabel();
+        showToast('Vista restaurada al 100%', 'info');
+    } else {
+        showToast('Hoja completa. Restaurar vuelve al 100%', 'info');
+    }
 
     setTimeout(() => {
         resizeCanvasViewport();
@@ -5328,6 +5382,14 @@ function formatFileSize(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+function getExportFilename(ext) {
+    const typed = (DOM.exportFilename && DOM.exportFilename.value) || STATE.exportName || '';
+    let name = typed.trim().replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+    name = name.replace(/\.(pdf|png|jpe?g|webp)$/i, '');
+    if (!name) name = `Carnet_Cardify_${STATE.paper.size.toUpperCase()}_${getFormattedTimestamp()}`;
+    return `${name}.${ext}`;
+}
+
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -5425,8 +5487,7 @@ async function exportPDFDocument(options = {}) {
         if (!light || (chosen && chosen.size <= EXPORT_MAX_BYTES)) break;
     }
 
-    const timestamp = getFormattedTimestamp();
-    const filename = `Carnet_Cardify_${STATE.paper.size.toUpperCase()}_${timestamp}.pdf`;
+    const filename = getExportFilename('pdf');
     downloadBlob(chosen, filename);
     return { bytes: chosen.size };
 }
@@ -5486,8 +5547,7 @@ async function exportImageDocument(format, dpi, options = {}) {
         if (!light || (blob && blob.size <= EXPORT_MAX_BYTES)) break;
     }
 
-    const timestamp = getFormattedTimestamp();
-    const filename = `Carnet_Cardify_${usedDpi}DPI_${timestamp}.${format}`;
+    const filename = getExportFilename(format);
     downloadBlob(blob, filename);
     return { bytes: blob.size };
 }
