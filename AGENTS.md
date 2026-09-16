@@ -1,10 +1,18 @@
 # AGENTS.md — Cardify
 
-**Antes de editar:** lee `docs/START.md` y ejecuta el ritual (crear/entrar a tu rama). No preguntes la rama.
+**Antes de editar:** lee `docs/START.md` y entra a tu rama. No preguntes la rama.
 
-- Cursor → `feature/cursor` (worktree `.worktrees/cursor`).
-- Anti-Gravity → `feature/antigravity` (worktree `.worktrees/antigravity`).
-- `main` no se edita. Mezcla a `main` **solo** si Estiven lo pide. Después se borran las dos features.
+| Si eres | Rama | Worktree |
+|---|---|---|
+| Cursor | `feature/cursor` | `.worktrees/cursor` |
+| Codex | `feature/codex` | `.worktrees/codex` |
+| Anti-Gravity | `feature/antigravity` | `.worktrees/antigravity` |
+| Claude Desktop | `feature/claude` | `.worktrees/claude` |
+
+Identifícate por el producto (Cursor vs Codex). Claude lee `CLAUDE.md`. Anti-Gravity lee `GEMINI.md`.
+
+- `main` no se edita. Mezcla **solo** si Estiven lo pide. Después se borran esas features.
+- Claude/Codex: zona la que Estiven asigne. Cursor no toca carga/perspectiva. Anti-Gravity no toca barra/zoom/iconos.
 
 También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/LOGS.md`.
 
@@ -12,14 +20,13 @@ También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/L
 
 - Lee `logs/local/_pending.json` (o los `AAAA-MM-DD.json` con `status: "pending"`).
 - Arregla solo `pending` de tu zona. Marca `resolved` + `resolvedNote`.
-- No re-revises resolved. No marques un bug de la otra IA.
+- No re-revises resolved. No marques un bug de otra IA.
 
 ## Reglas cortas
 
 - Español, respuestas compactas.
 - Cero emojis en UI. SVG propio.
 - Cero botones o textos duplicados en la misma pantalla.
-- Cursor no toca carga/perspectiva/blueprint. Anti-Gravity no toca barra/deselección/zoom/iconos/logs/shell.
 - No agregues framework, backend ni dependencias en un parche.
 - Deploy: Vercel. Supabase solo si Estiven lo pide.
 - Commit/push solo con pedido explícito. Nunca push a `main` salvo la mezcla pedida.

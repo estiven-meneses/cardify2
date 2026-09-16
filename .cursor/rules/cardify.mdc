@@ -8,15 +8,15 @@ alwaysApply: true
 Al **primer turno** de cada chat, antes de editar: lee `docs/START.md` y entra a tu rama. No preguntes.
 
 - Eres Cursor → rama `feature/cursor`, worktree `.worktrees/cursor`. Créala desde `origin/main` si no existe.
-- Anti-Gravity usa `feature/antigravity`. No la toques.
-- No trabajes en `main`. Mezcla a `main` solo si Estiven lo pide. Tras mezclar, se borran las dos features.
+- No toques `feature/antigravity`, `feature/claude` ni `feature/codex`.
+- No trabajes en `main`. Mezcla a `main` solo si Estiven lo pide. Tras mezclar, se borran las features de las IAs.
 - Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/LOGS.md`.
 - Al empezar: `logs/local/_pending.json`. Solo `pending` de tu zona. Resolved se ignoran.
 
 - Español, compacto.
 - Cero emojis en UI/toasts/tooltips. Solo SVG propio.
 - Cero redundancia: un botón = una acción por pantalla.
-- No pises carga/perspectiva/blueprint (Anti-Gravity). Tú: barra, deselección, zoom, iconos, logs, shell.
+- No pises carga/perspectiva/blueprint (Anti-Gravity). Tú: barra, deselección, zoom, iconos, logs, shell. Claude y Codex solo si Estiven les asigna tu zona.
 - No instales framework ni backend en un arreglo puntual. Vite+React+TS / Supabase solo si Estiven lo pide.
 - No commitees ni hagas push sin que lo pida. Nunca push a `main` salvo la mezcla pedida.
 - No subas fotos ni datos personales.
