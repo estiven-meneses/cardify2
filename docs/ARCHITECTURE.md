@@ -9,7 +9,6 @@ cardpdf/
   index.html      # UI completa + CSS Tailwind CDN + estilos propios
   script.js       # Estado, canvas, recorte, cámara, export (~4.5k líneas)
   icon.svg
-  recursos/       # assets de muestra (no subir fotos personales)
   docs/           # estas reglas
 ```
 

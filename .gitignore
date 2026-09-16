@@ -53,3 +53,6 @@ tmp/
 # Worktrees
 .worktrees/
 
+# Fotos de prueba (no van al git)
+recursos/
+
