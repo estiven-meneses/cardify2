@@ -79,6 +79,21 @@ STATE.theme = 'light';
 STATE.darkPaper = false;
 STATE.mobileView = 'canvas'; // 'canvas' | 'controls'
 
+const SVG_ICONS = {
+    check: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg>',
+    close: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
+    target: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3.5"></circle><circle cx="12" cy="12" r="1" fill="currentColor"></circle></svg>',
+    moon: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15.2A8.2 8.2 0 018.8 4 8.4 8.4 0 0012 20.5 8.4 8.4 0 0020 15.2z"></path></svg>',
+    sun: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.6"></circle><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"></path></svg>',
+    star: '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l2.2 5.4 5.8.5-4.4 3.8 1.4 5.6L12 15.7 6.99 18.5l1.4-5.6L4 9.1l5.8-.5L12 3.2z"></path></svg>',
+    sparkle: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.8L18.5 9.5 13.6 12.2 12 17l-1.6-4.8L5.5 9.5l4.9-1.7L12 3z"></path></svg>',
+    search: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>',
+    ruler: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V8.5L8.5 4H20"></path><path d="M4 16h4v4M16 4v4h4"></path></svg>',
+    cards: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="8" rx="1.5"></rect><rect x="9" y="11" width="12" height="8" rx="1.5"></rect></svg>',
+    flipH: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"></path></svg>',
+    flipV: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4"></path></svg>',
+};
+
 // Historial para Deshacer / Rehacer
 const HISTORY = {
     undoStack: [],
@@ -206,7 +221,9 @@ const DOM = {
     btnQuickCenterY: document.getElementById('btn-quick-center-y'),
     btnQuickCenter: document.getElementById('btn-quick-center'),
     btnQuickToSettings: document.getElementById('btn-quick-to-settings'),
+    btnQuickDeselect: document.getElementById('btn-quick-deselect'),
     viewportContainer: document.getElementById('viewport-container'),
+    viewportScroller: document.getElementById('viewport-scroller'),
     previewCanvas: document.getElementById('preview-canvas'),
     emptyState: document.getElementById('empty-state'),
     canvasStatusHint: document.getElementById('canvas-status-hint'),
@@ -275,6 +292,9 @@ let cameraFacingMode = 'environment'; // 'environment' (trasera) o 'user' (front
 const INTERACTION = {
     isDragging: false,
     isResizing: false,
+    isPanning: false,
+    panMoved: false,
+    panStart: { x: 0, y: 0, sl: 0, st: 0 },
     resizeHandle: null,
     dragStart: { x: 0, y: 0 },
     cardInitialPos: { x: 0, y: 0 },
@@ -283,10 +303,54 @@ const INTERACTION = {
 };
 
 // =============================================================================
+// 2B. REGISTRO DE ERRORES (local → tools/dev-server.py → logs/local)
+// =============================================================================
+
+function isLocalHost() {
+    const h = window.location.hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+}
+
+function reportClientError(payload) {
+    const body = {
+        level: payload.level || 'error',
+        message: String(payload.message || 'Error desconocido').slice(0, 2000),
+        stack: payload.stack ? String(payload.stack).slice(0, 8000) : '',
+        source: payload.source || 'client',
+        url: window.location.href,
+        userAgent: navigator.userAgent
+    };
+    const endpoint = isLocalHost() ? '/__log__' : '/api/logs';
+    try {
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            keepalive: true
+        }).catch(() => {});
+    } catch (_) {}
+}
+
+function installErrorLogger() {
+    window.addEventListener('error', (e) => {
+        const msg = e.message || (e.error && e.error.message) || 'Error de script';
+        const stack = (e.error && e.error.stack) || `${e.filename || ''}:${e.lineno || 0}`;
+        reportClientError({ level: 'error', message: msg, stack, source: 'window.onerror' });
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+        const reason = e.reason;
+        const msg = (reason && (reason.message || String(reason))) || 'Promesa rechazada';
+        const stack = (reason && reason.stack) || '';
+        reportClientError({ level: 'error', message: msg, stack, source: 'unhandledrejection' });
+    });
+}
+
+// =============================================================================
 // 3. INICIALIZACIÓN
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    installErrorLogger();
     initTheme();
     loadCustomDefaults(); // Carga las preferencias guardadas del usuario
     setupPaperDimensions();
@@ -358,8 +422,8 @@ function setMobileView(view) {
         DOM.panelCanvas.style.display = 'flex';
         DOM.panelControls.style.display = 'none';
 
-        DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
-        DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
+        DOM.mobileTabCanvas.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400';
+        DOM.mobileTabControls.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500';
         resizeCanvasViewport();
         scheduleRender();
     } else {
@@ -367,21 +431,21 @@ function setMobileView(view) {
         DOM.panelCanvas.style.display = 'none';
         DOM.panelControls.style.display = 'flex';
 
-        DOM.mobileTabControls.className = 'py-2 px-3 rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all flex items-center justify-center gap-1.5 font-bold text-xs';
-        DOM.mobileTabCanvas.className = 'py-2 px-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-medium text-xs';
+        DOM.mobileTabControls.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400';
+        DOM.mobileTabCanvas.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500';
     }
 }
 
 // =============================================================================
-// 5. GESTIÓN DE CONFIGURACIÓN PREDETERMINADA PERSONALIZADA (⭐ Favoritos)
+// 5. GESTIÓN DE CONFIGURACIÓN PREDETERMINADA PERSONALIZADA (Favoritos)
 // =============================================================================
 
 function updateDefaultConfigBadge() {
     const hasCustom = !!localStorage.getItem('cardify-custom-defaults');
     if (DOM.defaultConfigBadge) {
         if (hasCustom) {
-            DOM.defaultConfigBadge.textContent = 'Personalizada ⭐';
-            DOM.defaultConfigBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+            DOM.defaultConfigBadge.innerHTML = `<span>Personalizada</span>${SVG_ICONS.star}`;
+            DOM.defaultConfigBadge.className = 'inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
         } else {
             DOM.defaultConfigBadge.textContent = 'Fábrica';
             DOM.defaultConfigBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
@@ -477,7 +541,7 @@ function saveCustomDefaults() {
     syncConfigTelemetry('save_defaults');
     updateDefaultConfigBadge();
     triggerSuccessCelebration();
-    showToast('⭐ ¡Configuración guardada como tu plantilla predeterminada!', 'success');
+    showToast('¡Configuración guardada como tu plantilla predeterminada!', 'success', 'star');
 }
 
 function loadCustomDefaults() {
@@ -645,17 +709,17 @@ function togglePaperTheme() {
     STATE.darkPaper = !STATE.darkPaper;
     updatePaperThemeUI();
     scheduleRender();
-    showToast(STATE.darkPaper ? '🌙 Modo Papel Oscuro activado (anti-deslumbramiento)' : '☀️ Modo Papel Blanco activado', 'info');
+    showToast(STATE.darkPaper ? 'Modo Papel Oscuro activado (anti-deslumbramiento)' : 'Modo Papel Blanco activado', 'info', STATE.darkPaper ? 'moon' : 'sun');
 }
 
 function updatePaperThemeUI() {
     if (!DOM.btnTogglePaperTheme) return;
     if (STATE.darkPaper) {
-        if (DOM.paperThemeIcon) DOM.paperThemeIcon.textContent = '☀️';
+        if (DOM.paperThemeIcon) DOM.paperThemeIcon.innerHTML = SVG_ICONS.sun;
         if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = 'Papel Blanco';
         DOM.btnTogglePaperTheme.title = 'Cambiar vista previa a hoja blanca';
     } else {
-        if (DOM.paperThemeIcon) DOM.paperThemeIcon.textContent = '🌙';
+        if (DOM.paperThemeIcon) DOM.paperThemeIcon.innerHTML = SVG_ICONS.moon;
         if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = 'Papel Oscuro';
         DOM.btnTogglePaperTheme.title = 'Cambiar vista previa a hoja oscura (anti-deslumbramiento)';
     }
@@ -774,7 +838,7 @@ function setupEventListeners() {
     // Sincronización Automática
     DOM.checkSyncCards.addEventListener('change', (e) => {
         STATE.syncCards = e.target.checked;
-        showToast(STATE.syncCards ? '🔗 Ajustes sincronizados entre caras' : 'Ajustes independientes activados', 'info');
+        showToast(STATE.syncCards ? 'Ajustes sincronizados entre caras' : 'Ajustes independientes activados', 'info');
     });
 
     // Plantilla y Papel
@@ -940,6 +1004,13 @@ function setupEventListeners() {
         DOM.btnQuickToSettings.addEventListener('click', (e) => {
             e.stopPropagation();
             setMobileView('controls');
+        });
+    }
+
+    if (DOM.btnQuickDeselect) {
+        DOM.btnQuickDeselect.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deselectCards();
         });
     }
 
@@ -1147,7 +1218,7 @@ function swapCards() {
     updateDropzoneUI('frente', f.rawImage ? f.rawImage.src : null);
     updateDropzoneUI('dorso', d.rawImage ? d.rawImage.src : null);
 
-    saveHistoryState('Intercambiar Frente ↔ Dorso');
+    saveHistoryState('Intercambiar Frente y Dorso');
     scheduleRender();
     showToast('Frente y Dorso intercambiados', 'success');
 }
@@ -1170,7 +1241,32 @@ function handleGlobalPaste(e) {
     }
 }
 
+function isBlockingModalOpen() {
+    return (DOM.cropModal && !DOM.cropModal.classList.contains('hidden'))
+        || (DOM.cameraModal && !DOM.cameraModal.classList.contains('hidden'));
+}
+
+function deselectCards() {
+    if (!STATE.selectedCardId) {
+        if (DOM.canvasQuickBar) DOM.canvasQuickBar.classList.add('hidden');
+        return;
+    }
+    STATE.selectedCardId = null;
+    if (DOM.selectedCardIndicator) DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
+    syncControlsFromActiveCard();
+    scheduleRender();
+}
+
 function handleGlobalKeydown(e) {
+    if (e.key === 'Escape') {
+        if (isBlockingModalOpen()) return;
+        if (STATE.selectedCardId) {
+            e.preventDefault();
+            deselectCards();
+        }
+        return;
+    }
+
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -1285,23 +1381,23 @@ function syncControlsFromActiveCard() {
         }
     });
 
-    if (isBoth) {
-        DOM.selectedCardIndicator.textContent = '👥 Editando Ambos (Frente + Dorso)';
+    if (STATE.selectedCardId === 'both') {
+        DOM.selectedCardIndicator.textContent = 'Editando Ambos (Frente + Dorso)';
     } else if (STATE.selectedCardId) {
         DOM.selectedCardIndicator.textContent = `Editando ${STATE.cards[STATE.selectedCardId].name}`;
     } else {
         DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
     }
 
-    // Barra Rápida en el Canvas para Manipulación Directa (Agrandar con 1 Tap)
+    // Barra Rápida: solo visible si hay un carnet seleccionado en el lienzo
     if (DOM.canvasQuickBar) {
         const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
-        if ((STATE.selectedCardId || isBoth) && hasAnyImage) {
+        if (STATE.selectedCardId && hasAnyImage) {
             DOM.canvasQuickBar.classList.remove('hidden');
             if (DOM.quickCardBadge) {
-                DOM.quickCardBadge.textContent = isBoth
-                    ? 'Frente + Dorso'
-                    : STATE.cards[STATE.selectedCardId || STATE.activeCardId].name;
+                DOM.quickCardBadge.textContent = STATE.selectedCardId === 'both'
+                    ? 'Ambos'
+                    : STATE.cards[STATE.selectedCardId].name;
             }
             if (DOM.quickSelectBothLabel) {
                 DOM.quickSelectBothLabel.textContent = isBoth ? 'Solo Uno' : 'Ambos';
@@ -1329,7 +1425,7 @@ function centerCardsHorizontal() {
     syncControlsFromActiveCard();
     saveHistoryState('Centrar Horizontalmente (X=0)');
     scheduleRender();
-    showToast('↔ Centrado en el eje horizontal (X = 0 mm)', 'success');
+    showToast('Centrado en el eje horizontal (X = 0 mm)', 'success', 'flipH');
 }
 
 function centerCardsVertical() {
@@ -1349,7 +1445,7 @@ function centerCardsVertical() {
     syncControlsFromActiveCard();
     saveHistoryState('Centrar Verticalmente (Eje Y)');
     scheduleRender();
-    showToast('↕ Centrado en el eje vertical (Y óptimo)', 'success');
+    showToast('Centrado en el eje vertical (Y óptimo)', 'success', 'flipV');
 }
 
 function centerCardsBoth() {
@@ -1372,7 +1468,7 @@ function centerCardsBoth() {
     syncControlsFromActiveCard();
     saveHistoryState('Centrar Ambos Ejes (X/Y)');
     scheduleRender();
-    showToast('🎯 Centrado en ambos ejes (X e Y)', 'success');
+    showToast('Centrado en ambos ejes (X e Y)', 'success', 'target');
 }
 
 function centerCard(cardId) {
@@ -1387,7 +1483,7 @@ function toggleSelectBoth() {
     } else {
         STATE.selectedCardId = 'both';
         setActiveTab('both');
-        showToast('👥 Ambos carnets seleccionados (Frente + Dorso)', 'info');
+        showToast('Ambos carnets seleccionados (Frente + Dorso)', 'info', 'cards');
     }
 }
 
@@ -1770,10 +1866,11 @@ function resizeCanvasViewport() {
     if (!container) return;
 
     const isMobile = window.innerWidth < 1024;
+    const measureEl = getViewportScroller() || container;
     
     // Dimensiones reales disponibles del contenedor
-    const cWidth = container.clientWidth || (isMobile ? window.innerWidth - 12 : 800);
-    const cHeight = container.clientHeight || (isMobile ? window.innerHeight - 200 : 700);
+    const cWidth = measureEl.clientWidth || container.clientWidth || (isMobile ? window.innerWidth - 12 : 800);
+    const cHeight = measureEl.clientHeight || container.clientHeight || (isMobile ? window.innerHeight - 200 : 700);
 
     const paddingX = isMobile ? 8 : 36;
     const paddingY = isMobile ? 8 : 36;
@@ -1817,6 +1914,7 @@ function resizeCanvasViewport() {
 
     DOM.previewCanvas.style.width = `${Math.round(displayWidth * STATE.zoom)}px`;
     DOM.previewCanvas.style.height = `${Math.round(displayHeight * STATE.zoom)}px`;
+    updateViewportScrollMode();
 }
 
 function renderLoop() {
@@ -1852,7 +1950,7 @@ function renderLoop() {
         drawSnapLines(ctx, canvasWidth, canvasHeight, mmToPx);
     }
 
-    if (STATE.selectedCardId === 'both' || STATE.activeCardId === 'both') {
+    if (STATE.selectedCardId === 'both') {
         for (const inst of cardInstances) {
             drawSelectionBox(ctx, inst);
         }
@@ -2388,6 +2486,8 @@ function setupCanvasPointerEvents() {
             canvas.setPointerCapture(e.pointerId);
             syncControlsFromActiveCard();
             scheduleRender();
+        } else if (STATE.zoom > 1.0) {
+            beginViewportPan(e);
         } else {
             const placeholders = getBlueprintPlaceholders(mmToPx, canvasW, canvasH);
             const clickedBp = placeholders.find(bp =>
@@ -2398,11 +2498,7 @@ function setupCanvasPointerEvents() {
                 handleCameraTrigger(clickedBp.cardId);
                 return;
             }
-
-            STATE.selectedCardId = null;
-            if (DOM.selectedCardIndicator) DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
-            syncControlsFromActiveCard();
-            scheduleRender();
+            deselectCards();
         }
     });
 
@@ -2410,6 +2506,11 @@ function setupCanvasPointerEvents() {
         const coords = getCanvasPointerCoords(e);
         const mmToPx = (canvas.width / (window.devicePixelRatio || 1)) / STATE.paper.widthMm;
         const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
+
+        if (INTERACTION.isPanning) {
+            updateViewportPan(e);
+            return;
+        }
 
         if (INTERACTION.isResizing) {
             const deltaX = (coords.x - INTERACTION.dragStart.x) / mmToPx;
@@ -2585,6 +2686,14 @@ function setupCanvasPointerEvents() {
     }, { passive: true });
 
     const endInteraction = (e) => {
+        if (INTERACTION.isPanning) {
+            const moved = INTERACTION.panMoved;
+            INTERACTION.isPanning = false;
+            INTERACTION.panMoved = false;
+            canvas.style.cursor = 'default';
+            if (!moved) deselectCards();
+            return;
+        }
         if (INTERACTION.isDragging || INTERACTION.isResizing) {
             INTERACTION.isDragging = false;
             INTERACTION.isResizing = false;
@@ -2597,6 +2706,87 @@ function setupCanvasPointerEvents() {
 
     canvas.addEventListener('pointerup', endInteraction);
     canvas.addEventListener('pointercancel', endInteraction);
+
+    setupViewportEmptyDeselect();
+}
+
+function getViewportScroller() {
+    return DOM.viewportScroller || DOM.viewportContainer;
+}
+
+function beginViewportPan(e) {
+    const scroller = getViewportScroller();
+    if (!scroller) return;
+    INTERACTION.isPanning = true;
+    INTERACTION.panMoved = false;
+    INTERACTION.panStart = {
+        x: e.clientX,
+        y: e.clientY,
+        sl: scroller.scrollLeft,
+        st: scroller.scrollTop
+    };
+    if (DOM.previewCanvas) DOM.previewCanvas.style.cursor = 'grabbing';
+    if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+}
+
+function updateViewportPan(e) {
+    const scroller = getViewportScroller();
+    if (!scroller) return;
+    const dx = e.clientX - INTERACTION.panStart.x;
+    const dy = e.clientY - INTERACTION.panStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) INTERACTION.panMoved = true;
+    scroller.scrollLeft = INTERACTION.panStart.sl - dx;
+    scroller.scrollTop = INTERACTION.panStart.st - dy;
+}
+
+function setupViewportEmptyDeselect() {
+    const container = DOM.viewportContainer;
+    const scroller = getViewportScroller();
+    if (!container) return;
+
+    const onEmptyPointerDown = (e) => {
+        if (e.target.closest('#canvas-quick-bar')) return;
+        if (e.target.closest('#empty-state')) return;
+        if (e.target === DOM.previewCanvas) return;
+
+        if (STATE.zoom > 1.0 && (e.target === scroller || e.target.id === 'viewport-stage' || e.target === container)) {
+            beginViewportPan(e);
+            return;
+        }
+
+        deselectCards();
+    };
+
+    const onEmptyPointerMove = (e) => {
+        if (INTERACTION.isPanning) updateViewportPan(e);
+    };
+
+    const onEmptyPointerUp = (e) => {
+        if (!INTERACTION.isPanning) return;
+        const moved = INTERACTION.panMoved;
+        INTERACTION.isPanning = false;
+        INTERACTION.panMoved = false;
+        if (DOM.previewCanvas) DOM.previewCanvas.style.cursor = 'default';
+        if (!moved) deselectCards();
+    };
+
+    container.addEventListener('pointerdown', onEmptyPointerDown);
+    container.addEventListener('pointermove', onEmptyPointerMove);
+    container.addEventListener('pointerup', onEmptyPointerUp);
+    container.addEventListener('pointercancel', onEmptyPointerUp);
+}
+
+function updateViewportScrollMode() {
+    const scroller = getViewportScroller();
+    if (!scroller) return;
+    const zoomed = STATE.zoom > 1.0;
+    scroller.classList.toggle('is-zoomed', zoomed);
+    if (!zoomed) {
+        scroller.scrollLeft = 0;
+        scroller.scrollTop = 0;
+    }
 }
 
 function getCanvasPointerCoords(e) {
@@ -2798,7 +2988,7 @@ function cycleLoupeZoom() {
     else if (cur < 2.5) next = 3.0;
     else next = 1.0;
     setLoupeZoom(next);
-    showToast(`🔍 Lupa: aumento ${next}X`, 'info');
+    showToast(`Lupa: aumento ${next}X`, 'info', 'search');
 }
 
 function openCropModal(cardId, options = {}) {
@@ -3596,7 +3786,7 @@ function detectDocumentBounds() {
             w: detectedW,
             h: detectedH
         };
-        showToast('🎯 Contorno de carnet detectado', 'success');
+        showToast('Contorno de carnet detectado', 'success', 'target');
     } else {
         resetBoxAndQuadBounds();
         showToast('Encuadre estándar CR80 centrado', 'info');
@@ -3696,14 +3886,14 @@ function detectDocumentQuad(showNotification = true) {
                 br: { x: Math.max(0, Math.min(cw, bestBR.x * scaleX)), y: Math.max(0, Math.min(ch, bestBR.y * scaleY)) },
                 bl: { x: Math.max(0, Math.min(cw, bestBL.x * scaleX)), y: Math.max(0, Math.min(ch, bestBL.y * scaleY)) }
             };
-            if (showNotification) showToast('🎯 Esquinas de carnet detectadas automáticamente', 'success');
+            if (showNotification) showToast('Esquinas de carnet detectadas automáticamente', 'success', 'target');
             drawCropCanvas();
             return;
         }
     }
 
     resetQuadPoints();
-    if (showNotification) showToast('📐 Esquinas centradas estándar CR80', 'info');
+    if (showNotification) showToast('Esquinas centradas estándar CR80', 'info', 'ruler');
     drawCropCanvas();
 }
 
@@ -4109,7 +4299,7 @@ function autoProcessCardFromImage(cardId, sourceImg) {
     saveHistoryState(`Auto-escaneo ${card.name} (150% CR80 centrado)`);
     scheduleRender();
 
-    showToast(`✨ ${card.name} enderezado y centrado al 150% automáticamente`, 'success');
+    showToast(`${card.name} enderezado y centrado al 150% automáticamente`, 'success', 'sparkle');
 
     // En móvil, cambiar a la vista de la hoja para ver el resultado
     if (window.innerWidth < 1024) {
@@ -4388,7 +4578,7 @@ async function copyToClipboard() {
 // 18. NOTIFICACIONES, LOADERS Y CELEBRACIÓN
 // =============================================================================
 
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', iconName = null) {
     const toast = document.createElement('div');
     const colors = {
         success: 'bg-emerald-600 text-white shadow-emerald-500/25',
@@ -4396,9 +4586,15 @@ function showToast(message, type = 'info') {
         warning: 'bg-amber-500 text-white shadow-amber-500/25',
         info: 'bg-slate-900 dark:bg-slate-800 text-white shadow-slate-900/25'
     };
+    const fallbackIcon = { success: 'check', error: 'close', warning: 'target', info: null };
+    const icon = SVG_ICONS[iconName] || SVG_ICONS[fallbackIcon[type]] || '';
 
     toast.className = `${colors[type] || colors.info} px-3.5 py-2 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
-    toast.innerHTML = `<span>${message}</span>`;
+    toast.innerHTML = `${icon ? `<span class="shrink-0 inline-flex">${icon}</span>` : ''}<span>${message}</span>`;
+
+    if (type === 'error' || type === 'warning') {
+        reportClientError({ level: type, message, source: 'toast' });
+    }
 
     DOM.toastContainer.appendChild(toast);
 
