@@ -125,6 +125,7 @@ const DOM = {
     mobileTabExport: document.getElementById('mobile-tab-export'),
     panelSidebar: document.getElementById('panel-sidebar'),
     panelControls: document.getElementById('panel-controls'),
+    panelOutput: document.getElementById('panel-output'),
     panelExport: document.getElementById('panel-export'),
     panelCanvas: document.getElementById('panel-canvas'),
     exportSheetSummary: document.getElementById('export-sheet-summary'),
@@ -409,6 +410,7 @@ function setupResponsiveMobile() {
     } else {
         if (DOM.panelSidebar) DOM.panelSidebar.style.display = 'flex';
         if (DOM.panelControls) DOM.panelControls.style.display = 'flex';
+        if (DOM.panelOutput) DOM.panelOutput.style.display = 'flex';
         if (DOM.panelExport) DOM.panelExport.style.display = 'flex';
         if (DOM.panelCanvas) DOM.panelCanvas.style.display = 'flex';
         DOM.panelCanvas.classList.remove('mobile-compact-view');
@@ -438,6 +440,7 @@ function setMobileView(view) {
     if (!isMobile) {
         if (DOM.panelSidebar) DOM.panelSidebar.style.display = 'flex';
         if (DOM.panelControls) DOM.panelControls.style.display = 'flex';
+        if (DOM.panelOutput) DOM.panelOutput.style.display = 'flex';
         if (DOM.panelExport) DOM.panelExport.style.display = 'flex';
         if (DOM.panelCanvas) DOM.panelCanvas.style.display = 'flex';
         return;
@@ -448,8 +451,9 @@ function setMobileView(view) {
     const showExport = view === 'export';
 
     if (DOM.panelCanvas) DOM.panelCanvas.style.display = showCanvas ? 'flex' : 'none';
-    if (DOM.panelSidebar) DOM.panelSidebar.style.display = (showControls || showExport) ? 'flex' : 'none';
+    if (DOM.panelSidebar) DOM.panelSidebar.style.display = showControls ? 'flex' : 'none';
     if (DOM.panelControls) DOM.panelControls.style.display = showControls ? 'flex' : 'none';
+    if (DOM.panelOutput) DOM.panelOutput.style.display = showExport ? 'flex' : 'none';
     if (DOM.panelExport) DOM.panelExport.style.display = showExport ? 'flex' : 'none';
 
     applyMobileTabStyles(view);
@@ -773,7 +777,11 @@ function setupPaperDimensions() {
 // 8. EVENT LISTENERS
 // =============================================================================
 
-// Botones Únicos de Cámara (Inteligentes: en móvil/táctil abre cámara nativa sin complicaciones, en escritorio abre visor modal)
+function openCardFilePicker(cardId) {
+    const input = cardId === 'dorso' ? DOM.dorsoInput : DOM.frenteInput;
+    if (input) input.click();
+}
+
 function handleCameraTrigger(cardId) {
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth < 768);
     if (isTouch) {
@@ -2523,7 +2531,7 @@ function setupCanvasPointerEvents() {
                 coords.y >= bp.pxY && coords.y <= bp.pxY + bp.pxH
             );
             if (clickedBp) {
-                handleCameraTrigger(clickedBp.cardId);
+                openCardFilePicker(clickedBp.cardId);
                 return;
             }
             deselectCards();

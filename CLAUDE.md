@@ -8,7 +8,9 @@ Eres **Claude**. Rama `feature/claude`. Worktree `.worktrees/claude`. Créala de
 - Mezcla a `main` **solo** si Estiven lo pide. Después se borra tu feature.
 - Zona: la que Estiven asigne. Si no la dice, pregunta solo la zona. No pises carga/recorte (Anti-Gravity) ni barra/zoom/iconos (Cursor) salvo que te las asigne.
 
-También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/LOGS.md`.
+También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
+
+Cardify es **app**, no web. Celular tipo iPhone: Hoja / Ajustes / Salida, sin encabezado. Escritorio: Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
 
 - Español, compacto.
 - Cero emojis en UI. SVG propio. Cero botones duplicados.
