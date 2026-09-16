@@ -330,7 +330,7 @@
         #panel-canvas.canvas-fullscreen {
             position: fixed !important;
             inset: 0 !important;
-            z-index: 100 !important;
+            z-index: 40 !important;
             width: 100vw !important;
             height: 100dvh !important;
             max-height: 100dvh !important;
@@ -338,6 +338,13 @@
             margin: 0 !important;
             padding: 0.5rem !important;
             background: #0f172a !important;
+        }
+        @media screen and (max-width: 1023px) {
+            #panel-canvas.canvas-fullscreen {
+                bottom: calc(52px + env(safe-area-inset-bottom, 0px)) !important;
+                height: auto !important;
+                max-height: none !important;
+            }
         }
         #panel-canvas.canvas-fullscreen #canvas-toolbar {
             top: 0.5rem;
@@ -845,6 +852,7 @@
                 </div>
             </div>
 
+        </div>
         </div>
 
         <!-- ========================================== -->
