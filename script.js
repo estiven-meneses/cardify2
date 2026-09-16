@@ -1425,10 +1425,14 @@ function syncControlsFromActiveCard() {
         : `(${currentW} × ${currentH} mm)`;
 
     DOM.filterPresetBtns.forEach(btn => {
-        if (btn.dataset.filter === card.filter) {
-            btn.className = 'filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+        let targetFilter = card.filter;
+        if (targetFilter === 'scan') targetFilter = 'sharp_scan';
+        if (targetFilter === 'bw') targetFilter = 'photocopy';
+
+        if (btn.dataset.filter === targetFilter) {
+            btn.className = 'filter-preset-btn min-h-[40px] py-1 px-1 text-[11px] font-bold rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex flex-col items-center justify-center gap-0.5 transition-all shadow-sm';
         } else {
-            btn.className = 'filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+            btn.className = 'filter-preset-btn min-h-[40px] py-1 px-1 text-[11px] font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 flex flex-col items-center justify-center gap-0.5 transition-all';
         }
     });
 
@@ -1626,7 +1630,16 @@ function setupCardControls() {
                 c.dirty = true;
             });
             syncControlsFromActiveCard();
-            saveHistoryState(`Filtro ${filterMode}`);
+            const filterNames = {
+                normal: 'Original',
+                magic: 'Color Mágico (Fondo blanco y color vivo)',
+                portrait: 'Retrato Vívido (Optimizado para fotos)',
+                sharp_scan: 'Texto Nítido (Microtextos y firmas)',
+                photocopy: 'Fotocopia B/N',
+                contrast_bw: 'B/N Puro (Sin reflejos de plástico)'
+            };
+            showToast(`Filtro aplicado: ${filterNames[filterMode] || filterMode}`, 'info');
+            saveHistoryState(`Filtro ${filterNames[filterMode] || filterMode}`);
             scheduleRender();
         });
     });
@@ -1856,36 +1869,124 @@ function processCardImage(card) {
 function applyPixelFilters(ctx, width, height, filterType, brightness, contrast) {
     const imgData = ctx.getImageData(0, 0, width, height);
     const d = imgData.data;
+    const totalPixels = width * height;
     const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+    // Compatibilidad hacia atrás para plantillas existentes
+    let mode = filterType;
+    if (mode === 'scan') mode = 'sharp_scan';
+    if (mode === 'bw') mode = 'photocopy';
+
+    // Para filtros que requieren estiramiento de histograma o auto-niveles (magic, sharp_scan, contrast_bw)
+    let minLum = 0;
+    let maxLum = 255;
+    if (mode === 'magic' || mode === 'sharp_scan' || mode === 'contrast_bw') {
+        const hist = new Uint32Array(256);
+        let sampleCount = 0;
+        const step = Math.max(1, Math.floor(totalPixels / 15000));
+        for (let i = 0; i < d.length; i += 4 * step) {
+            const l = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+            hist[l]++;
+            sampleCount++;
+        }
+
+        let acc = 0;
+        const lowCut = sampleCount * 0.03;
+        const highCut = sampleCount * 0.96;
+        for (let j = 0; j < 256; j++) {
+            acc += hist[j];
+            if (minLum === 0 && acc >= lowCut) minLum = j;
+            if (acc >= highCut) { maxLum = j; break; }
+        }
+        if (maxLum <= minLum + 20) {
+            minLum = 10;
+            maxLum = 245;
+        }
+    }
+
+    const lumRange = Math.max(1, maxLum - minLum);
+
+    // Buffer para máscara de enfoque espacial en 'sharp_scan' y 'magic'
+    let origData = null;
+    if (mode === 'sharp_scan' || mode === 'magic') {
+        origData = new Uint8ClampedArray(d);
+    }
 
     for (let i = 0; i < d.length; i += 4) {
         let r = d[i];
         let g = d[i + 1];
         let b = d[i + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
 
-        if (filterType === 'bw') {
-            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            const enhanced = gray > 140 ? Math.min(255, gray * 1.15) : Math.max(0, gray * 0.85);
-            r = g = b = enhanced;
-        } else if (filterType === 'scan') {
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            if (lum > 180) {
-                r = Math.min(255, r * 1.08);
-                g = Math.min(255, g * 1.08);
-                b = Math.min(255, b * 1.08);
-            } else if (lum < 95) {
-                r = Math.max(0, r * 0.88);
-                g = Math.max(0, g * 0.88);
-                b = Math.max(0, b * 0.88);
+        if (mode === 'magic') {
+            // 1. Color Mágico: Blanqueamiento inteligente de fondo + realce de color
+            const normLum = Math.min(255, Math.max(0, ((lum - minLum) / lumRange) * 255));
+            const lumRatio = lum > 0 ? normLum / lum : 1;
+            const whiten = lum > maxLum * 0.84 ? 1.12 : 1.0;
+            r = Math.min(255, r * lumRatio * whiten);
+            g = Math.min(255, g * lumRatio * whiten);
+            b = Math.min(255, b * lumRatio * whiten);
+
+            // Realce de saturación selectiva para sellos, escudos y texto
+            const newLum = 0.299 * r + 0.587 * g + 0.114 * b;
+            r = newLum + (r - newLum) * 1.25;
+            g = newLum + (g - newLum) * 1.25;
+            b = newLum + (b - newLum) * 1.25;
+
+        } else if (mode === 'portrait') {
+            // 2. Retrato Vívido: Optimizado para fotografía facial en credenciales
+            const midBoost = Math.sin((lum / 255) * Math.PI) * 14;
+            r = r + midBoost + 4;
+            g = g + midBoost + 2;
+            b = b + (midBoost * 0.6) - 1;
+
+            const pLum = 0.299 * r + 0.587 * g + 0.114 * b;
+            r = pLum + (r - pLum) * 1.14;
+            g = pLum + (g - pLum) * 1.14;
+            b = pLum + (b - pLum) * 1.14;
+
+        } else if (mode === 'sharp_scan') {
+            // 3. Texto Nítido: Máximo contraste tipográfico y microtextos limpios
+            const normLum = Math.min(255, Math.max(0, ((lum - minLum) / lumRange) * 255));
+            if (normLum > 185) {
+                const boost = 1 + (normLum - 185) / 140;
+                r = Math.min(255, r * boost);
+                g = Math.min(255, g * boost);
+                b = Math.min(255, b * boost);
+            } else if (normLum < 110) {
+                const dip = normLum / 110;
+                r = r * dip * 0.9;
+                g = g * dip * 0.9;
+                b = b * dip * 0.9;
             }
+
+        } else if (mode === 'photocopy') {
+            // 4. Fotocopia B/N: Escala de grises calibrada para impresión formal de cédulas
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            let tone = gray;
+            if (gray < 128) {
+                tone = Math.pow(gray / 128, 1.2) * 128;
+            } else {
+                tone = 128 + Math.pow((gray - 128) / 127, 0.9) * 127;
+            }
+            r = g = b = tone;
+
+        } else if (mode === 'contrast_bw') {
+            // 5. B/N Puro: Binarización limpia sin grises ni reflejos de plástico
+            const threshold = (minLum + maxLum) * 0.48;
+            const bin = lum < threshold ? 0 : 255;
+            r = g = b = bin;
         }
 
+        // Ajustes manuales del usuario (Brillo)
         if (brightness !== 0) {
-            r += brightness * 2;
-            g += brightness * 2;
-            b += brightness * 2;
+            const bDelta = brightness * 2;
+            r += bDelta;
+            g += bDelta;
+            b += bDelta;
         }
 
+        // Ajustes manuales del usuario (Contraste)
         if (contrast !== 0) {
             r = factor * (r - 128) + 128;
             g = factor * (g - 128) + 128;
@@ -1895,6 +1996,27 @@ function applyPixelFilters(ctx, width, height, filterType, brightness, contrast)
         d[i] = Math.min(255, Math.max(0, r));
         d[i + 1] = Math.min(255, Math.max(0, g));
         d[i + 2] = Math.min(255, Math.max(0, b));
+    }
+
+    // Paso de convolución espacial para Nitidez (Laplacian unsharp mask)
+    if (origData && (mode === 'sharp_scan' || mode === 'magic')) {
+        const sharpenWeight = mode === 'sharp_scan' ? 0.35 : 0.22;
+        for (let y = 1; y < height - 1; y++) {
+            const rowOffset = y * width;
+            for (let x = 1; x < width - 1; x++) {
+                const idx = (rowOffset + x) * 4;
+                const topIdx = ((y - 1) * width + x) * 4;
+                const bottomIdx = ((y + 1) * width + x) * 4;
+                const leftIdx = (rowOffset + x - 1) * 4;
+                const rightIdx = (rowOffset + x + 1) * 4;
+
+                for (let c = 0; c < 3; c++) {
+                    const center = origData[idx + c];
+                    const laplacian = 4 * center - origData[topIdx + c] - origData[bottomIdx + c] - origData[leftIdx + c] - origData[rightIdx + c];
+                    d[idx + c] = Math.min(255, Math.max(0, d[idx + c] + laplacian * sharpenWeight));
+                }
+            }
+        }
     }
 
     ctx.putImageData(imgData, 0, 0);
