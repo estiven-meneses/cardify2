@@ -1,9 +1,7 @@
-const CACHE = 'cardpdf-v2';
+const CACHE = 'cardpdf-v3';
 const PRECACHE = [
     './',
     './index.html',
-    './script.js',
-    './i18n.js',
     './icon.svg',
     './manifest.json',
     './icons/icon-192.png',
@@ -15,6 +13,12 @@ const PRECACHE = [
 
 function isPassthrough(url) {
     return url.pathname.startsWith('/__log') || url.pathname.startsWith('/api/');
+}
+
+// Solo se cachea lo propio. Lo de fuera (Supabase, fuentes) pasa directo:
+// las URLs firmadas de las fotos privadas caducan y no deben quedar en disco.
+function isSameOrigin(url) {
+    return url.origin === self.location.origin;
 }
 
 self.addEventListener('install', (event) => {
@@ -38,7 +42,7 @@ self.addEventListener('fetch', (event) => {
     if (request.method !== 'GET') return;
 
     const url = new URL(request.url);
-    if (!url.protocol.startsWith('http') || isPassthrough(url)) return;
+    if (!url.protocol.startsWith('http') || !isSameOrigin(url) || isPassthrough(url)) return;
 
     if (request.mode === 'navigate') {
         event.respondWith(

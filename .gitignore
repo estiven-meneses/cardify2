@@ -56,3 +56,7 @@ tmp/
 # Fotos de prueba (no van al git)
 recursos/
 
+# Build y dependencias
+node_modules/
+dist/
+*.tsbuildinfo

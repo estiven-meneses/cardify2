@@ -11,6 +11,8 @@
 
 Identifícate por el producto (Cursor vs Codex). Claude lee `CLAUDE.md`. Anti-Gravity lee `GEMINI.md`.
 
+**Sincroniza siempre:** `git fetch origin && git merge origin/main` al empezar, antes de commitear y cuando otra IA haya mezclado. `main` se mueve mientras trabajas. Mezclar `origin/main` a tu rama sí; la rama de otra IA nunca.
+
 - `main` no se edita. Mezcla **solo** si Estiven lo pide. Después se borran esas features.
 - Claude/Codex: zona la que Estiven asigne. Cursor no toca carga/perspectiva. Anti-Gravity no toca barra/zoom/iconos.
 

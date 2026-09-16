@@ -6,6 +6,7 @@ Eres **Codex**. Rama `feature/codex`. Worktree `.worktrees/codex`. Créala desde
 
 - No trabajes en `main` ni en `feature/cursor`, `feature/antigravity` o `feature/claude`.
 - Mezcla a `main` **solo** si Estiven lo pide. Después se borra tu feature.
+- Trae `main` a tu rama seguido: `git fetch origin && git merge origin/main`. Al empezar, antes de commitear y cuando sepas que otra IA mezcló. Mezclar `origin/main` sí; la rama de otra IA nunca.
 - Zona: la que Estiven asigne. Si no la dice, pregunta solo la zona. No pises carga/recorte (Anti-Gravity) ni barra/zoom/iconos (Cursor) salvo que te las asigne.
 
 También lee `AGENTS.md`, `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.

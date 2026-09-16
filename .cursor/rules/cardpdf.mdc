@@ -10,6 +10,8 @@ Al **primer turno** de cada chat, antes de editar: lee `docs/START.md` y entra a
 - Eres Cursor → rama `feature/cursor`, worktree `.worktrees/cursor`. Créala desde `origin/main` si no existe.
 - No toques `feature/antigravity`, `feature/claude` ni `feature/codex`.
 - No trabajes en `main`. Mezcla a `main` solo si Estiven lo pide. Tras mezclar, se borran las features de las IAs.
+- Trae `main` a tu rama seguido: `git fetch origin && git merge origin/main`. Al empezar cada chat, antes de commitear y cuando otra IA haya mezclado. Mezclar `origin/main` a tu rama sí; la rama de otra IA nunca.
+- El bloque de limpieza de `docs/START.md` borra ramas y worktrees de **todas** las IAs, con su trabajo sin commitear dentro. Córrelo solo cuando Estiven diga "mezcla a main", nunca por iniciativa propia.
 - Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
 - CardPDF es **app**, no web. Celular tipo iPhone: tab bar Hoja / Ajustes / Salida, sin encabezado. Simple oculta Ajustes. Escritorio: Ajustes | Hoja | Salida (derecha). Tema y reinicio siempre visibles. No metas export en Ajustes.
 - Al empezar: `logs/local/_pending.json`. Solo `pending` de tu zona. Resolved se ignoran.

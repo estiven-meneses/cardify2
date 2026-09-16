@@ -465,3 +465,14 @@ function setLang(next) {
     if (typeof updateDefaultConfigBadge === 'function') updateDefaultConfigBadge();
     if (typeof scheduleRender === 'function') scheduleRender();
 }
+
+// -----------------------------------------------------------------------------
+// Puente de la migracion a modulos ES.
+// Antes i18n.js y script.js eran scripts clasicos y compartian el ambito global.
+// Como modulos ya no se ven, asi que se exponen a mano las funciones que el
+// codigo heredado se llama entre si. Se quita cuando ambos esten tipados.
+// -----------------------------------------------------------------------------
+window.t = t;
+window.applyI18n = applyI18n;
+window.initLang = initLang;
+window.setLang = setLang;
