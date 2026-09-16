@@ -58,7 +58,14 @@ Si tu tarea es de una zona, no “aprovechas” para rehacer la otra.
 
 - **Vite + TypeScript**, con React para las superficies nuevas. El lienzo y el
   recorte siguen en `src/legacy/`, sin tipar todavía.
-- Deploy: **Vercel**, build `npm run build` a `dist/`. No hay nada de Netlify.
+- Deploy: **dos hostings a la vez**, ambos desde `main` y ambos compilando.
+  - Netlify (`icardify.netlify.app`) es el que esta vivo hoy. Config en
+    `netlify.toml`, funcion en `netlify/functions/logs.js`.
+  - Vercel es el destino. Config en `vercel.json`, funcion en `api/logs.js`.
+  - La logica de ambos endpoints vive en `shared/log-entry.js`: se toca ahi,
+    no en cada copia.
+- **Nada se sirve sin compilar.** Si cambias como se construye la app, revisa
+  los dos archivos de config, o un hosting queda sirviendo la raiz cruda.
 - `api/logs.js` recoge los errores del cliente en producción (ver `docs/LOGS.md`).
 - **Supabase** para login y fotos privadas. Sin las variables de entorno la app
   corre igual, 100% en el cliente: el backend es opcional, no obligatorio.
