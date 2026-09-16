@@ -37,7 +37,7 @@ const FACTORY_DEFAULTS = {
             rotation: 0,
             flipH: false,
             flipV: false,
-            borderRadiusMm: 6,
+            borderRadiusMm: 5,
             filter: 'normal',
             brightness: 0,
             contrast: 0,
@@ -58,7 +58,7 @@ const FACTORY_DEFAULTS = {
             rotation: 0,
             flipH: false,
             flipV: false,
-            borderRadiusMm: 6,
+            borderRadiusMm: 5,
             filter: 'normal',
             brightness: 0,
             contrast: 0,
@@ -685,6 +685,18 @@ function setupPaperDimensions() {
 // 8. EVENT LISTENERS
 // =============================================================================
 
+// Botones Únicos de Cámara (Inteligentes: en móvil/táctil abre cámara nativa sin complicaciones, en escritorio abre visor modal)
+function handleCameraTrigger(cardId) {
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth < 768);
+    if (isTouch) {
+        if (cardId === 'frente' && DOM.frenteCameraInput) DOM.frenteCameraInput.click();
+        else if (cardId === 'dorso' && DOM.dorsoCameraInput) DOM.dorsoCameraInput.click();
+        else openCameraModal(cardId);
+    } else {
+        openCameraModal(cardId);
+    }
+}
+
 function setupEventListeners() {
     // Header & Mobile Switcher
     if (DOM.btnThemeToggle) DOM.btnThemeToggle.addEventListener('click', toggleTheme);
@@ -710,18 +722,7 @@ function setupEventListeners() {
         });
     }
 
-    // Botones Únicos de Cámara (Inteligentes: en móvil/táctil abre cámara nativa sin complicaciones, en escritorio abre visor modal)
-    function handleCameraTrigger(cardId) {
-        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth < 768);
-        if (isTouch) {
-            if (cardId === 'frente' && DOM.frenteCameraInput) DOM.frenteCameraInput.click();
-            else if (cardId === 'dorso' && DOM.dorsoCameraInput) DOM.dorsoCameraInput.click();
-            else openCameraModal(cardId);
-        } else {
-            openCameraModal(cardId);
-        }
-    }
-
+    // Botones Únicos de Cámara
     if (DOM.btnCameraFrente) {
         DOM.btnCameraFrente.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -767,10 +768,8 @@ function setupEventListeners() {
         });
     }
 
-    // Swap & Demos
+    // Swap Cards
     DOM.btnSwapCards.addEventListener('click', swapCards);
-    DOM.btnLoadDemo.addEventListener('click', loadDemoCards);
-    DOM.btnEmptyDemo.addEventListener('click', loadDemoCards);
 
     // Sincronización Automática
     DOM.checkSyncCards.addEventListener('change', (e) => {
@@ -990,7 +989,19 @@ function loadFileIntoCard(file, cardId) {
     reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-            autoProcessCardFromImage(cardId, img);
+            const card = STATE.cards[cardId];
+            card.rawImage = img;
+            card.croppedCanvas = null;
+            card.cachedCanvas = null;
+            card.dirty = true;
+
+            updateDropzoneUI(cardId, img.src);
+            setActiveTab(cardId);
+            openCropModal(cardId, { autoDetect: true, defaultMode: 'quad' });
+
+            if (window.innerWidth < 1024) {
+                setMobileView('canvas');
+            }
         };
         img.src = e.target.result;
     };
@@ -1030,12 +1041,18 @@ function removeCard(cardId) {
     card.cachedCanvas = null;
     card.dirty = true;
 
-    if (cardId === 'frente') DOM.frenteInput.value = '';
-    else DOM.dorsoInput.value = '';
+    if (cardId === 'frente') {
+        if (DOM.frenteInput) DOM.frenteInput.value = '';
+        if (DOM.frenteCameraInput) DOM.frenteCameraInput.value = '';
+    } else {
+        if (DOM.dorsoInput) DOM.dorsoInput.value = '';
+        if (DOM.dorsoCameraInput) DOM.dorsoCameraInput.value = '';
+    }
 
     updateDropzoneUI(cardId, null);
     if (STATE.selectedCardId === cardId) STATE.selectedCardId = null;
 
+    updateEmptyStateVisibility();
     saveHistoryState(`Eliminar ${card.name}`);
     scheduleRender();
     showToast(`${card.name} eliminado`, 'info');
@@ -1133,63 +1150,6 @@ function swapCards() {
     saveHistoryState('Intercambiar Frente ↔ Dorso');
     scheduleRender();
     showToast('Frente y Dorso intercambiados', 'success');
-}
-
-function loadDemoCards() {
-    showLoader('Cargando ejemplo...', 'Preparando muestra de carnet');
-
-    const img1 = new Image();
-    const img2 = new Image();
-    let loaded = 0;
-
-    const checkComplete = () => {
-        loaded++;
-        if (loaded === 2) {
-            hideLoader();
-            STATE.cards.frente.rawImage = img1;
-            STATE.cards.frente.croppedCanvas = null;
-            STATE.cards.frente.cachedCanvas = null;
-            STATE.cards.frente.widthMm = 85.6;
-            STATE.cards.frente.heightMm = 54.0;
-            STATE.cards.frente.scale = 75;
-            STATE.cards.frente.xMm = 0;
-            STATE.cards.frente.yMm = 45;
-            STATE.cards.frente.dirty = true;
-
-            STATE.cards.dorso.rawImage = img2;
-            STATE.cards.dorso.croppedCanvas = null;
-            STATE.cards.dorso.cachedCanvas = null;
-            STATE.cards.dorso.widthMm = 85.6;
-            STATE.cards.dorso.heightMm = 54.0;
-            STATE.cards.dorso.scale = 75;
-            STATE.cards.dorso.xMm = 0;
-            STATE.cards.dorso.yMm = 15;
-            STATE.cards.dorso.dirty = true;
-
-            updateDropzoneUI('frente', img1.src);
-            updateDropzoneUI('dorso', img2.src);
-            updateEmptyStateVisibility();
-            STATE.selectedCardId = 'frente';
-            setActiveTab('frente');
-            syncControlsFromActiveCard();
-
-            saveHistoryState('Cargar Carnet de Muestra');
-            scheduleRender();
-            showToast('¡Carnets de muestra cargados!', 'success');
-
-            if (window.innerWidth < 1024) {
-                setMobileView('canvas');
-            }
-        }
-    };
-
-    img1.onload = checkComplete;
-    img2.onload = checkComplete;
-    img1.onerror = () => { hideLoader(); showToast('Error al cargar la imagen de frente', 'error'); };
-    img2.onerror = () => { hideLoader(); showToast('Error al cargar la imagen de dorso', 'error'); };
-
-    img1.src = encodeURI('recursos/carnet confa 1.png');
-    img2.src = encodeURI('recursos/carnet confa 2.png');
 }
 
 function handleGlobalPaste(e) {
@@ -1648,34 +1608,57 @@ function setOrientation(orientation) {
 }
 
 function resetAllDefaults() {
-    // Si tiene favoritos guardados, preguntar o restaurar fábrica
     const hasCustom = !!localStorage.getItem('cardify-custom-defaults');
     if (hasCustom) {
         localStorage.removeItem('cardify-custom-defaults');
-        showToast('Configuración personalizada borrada. Restaurado a valores de fábrica.', 'info');
     }
+
+    ['frente', 'dorso'].forEach(k => {
+        const card = STATE.cards[k];
+        card.rawImage = null;
+        card.croppedCanvas = null;
+        card.cachedCanvas = null;
+        card.cropRect = null;
+        card.cropQuad = null;
+        card.widthMm = 85.6;
+        card.heightMm = 53.98;
+        card.scale = 150;
+        card.xMm = 0;
+        card.yMm = (k === 'frente' ? 21 : -8);
+        card.rotation = 0;
+        card.flipH = false;
+        card.flipV = false;
+        card.borderRadiusMm = 5;
+        card.filter = 'normal';
+        card.brightness = 0;
+        card.contrast = 0;
+        card.dirty = true;
+    });
+
+    if (DOM.frenteInput) DOM.frenteInput.value = '';
+    if (DOM.dorsoInput) DOM.dorsoInput.value = '';
+    if (DOM.frenteCameraInput) DOM.frenteCameraInput.value = '';
+    if (DOM.dorsoCameraInput) DOM.dorsoCameraInput.value = '';
+
+    updateDropzoneUI('frente', null);
+    updateDropzoneUI('dorso', null);
+
+    STATE.selectedCardId = null;
+    STATE.activeCardId = 'frente';
+
+    if (DOM.canvasQuickBar) DOM.canvasQuickBar.classList.add('hidden');
+    if (DOM.bannerScanDorso) DOM.bannerScanDorso.classList.add('hidden');
 
     Object.assign(STATE.paper, FACTORY_DEFAULTS.paper);
     Object.assign(STATE.layout, FACTORY_DEFAULTS.layout);
     STATE.syncCards = FACTORY_DEFAULTS.syncCards;
 
-    ['frente', 'dorso'].forEach(k => {
-        Object.assign(STATE.cards[k], {
-            scale: FACTORY_DEFAULTS.cards[k].scale,
-            xMm: FACTORY_DEFAULTS.cards[k].xMm,
-            yMm: FACTORY_DEFAULTS.cards[k].yMm,
-            rotation: 0,
-            borderRadiusMm: 3.5,
-            filter: 'normal',
-            brightness: 0,
-            contrast: 0,
-            dirty: true
-        });
-    });
-
+    setupPaperDimensions();
     updateUIFromState();
-    saveHistoryState('Restablecer todo');
+    updateEmptyStateVisibility();
+    saveHistoryState('Reiniciar aplicación');
     scheduleRender();
+    showToast('Aplicación reiniciada a nuevo', 'info');
 }
 
 function updateUIFromState() {
@@ -1686,6 +1669,7 @@ function updateUIFromState() {
     DOM.checkCardBorder.checked = STATE.layout.showBorder;
     DOM.checkSyncCards.checked = STATE.syncCards;
     setActiveTab(STATE.activeCardId);
+    syncControlsFromActiveCard();
 }
 
 // =============================================================================
@@ -1856,6 +1840,12 @@ function renderLoop() {
 
     for (const inst of cardInstances) {
         drawCardInstance(ctx, inst, mmToPx);
+    }
+
+    // Guías visuales Blueprint para carnets aún no cargados
+    const placeholders = getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight);
+    if (placeholders.length > 0) {
+        drawBlueprintPlaceholders(ctx, placeholders, mmToPx);
     }
 
     if (INTERACTION.isDragging && INTERACTION.activeSnapLines.length > 0) {
@@ -2092,14 +2082,231 @@ function drawSnapLines(ctx, canvasWidth, canvasHeight, mmToPx) {
     ctx.restore();
 }
 
+function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
+    const placeholders = [];
+    const mode = STATE.layout.mode;
+    const arrange = STATE.layout.arrange;
+    const paperW = STATE.paper.widthMm;
+    const paperH = STATE.paper.heightMm;
+
+    const f = STATE.cards.frente;
+    const d = STATE.cards.dorso;
+
+    if (mode === 'both') {
+        if (arrange === 'vertical') {
+            if (!f.rawImage) {
+                const wMm = f.widthMm * (f.scale / 100);
+                const hMm = f.heightMm * (f.scale / 100);
+                const xMm = (paperW - wMm) / 2 + f.xMm;
+                const yMm = 30 + f.yMm;
+                placeholders.push({
+                    cardId: 'frente',
+                    title: 'CARNET FRONTAL (150%)',
+                    sub: 'Toca o haz clic para subir o escanear',
+                    tag: '85.6 × 54 mm • R5 mm',
+                    borderRadiusMm: f.borderRadiusMm || 5,
+                    xMm, yMm, wMm, hMm,
+                    pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+                });
+            }
+            if (!d.rawImage) {
+                const wMm = d.widthMm * (d.scale / 100);
+                const hMm = d.heightMm * (d.scale / 100);
+                const xMm = (paperW - wMm) / 2 + d.xMm;
+                const yMm = (paperH / 2) + 15 + d.yMm;
+                placeholders.push({
+                    cardId: 'dorso',
+                    title: 'CARNET DORSO (150%)',
+                    sub: 'Toca o haz clic para subir o escanear',
+                    tag: '85.6 × 54 mm • R5 mm',
+                    borderRadiusMm: d.borderRadiusMm || 5,
+                    xMm, yMm, wMm, hMm,
+                    pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+                });
+            }
+        } else {
+            const halfW = paperW / 2;
+            if (!f.rawImage) {
+                const wMm = f.widthMm * (f.scale / 100);
+                const hMm = f.heightMm * (f.scale / 100);
+                const xMm = (halfW - wMm) / 2 + f.xMm + 4;
+                const yMm = (paperH - hMm) / 2 + f.yMm;
+                placeholders.push({
+                    cardId: 'frente',
+                    title: 'CARNET FRONTAL (150%)',
+                    sub: 'Toca o haz clic para subir o escanear',
+                    tag: '85.6 × 54 mm • R5 mm',
+                    borderRadiusMm: f.borderRadiusMm || 5,
+                    xMm, yMm, wMm, hMm,
+                    pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+                });
+            }
+            if (!d.rawImage) {
+                const wMm = d.widthMm * (d.scale / 100);
+                const hMm = d.heightMm * (d.scale / 100);
+                const xMm = halfW + (halfW - wMm) / 2 + d.xMm - 4;
+                const yMm = (paperH - hMm) / 2 + d.yMm;
+                placeholders.push({
+                    cardId: 'dorso',
+                    title: 'CARNET DORSO (150%)',
+                    sub: 'Toca o haz clic para subir o escanear',
+                    tag: '85.6 × 54 mm • R5 mm',
+                    borderRadiusMm: d.borderRadiusMm || 5,
+                    xMm, yMm, wMm, hMm,
+                    pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+                });
+            }
+        }
+    } else if (mode === 'front-only') {
+        if (!f.rawImage) {
+            const wMm = f.widthMm * (f.scale / 100);
+            const hMm = f.heightMm * (f.scale / 100);
+            const xMm = (paperW - wMm) / 2 + f.xMm;
+            const yMm = (paperH - hMm) / 2 + f.yMm;
+            placeholders.push({
+                cardId: 'frente',
+                title: 'CARNET FRONTAL (150%)',
+                sub: 'Toca o haz clic para subir o escanear',
+                tag: '85.6 × 54 mm • R5 mm',
+                borderRadiusMm: f.borderRadiusMm || 5,
+                xMm, yMm, wMm, hMm,
+                pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+            });
+        }
+    } else if (mode === 'back-only') {
+        if (!d.rawImage) {
+            const wMm = d.widthMm * (d.scale / 100);
+            const hMm = d.heightMm * (d.scale / 100);
+            const xMm = (paperW - wMm) / 2 + d.xMm;
+            const yMm = (paperH - hMm) / 2 + d.yMm;
+            placeholders.push({
+                cardId: 'dorso',
+                title: 'CARNET DORSO (150%)',
+                sub: 'Toca o haz clic para subir o escanear',
+                tag: '85.6 × 54 mm • R5 mm',
+                borderRadiusMm: d.borderRadiusMm || 5,
+                xMm, yMm, wMm, hMm,
+                pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+            });
+        }
+    } else if (mode === 'multi-2' || mode === 'multi-4') {
+        if (!f.rawImage) {
+            const wMm = f.widthMm * (f.scale / 100);
+            const hMm = f.heightMm * (f.scale / 100);
+            const xMm = 15 + f.xMm;
+            const yMm = 15 + f.yMm;
+            placeholders.push({
+                cardId: 'frente',
+                title: 'CARNET FRONTAL (150%)',
+                sub: 'Toca o haz clic para subir o escanear',
+                tag: '85.6 × 54 mm • R5 mm',
+                borderRadiusMm: f.borderRadiusMm || 5,
+                xMm, yMm, wMm, hMm,
+                pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+            });
+        }
+        if (!d.rawImage) {
+            const wMm = d.widthMm * (d.scale / 100);
+            const hMm = d.heightMm * (d.scale / 100);
+            const xMm = paperW - wMm - 15 + d.xMm;
+            const yMm = 15 + d.yMm;
+            placeholders.push({
+                cardId: 'dorso',
+                title: 'CARNET DORSO (150%)',
+                sub: 'Toca o haz clic para subir o escanear',
+                tag: '85.6 × 54 mm • R5 mm',
+                borderRadiusMm: d.borderRadiusMm || 5,
+                xMm, yMm, wMm, hMm,
+                pxX: xMm * mmToPx, pxY: yMm * mmToPx, pxW: wMm * mmToPx, pxH: hMm * mmToPx
+            });
+        }
+    }
+
+    return placeholders;
+}
+
+function drawBlueprintPlaceholders(ctx, placeholders, mmToPx) {
+    for (const bp of placeholders) {
+        const x = bp.pxX;
+        const y = bp.pxY;
+        const w = bp.pxW;
+        const h = bp.pxH;
+        const r = (bp.borderRadiusMm || 5) * mmToPx;
+
+        ctx.save();
+
+        // 1. Fondo sutil del carnet en el lienzo
+        ctx.beginPath();
+        drawRoundedRectPath(ctx, x, y, w, h, r);
+        ctx.fillStyle = STATE.darkPaper ? 'rgba(30, 41, 59, 0.75)' : 'rgba(248, 250, 252, 0.85)';
+        ctx.fill();
+
+        // 2. Borde punteado
+        ctx.strokeStyle = STATE.darkPaper ? '#475569' : '#cbd5e1';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+
+        // 3. Icono centrado sutil
+        const iconW = Math.min(32, w * 0.15);
+        const iconH = iconW * 0.65;
+        const iconY = cy - 22;
+
+        ctx.strokeStyle = STATE.darkPaper ? '#64748b' : '#94a3b8';
+        ctx.lineWidth = 1.8;
+        ctx.lineJoin = 'round';
+        ctx.strokeRect(cx - iconW / 2, iconY - iconH / 2, iconW, iconH);
+
+        ctx.beginPath();
+        ctx.arc(cx - iconW * 0.22, iconY, iconH * 0.28, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(cx, iconY - iconH * 0.18);
+        ctx.lineTo(cx + iconW * 0.35, iconY - iconH * 0.18);
+        ctx.moveTo(cx, iconY + iconH * 0.18);
+        ctx.lineTo(cx + iconW * 0.25, iconY + iconH * 0.18);
+        ctx.stroke();
+
+        // 4. Título
+        const titleFontSize = Math.max(12, Math.min(16, Math.round(w * 0.04)));
+        ctx.font = `700 ${titleFontSize}px Inter, -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = STATE.darkPaper ? '#f1f5f9' : '#1e293b';
+        ctx.fillText(bp.title, cx, cy + 10);
+
+        // 5. Subtítulo interactivo
+        const subFontSize = Math.max(10, Math.min(13, Math.round(w * 0.028)));
+        ctx.font = `500 ${subFontSize}px Inter, -apple-system, sans-serif`;
+        ctx.fillStyle = STATE.darkPaper ? '#94a3b8' : '#64748b';
+        ctx.fillText(bp.sub, cx, cy + 28);
+
+        // 6. Badge de dimensiones
+        const tagFontSize = Math.max(9, Math.min(11, Math.round(w * 0.024)));
+        ctx.font = `600 ${tagFontSize}px Inter, -apple-system, sans-serif`;
+        ctx.fillStyle = '#2563eb';
+        ctx.fillText(bp.tag, cx, cy + 45);
+
+        ctx.restore();
+    }
+}
+
 function updateEmptyStateVisibility() {
     const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
-    if (hasAnyImage) {
-        DOM.emptyState.classList.add('hidden');
-        DOM.btnGenerateDownload.disabled = false;
-    } else {
-        DOM.emptyState.classList.remove('hidden');
-        DOM.btnGenerateDownload.disabled = true;
+    if (DOM.emptyState) {
+        if (hasAnyImage) {
+            DOM.emptyState.classList.add('hidden');
+        } else {
+            DOM.emptyState.classList.remove('hidden');
+        }
+    }
+    if (DOM.btnGenerateDownload) {
+        DOM.btnGenerateDownload.disabled = !hasAnyImage;
     }
 }
 
@@ -2112,8 +2319,11 @@ function setupCanvasPointerEvents() {
 
     canvas.addEventListener('pointerdown', (e) => {
         const coords = getCanvasPointerCoords(e);
-        const mmToPx = (canvas.width / (window.devicePixelRatio || 1)) / STATE.paper.widthMm;
-        const instances = getCardInstances(mmToPx, canvas.width, canvas.height);
+        const dpr = window.devicePixelRatio || 1;
+        const canvasW = canvas.width / dpr;
+        const canvasH = canvas.height / dpr;
+        const mmToPx = canvasW / STATE.paper.widthMm;
+        const instances = getCardInstances(mmToPx, canvasW, canvasH);
 
         if (STATE.selectedCardId) {
             if (STATE.selectedCardId === 'both') {
@@ -2179,8 +2389,18 @@ function setupCanvasPointerEvents() {
             syncControlsFromActiveCard();
             scheduleRender();
         } else {
+            const placeholders = getBlueprintPlaceholders(mmToPx, canvasW, canvasH);
+            const clickedBp = placeholders.find(bp =>
+                coords.x >= bp.pxX && coords.x <= bp.pxX + bp.pxW &&
+                coords.y >= bp.pxY && coords.y <= bp.pxY + bp.pxH
+            );
+            if (clickedBp) {
+                handleCameraTrigger(clickedBp.cardId);
+                return;
+            }
+
             STATE.selectedCardId = null;
-            DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
+            if (DOM.selectedCardIndicator) DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
             syncControlsFromActiveCard();
             scheduleRender();
         }
@@ -2305,7 +2525,16 @@ function setupCanvasPointerEvents() {
         }
 
         const isOverCard = instances.some(i => coords.x >= i.pxX && coords.x <= i.pxX + i.pxW && coords.y >= i.pxY && coords.y <= i.pxY + i.pxH);
-        canvas.style.cursor = isOverCard ? 'grab' : 'default';
+        if (isOverCard) {
+            canvas.style.cursor = 'grab';
+        } else {
+            const dpr = window.devicePixelRatio || 1;
+            const canvasW = canvas.width / dpr;
+            const canvasH = canvas.height / dpr;
+            const placeholders = getBlueprintPlaceholders(mmToPx, canvasW, canvasH);
+            const isOverBp = placeholders.some(bp => coords.x >= bp.pxX && coords.x <= bp.pxX + bp.pxW && coords.y >= bp.pxY && coords.y <= bp.pxY + bp.pxH);
+            canvas.style.cursor = isOverBp ? 'pointer' : 'default';
+        }
     });
 
     // Soporte nativo de pellizco multitáctil (Pinch-to-Resize) para agrandar en celulares
@@ -3623,12 +3852,39 @@ function applyCroppedResult() {
     card.widthMm = 85.6;
     card.heightMm = 85.6 * (croppedCanvas.height / croppedCanvas.width);
 
+    // Configuración preferida estándar solicitada por el usuario:
+    card.scale = 150;
+    card.borderRadiusMm = 5;
+    card.xMm = 0;
+    if (STATE.layout.mode === 'single') {
+        card.yMm = 0;
+    } else {
+        card.yMm = (cropState.cardId === 'frente') ? 21 : -8;
+    }
+
+    if (STATE.syncCards) {
+        const otherId = cropState.cardId === 'frente' ? 'dorso' : 'frente';
+        STATE.cards[otherId].scale = 150;
+        STATE.cards[otherId].borderRadiusMm = 5;
+        STATE.cards[otherId].xMm = 0;
+    }
+
+    STATE.selectedCardId = cropState.cardId;
+    setActiveTab(cropState.cardId);
+    syncControlsFromActiveCard();
+
     DOM.cropModal.classList.add('hidden');
     hideCropLoupe();
     updateDropzoneUI(cropState.cardId, croppedCanvas.toDataURL('image/jpeg', 0.94));
     saveHistoryState(`Recortar & Enderezar ${card.name}`);
     scheduleRender();
-    showToast(`✅ ${card.name} enderezado y perpendicular guardado`, 'success');
+    showToast(`${card.name} recortado al 150% y radio de 5 mm`, 'success');
+
+    if (cropState.cardId === 'frente' && !STATE.cards.dorso.rawImage) {
+        setTimeout(() => {
+            showDorsoPrompt();
+        }, 800);
+    }
 }
 
 // Eventos del modal de recorte interactivo
@@ -3899,8 +4155,23 @@ function captureCameraPhoto() {
 
     closeCameraModal();
 
-    // 2. Procesar 100% AUTOMÁTICO: Recorte, homografía CR80, 150% y centrado X/Y
-    autoProcessCardFromImage(targetCameraCard, fullCanvas);
+    const fullImg = new Image();
+    fullImg.onload = () => {
+        const card = STATE.cards[targetCameraCard];
+        card.rawImage = fullImg;
+        card.croppedCanvas = null;
+        card.cachedCanvas = null;
+        card.dirty = true;
+
+        updateDropzoneUI(targetCameraCard, fullImg.src);
+        setActiveTab(targetCameraCard);
+        openCropModal(targetCameraCard, { autoDetect: true, defaultMode: 'quad' });
+
+        if (window.innerWidth < 1024) {
+            setMobileView('canvas');
+        }
+    };
+    fullImg.src = fullCanvas.toDataURL('image/jpeg', 0.96);
 }
 
 // =============================================================================

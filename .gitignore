@@ -46,3 +46,6 @@ tmp/
 .env.local
 .env.production
 
+# Worktrees
+.worktrees/
+
