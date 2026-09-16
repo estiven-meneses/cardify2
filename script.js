@@ -77,7 +77,7 @@ STATE.snapEnabled = true;
 STATE.zoom = 1.0;
 STATE.theme = 'light';
 STATE.darkPaper = false;
-STATE.mobileView = 'canvas'; // 'canvas' | 'controls'
+STATE.mobileView = 'canvas'; // 'canvas' | 'controls' | 'export'
 
 const SVG_ICONS = {
     check: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg>',
@@ -114,12 +114,20 @@ const DOM = {
     themeIconDark: document.getElementById('theme-icon-dark'),
     themeIconLight: document.getElementById('theme-icon-light'),
     btnResetAll: document.getElementById('btn-reset-all'),
+    btnThemeToggleMobile: document.getElementById('btn-theme-toggle-mobile'),
+    themeIconDarkMobile: document.getElementById('theme-icon-dark-mobile'),
+    themeIconLightMobile: document.getElementById('theme-icon-light-mobile'),
+    btnResetAllMobile: document.getElementById('btn-reset-all-mobile'),
 
     // Mobile View Switcher
     mobileTabCanvas: document.getElementById('mobile-tab-canvas'),
     mobileTabControls: document.getElementById('mobile-tab-controls'),
+    mobileTabExport: document.getElementById('mobile-tab-export'),
+    panelSidebar: document.getElementById('panel-sidebar'),
     panelControls: document.getElementById('panel-controls'),
+    panelExport: document.getElementById('panel-export'),
     panelCanvas: document.getElementById('panel-canvas'),
+    exportSheetSummary: document.getElementById('export-sheet-summary'),
 
     // Dropzones & Carga
     dropzoneFrente: document.getElementById('dropzone-frente'),
@@ -399,40 +407,56 @@ function setupResponsiveMobile() {
     if (isMobile) {
         setMobileView(STATE.mobileView);
     } else {
-        // En escritorio, ambos paneles siempre visibles en paralelo
-        DOM.panelControls.style.display = 'flex';
-        DOM.panelCanvas.style.display = 'flex';
+        if (DOM.panelSidebar) DOM.panelSidebar.style.display = 'flex';
+        if (DOM.panelControls) DOM.panelControls.style.display = 'flex';
+        if (DOM.panelExport) DOM.panelExport.style.display = 'flex';
+        if (DOM.panelCanvas) DOM.panelCanvas.style.display = 'flex';
         DOM.panelCanvas.classList.remove('mobile-compact-view');
-        DOM.viewportContainer.classList.remove('compact-mobile-viewport');
+        if (DOM.viewportContainer) DOM.viewportContainer.classList.remove('compact-mobile-viewport');
+        document.body.dataset.mobileView = 'desktop';
         resizeCanvasViewport();
     }
+}
+
+function applyMobileTabStyles(active) {
+    const tabs = [
+        [DOM.mobileTabCanvas, 'canvas'],
+        [DOM.mobileTabControls, 'controls'],
+        [DOM.mobileTabExport, 'export']
+    ];
+    tabs.forEach(([el, id]) => {
+        if (!el) return;
+        el.className = active === id ? 'mobile-tab is-active' : 'mobile-tab';
+    });
 }
 
 function setMobileView(view) {
     STATE.mobileView = view;
     const isMobile = window.innerWidth < 1024;
+    document.body.dataset.mobileView = isMobile ? view : 'desktop';
+
     if (!isMobile) {
-        DOM.panelControls.style.display = 'flex';
-        DOM.panelCanvas.style.display = 'flex';
+        if (DOM.panelSidebar) DOM.panelSidebar.style.display = 'flex';
+        if (DOM.panelControls) DOM.panelControls.style.display = 'flex';
+        if (DOM.panelExport) DOM.panelExport.style.display = 'flex';
+        if (DOM.panelCanvas) DOM.panelCanvas.style.display = 'flex';
         return;
     }
 
-    if (view === 'canvas') {
-        // Modo Hoja Completa: Lienzo a pantalla completa, controles ocultos
-        DOM.panelCanvas.style.display = 'flex';
-        DOM.panelControls.style.display = 'none';
+    const showCanvas = view === 'canvas';
+    const showControls = view === 'controls';
+    const showExport = view === 'export';
 
-        DOM.mobileTabCanvas.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400';
-        DOM.mobileTabControls.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500';
+    if (DOM.panelCanvas) DOM.panelCanvas.style.display = showCanvas ? 'flex' : 'none';
+    if (DOM.panelSidebar) DOM.panelSidebar.style.display = (showControls || showExport) ? 'flex' : 'none';
+    if (DOM.panelControls) DOM.panelControls.style.display = showControls ? 'flex' : 'none';
+    if (DOM.panelExport) DOM.panelExport.style.display = showExport ? 'flex' : 'none';
+
+    applyMobileTabStyles(view);
+
+    if (showCanvas) {
         resizeCanvasViewport();
         scheduleRender();
-    } else {
-        // Modo Ajustes del Carnet: Panel de controles limpio y espacioso, lienzo oculto sin superposiciones
-        DOM.panelCanvas.style.display = 'none';
-        DOM.panelControls.style.display = 'flex';
-
-        DOM.mobileTabControls.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400';
-        DOM.mobileTabCanvas.className = 'flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500';
     }
 }
 
@@ -684,17 +708,15 @@ function initTheme() {
 }
 
 function applyTheme(theme) {
-    if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-        DOM.themeIconDark.classList.remove('hidden');
-        DOM.themeIconLight.classList.add('hidden');
-        STATE.darkPaper = true;
-    } else {
-        document.documentElement.classList.remove('dark');
-        DOM.themeIconDark.classList.add('hidden');
-        DOM.themeIconLight.classList.remove('hidden');
-        STATE.darkPaper = false;
-    }
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    if (DOM.themeIconDark) DOM.themeIconDark.classList.toggle('hidden', !isDark);
+    if (DOM.themeIconLight) DOM.themeIconLight.classList.toggle('hidden', isDark);
+    if (DOM.themeIconDarkMobile) DOM.themeIconDarkMobile.classList.toggle('hidden', !isDark);
+    if (DOM.themeIconLightMobile) DOM.themeIconLightMobile.classList.toggle('hidden', isDark);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.setAttribute('content', isDark ? '#0f172a' : '#f1f5f9');
+    STATE.darkPaper = isDark;
     localStorage.setItem('cardify-theme', theme);
     updatePaperThemeUI();
     scheduleRender();
@@ -742,7 +764,9 @@ function setupPaperDimensions() {
     STATE.paper.widthMm = isPortrait ? w : h;
     STATE.paper.heightMm = isPortrait ? h : w;
 
-    DOM.sheetInfoBadge.textContent = `${STATE.paper.size.toUpperCase()} • ${STATE.paper.widthMm.toFixed(1)} × ${STATE.paper.heightMm.toFixed(1)} mm`;
+    const sheetLabel = `${STATE.paper.size.toUpperCase()} • ${STATE.paper.widthMm.toFixed(1)} × ${STATE.paper.heightMm.toFixed(1)} mm`;
+    if (DOM.sheetInfoBadge) DOM.sheetInfoBadge.textContent = sheetLabel;
+    if (DOM.exportSheetSummary) DOM.exportSheetSummary.textContent = sheetLabel;
 }
 
 // =============================================================================
@@ -764,9 +788,12 @@ function handleCameraTrigger(cardId) {
 function setupEventListeners() {
     // Header & Mobile Switcher
     if (DOM.btnThemeToggle) DOM.btnThemeToggle.addEventListener('click', toggleTheme);
+    if (DOM.btnThemeToggleMobile) DOM.btnThemeToggleMobile.addEventListener('click', toggleTheme);
     if (DOM.btnResetAll) DOM.btnResetAll.addEventListener('click', resetAllDefaults);
+    if (DOM.btnResetAllMobile) DOM.btnResetAllMobile.addEventListener('click', resetAllDefaults);
     if (DOM.mobileTabCanvas) DOM.mobileTabCanvas.addEventListener('click', () => setMobileView('canvas'));
     if (DOM.mobileTabControls) DOM.mobileTabControls.addEventListener('click', () => setMobileView('controls'));
+    if (DOM.mobileTabExport) DOM.mobileTabExport.addEventListener('click', () => setMobileView('export'));
 
     // Carga de Archivos
     if (DOM.dropzoneFrente && DOM.frenteInput) setupDropzone(DOM.dropzoneFrente, DOM.frenteInput, 'frente');
@@ -1915,6 +1942,7 @@ function resizeCanvasViewport() {
     DOM.previewCanvas.style.width = `${Math.round(displayWidth * STATE.zoom)}px`;
     DOM.previewCanvas.style.height = `${Math.round(displayHeight * STATE.zoom)}px`;
     updateViewportScrollMode();
+    requestAnimationFrame(updateViewportScrollMode);
 }
 
 function renderLoop() {
@@ -2751,7 +2779,7 @@ function setupViewportEmptyDeselect() {
         if (e.target.closest('#empty-state')) return;
         if (e.target === DOM.previewCanvas) return;
 
-        if (STATE.zoom > 1.0 && (e.target === scroller || e.target.id === 'viewport-stage' || e.target === container)) {
+        if (scroller && scroller.classList.contains('is-zoomed') && (e.target === scroller || e.target.id === 'viewport-stage' || e.target === container)) {
             beginViewportPan(e);
             return;
         }
@@ -2781,9 +2809,13 @@ function setupViewportEmptyDeselect() {
 function updateViewportScrollMode() {
     const scroller = getViewportScroller();
     if (!scroller) return;
-    const zoomed = STATE.zoom > 1.0;
-    scroller.classList.toggle('is-zoomed', zoomed);
-    if (!zoomed) {
+    const canvas = DOM.previewCanvas;
+    const overflow = STATE.zoom > 1.0 || !!(canvas && (
+        canvas.offsetWidth > scroller.clientWidth + 2 ||
+        canvas.offsetHeight > scroller.clientHeight + 2
+    ));
+    scroller.classList.toggle('is-zoomed', overflow);
+    if (!overflow) {
         scroller.scrollLeft = 0;
         scroller.scrollTop = 0;
     }
