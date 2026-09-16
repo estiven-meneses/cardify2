@@ -97,8 +97,10 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
-Para producción, `npm run build` genera `dist/`. El despliegue es **Vercel**,
-que corre ese build solo en cada push a `main`.
+Para producción, `npm run build` genera `dist/`. Cada push a `main` despliega
+solo en **Netlify** (`icardify.netlify.app`, config en `netlify.toml`) y en
+**Vercel** (config en `vercel.json`). Los dos compilan; ninguno sirve la raíz
+del repo.
 
 Abrir `index.html` directamente ya no funciona: los módulos y los estilos los
 resuelve el bundler.

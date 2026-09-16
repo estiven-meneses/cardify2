@@ -1,0 +1,41 @@
+# Netlify sirve icardify.netlify.app y despliega solo en cada push a main.
+# Sin este archivo publicaba la raiz del repo tal cual, que funcionaba cuando
+# la app era index.html + script.js. Desde la migracion a Vite hay que
+# compilar: si no, el navegador recibe /src/main.tsx como octet-stream, lo
+# rechaza por MIME y la pagina queda sin estilos ni JS.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA: cualquier ruta cae en index.html. Se excluyen /api/* y los archivos con
+# extension para no tragarse los assets.
+[[redirects]]
+  from = "/api/logs"
+  to = "/.netlify/functions/logs"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

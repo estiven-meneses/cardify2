@@ -53,7 +53,8 @@ Fuera de localhost el cliente envía a **`/api/logs`**, que ya existe
 (`api/logs.js`). No escribe en disco: emite una línea JSON con el prefijo
 `[cardpdf-client]` que Vercel guarda como runtime log.
 
-Para leerlos, con el conector de Vercel:
+En Netlify los recoge `netlify/functions/logs.js` y se leen en los function
+logs del panel. En Vercel, con el conector:
 
 - `get_runtime_logs` filtrando por `[cardpdf-client]` — todo lo que reportó el
   navegador: mensaje, stack, URL, user agent.

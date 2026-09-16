@@ -7,7 +7,11 @@ App de escritorio/móvil para maquetar carnets CR80 sobre una hoja (A4/Carta), r
 ```
 cardpdf/
   index.html              # UI completa (solo markup; el CSS salio de aqui)
-  api/logs.js             # funcion de Vercel: errores del cliente en produccion
+  api/logs.js             # errores del cliente en produccion (Vercel)
+  netlify/functions/logs.js  # lo mismo, en Netlify
+  shared/log-entry.js     # logica comun de los dos, para que no se desvien
+  netlify.toml            # build de Netlify
+  vercel.json             # build de Vercel
   public/                 # manifest, sw.js, iconos (se copian tal cual a dist/)
   src/
     main.tsx              # entrada: estilos -> globales -> i18n -> legacy -> React
