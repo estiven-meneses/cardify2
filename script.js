@@ -803,12 +803,14 @@ function setupEventListeners() {
     if (DOM.frenteCameraInput) {
         DOM.frenteCameraInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
+            e.target.value = '';
             if (file) loadFileIntoCard(file, 'frente');
         });
     }
     if (DOM.dorsoCameraInput) {
         DOM.dorsoCameraInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
+            e.target.value = '';
             if (file) loadFileIntoCard(file, 'dorso');
         });
     }
@@ -1062,6 +1064,7 @@ function setupDropzone(dropzoneEl, inputEl, cardId) {
 
     inputEl.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
+        e.target.value = '';
         if (file) loadFileIntoCard(file, cardId);
     });
 
@@ -1083,33 +1086,120 @@ function setupDropzone(dropzoneEl, inputEl, cardId) {
     });
 }
 
-function loadFileIntoCard(file, cardId) {
-    if (!file.type.startsWith('image/')) {
-        showToast('Por favor selecciona una imagen válida.', 'warning');
+const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1', 'miaf']);
+let heic2anyLoader = null;
+
+function isHeicFile(file) {
+    const type = (file.type || '').toLowerCase();
+    const name = (file.name || '').toLowerCase();
+    return type.includes('heic') || type.includes('heif')
+        || name.endsWith('.heic') || name.endsWith('.heif');
+}
+
+function isSupportedImageFile(file) {
+    if (!file) return false;
+    if (isHeicFile(file)) return true;
+    if ((file.type || '').startsWith('image/')) return true;
+    return /\.(jpe?g|png|webp|gif|bmp|tiff?|avif)$/i.test(file.name || '');
+}
+
+async function fileLooksLikeHeic(file) {
+    if (isHeicFile(file)) return true;
+    if (file.type) return false;
+    try {
+        const buf = await file.slice(4, 12).arrayBuffer();
+        const brand = String.fromCharCode(...new Uint8Array(buf).slice(4, 8)).toLowerCase();
+        return HEIC_BRANDS.has(brand);
+    } catch (_) {
+        return false;
+    }
+}
+
+function loadImageFromUrl(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('decode'));
+        img.src = src;
+    });
+}
+
+function ensureHeic2Any() {
+    if (typeof window.heic2any === 'function') return Promise.resolve(window.heic2any);
+    if (heic2anyLoader) return heic2anyLoader;
+    heic2anyLoader = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+        script.async = true;
+        script.onload = () => {
+            if (typeof window.heic2any === 'function') resolve(window.heic2any);
+            else reject(new Error('heic2any'));
+        };
+        script.onerror = () => reject(new Error('heic2any'));
+        document.head.appendChild(script);
+    });
+    return heic2anyLoader;
+}
+
+async function convertHeicToJpegBlob(file) {
+    try {
+        const bitmap = await createImageBitmap(file);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d').drawImage(bitmap, 0, 0);
+        if (bitmap.close) bitmap.close();
+        const nativeBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+        if (nativeBlob) return nativeBlob;
+    } catch (_) { /* Chrome y Firefox no decodifican HEIC de forma nativa */ }
+
+    const heic2any = await ensureHeic2Any();
+    let converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    if (Array.isArray(converted)) converted = converted[0];
+    return converted;
+}
+
+function applyLoadedImage(img, cardId) {
+    const card = STATE.cards[cardId];
+    card.rawImage = img;
+    card.croppedCanvas = null;
+    card.cachedCanvas = null;
+    card.dirty = true;
+
+    updateDropzoneUI(cardId, img.src);
+    setActiveTab(cardId);
+    openCropModal(cardId, { autoDetect: true, defaultMode: 'quad' });
+
+    if (window.innerWidth < 1024) {
+        setMobileView('canvas');
+    }
+}
+
+async function loadFileIntoCard(file, cardId) {
+    if (!file) return;
+
+    const looksHeic = await fileLooksLikeHeic(file);
+    if (!looksHeic && !isSupportedImageFile(file)) {
+        showToast('Selecciona una imagen (JPG, PNG, WebP o HEIC).', 'warning');
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-            const card = STATE.cards[cardId];
-            card.rawImage = img;
-            card.croppedCanvas = null;
-            card.cachedCanvas = null;
-            card.dirty = true;
+    try {
+        let source = file;
+        if (looksHeic) {
+            showToast('Leyendo HEIC…', 'info');
+            source = await convertHeicToJpegBlob(file);
+            if (!source) throw new Error('heic');
+        }
 
-            updateDropzoneUI(cardId, img.src);
-            setActiveTab(cardId);
-            openCropModal(cardId, { autoDetect: true, defaultMode: 'quad' });
-
-            if (window.innerWidth < 1024) {
-                setMobileView('canvas');
-            }
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+        const url = URL.createObjectURL(source);
+        const img = await loadImageFromUrl(url);
+        applyLoadedImage(img, cardId);
+    } catch (err) {
+        showToast(looksHeic
+            ? 'No se pudo leer el HEIC. Intenta de nuevo o usa JPG/PNG.'
+            : 'No se pudo abrir esa imagen.', 'error');
+    }
 }
 
 function updateDropzoneUI(cardId, src) {
