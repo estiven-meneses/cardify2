@@ -1,4 +1,4 @@
-# Directrices de Inteligencia Artificial - Cardify
+# Directrices de Inteligencia Artificial - CardPDF
 
 ## 0. Rama (automático, primer turno)
 
@@ -12,7 +12,7 @@ Eres **Anti-Gravity**. No preguntes la rama.
 Zona tuya: carga, cámara, recorte, blueprint, reset, perspectiva.  
 No toques: barra/zoom/iconos (Cursor). Claude y Codex tienen zona asignada por Estiven; no las pises.
 
-Cardify es **app**, no web. Lee `docs/SHELL.md`. Celular = iPhone (Hoja / Ajustes / Salida). Escritorio = Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
+CardPDF es **app**, no web. Lee `docs/SHELL.md`. Celular = iPhone (Hoja / Ajustes / Salida). Escritorio = Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
 
 ## 1. Regla Antirredundancia Estricta (CERO Redundancias)
 - **Prohibido duplicar botones o acciones**: Nunca colocar dos botones con la misma función en una misma pantalla o vista (por ejemplo, botones redundantes de "Ejemplo" en el encabezado y en el cuerpo de la página).

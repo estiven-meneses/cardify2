@@ -1,9 +1,9 @@
-# 🎴 Cardify 2.0 Pro
+# 🎴 CardPDF 2.0 Pro
 
 **Maquetador y convertidor profesional de carnets e identificaciones a PDF (300 DPI), JPG, PNG y WebP con manipulación directa en tiempo real.**
 
 <div align="center">
-  <img src="icon.svg" alt="Cardify 2.0 Banner" width="140" height="140">
+  <img src="icon.svg" alt="CardPDF 2.0 Banner" width="140" height="140">
   <br>
   <p>
     <b>Convierte, personaliza e imprime carnets físicos con medidas exactas y calidad de imprenta.</b>
@@ -18,9 +18,9 @@
 
 ---
 
-## 🌟 ¿Qué hay de nuevo en Cardify 2.0?
+## 🌟 ¿Qué hay de nuevo en CardPDF 2.0?
 
-Cardify 2.0 es una reconstrucción total del motor y la interfaz, diseñada para ofrecer una experiencia de usuario fluida a 60 FPS, calidad de impresión profesional a 300 DPI y herramientas avanzadas de edición:
+CardPDF 2.0 es una reconstrucción total del motor y la interfaz, diseñada para ofrecer una experiencia de usuario fluida a 60 FPS, calidad de impresión profesional a 300 DPI y herramientas avanzadas de edición:
 
 ### 🖱️ 1. Manipulación Directa en el Canvas
 - **Arrastra y posiciona libremente** los carnets directamente sobre la hoja con el mouse o en pantallas táctiles.
@@ -47,7 +47,7 @@ Cardify 2.0 es una reconstrucción total del motor y la interfaz, diseñada para
 - **Multi-Copia (2 Copias y 4 Copias Cuadrícula 2x2)**: Ideal para papelerías y oficinas que necesitan imprimir varios carnets o duplicados en una sola hoja para ahorrar papel.
 
 ### 📸 6. Métodos de Carga Ultrarrápidos
-- **Pegar desde el Portapapeles (`Ctrl + V` / `Cmd + V`)**: Captura la pantalla y pégala directamente en Cardify.
+- **Pegar desde el Portapapeles (`Ctrl + V` / `Cmd + V`)**: Captura la pantalla y pégala directamente en CardPDF.
 - **Captura con Cámara Web / Móvil**: Toma foto a tu carnet con una guía visual de encuadre en pantalla.
 - **Cargar Ejemplo con 1 Clic**: Prueba inmediatamente la aplicación con muestras de alta calidad incluidas.
 - **Intercambiar Frente ↔ Dorso (Swap)**: Cambia las caras de posición con un solo toque.
@@ -91,7 +91,7 @@ No requiere instalación, Node.js ni compilación en el servidor. Funciona 100% 
 
 1. Clona el repositorio:
 ```bash
-git clone https://github.com/estiven-meneses/cardify2.git
+git clone https://github.com/estiven-meneses/cardpdf.git
 ```
 
 2. Abre `index.html` en tu navegador favorito (Chrome, Edge, Safari, Firefox).

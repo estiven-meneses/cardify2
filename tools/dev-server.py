@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Servidor local de Cardify: archivos estáticos + recolector de errores (sin UI)."""
+"""Servidor local de CardPDF: archivos estáticos + recolector de errores (sin UI)."""
 
 from __future__ import annotations
 
@@ -150,6 +150,18 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - %s\n" % (self.log_date_time_string(), fmt % args))
 
+    def guess_type(self, path):
+        if str(path).endswith(".webmanifest") or str(path).endswith("manifest.json"):
+            return "application/manifest+json"
+        return super().guess_type(path)
+
+    def end_headers(self):
+        route = self.path.split("?", 1)[0]
+        if route.endswith("/sw.js") or route == "/sw.js":
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Service-Worker-Allowed", "/")
+        super().end_headers()
+
     def _json(self, code: int, data) -> None:
         raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
@@ -200,7 +212,7 @@ def main() -> None:
     LOGS_PROD.mkdir(parents=True, exist_ok=True)
     rebuild_pending("local")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Cardify local: http://127.0.0.1:{PORT}")
+    print(f"CardPDF local: http://127.0.0.1:{PORT}")
     print(f"Logs: {LOGS_LOCAL}")
     print("Sin UI de backend. Errores → logs/local/AAAA-MM-DD.json")
     try:

@@ -1,4 +1,4 @@
-# Reglas para IAs que editan Cardify
+# Reglas para IAs que editan CardPDF
 
 Estiven quiere código limpio, compacto y sin adornos. Si una instrucción de este archivo choca con un pedido puntual del usuario, gana el pedido puntual.
 

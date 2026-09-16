@@ -1,6 +1,6 @@
-# Shell: Cardify es una aplicación, no una página web
+# Shell: CardPDF es una aplicación, no una página web
 
-Cardify se diseña y se comporta como **app nativa**. Nunca como sitio web con encabezado de marca, columnas de blog o export mezclado con la entrada.
+CardPDF se diseña y se comporta como **app nativa**. Nunca como sitio web con encabezado de marca, columnas de blog o export mezclado con la entrada.
 
 ## Tres zonas (fijas)
 

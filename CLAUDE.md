@@ -1,4 +1,4 @@
-# CLAUDE.md — Cardify (Claude Desktop / Claude Code)
+# CLAUDE.md — CardPDF (Claude Desktop / Claude Code)
 
 Al **primer turno**, antes de editar: lee `docs/START.md` y entra a tu rama. No preguntes la rama.
 
@@ -10,7 +10,7 @@ Eres **Claude**. Rama `feature/claude`. Worktree `.worktrees/claude`. Créala de
 
 También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
 
-Cardify es **app**, no web. Celular tipo iPhone: Hoja / Ajustes / Salida, sin encabezado. Escritorio: Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
+CardPDF es **app**, no web. Celular tipo iPhone: Hoja / Ajustes / Salida, sin encabezado. Escritorio: Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
 
 - Español, compacto.
 - Cero emojis en UI. SVG propio. Cero botones duplicados.

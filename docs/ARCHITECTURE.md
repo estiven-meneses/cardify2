@@ -1,11 +1,11 @@
-# Arquitectura de Cardify
+# Arquitectura de CardPDF
 
 App de escritorio/móvil para maquetar carnets CR80 sobre una hoja (A4/Carta), recortar con perspectiva y exportar PDF/PNG/JPG.
 
 ## Hoy (vanilla)
 
 ```
-cardify2/
+cardpdf/
   index.html      # UI completa + CSS Tailwind CDN + estilos propios
   script.js       # Estado, canvas, recorte, cámara, export (~4.5k líneas)
   icon.svg
@@ -24,7 +24,7 @@ Un `STATE` mutable (clon de `FACTORY_DEFAULTS`) + `INTERACTION` + `cropState` + 
 - `STATE.activeCardId`: pestaña del panel de ajustes.
 - `STATE.zoom`: zoom de vista. Si `> 1`, `#viewport-scroller` hace scroll/paneo.
 
-Persistencia: `localStorage` (`cardify-theme`, `cardify-custom-defaults`).
+Persistencia: `localStorage` (`cardpdf-theme`, `cardpdf-custom-defaults`).
 
 ### UI clave
 
@@ -80,7 +80,7 @@ Criterio de corte: un PR de migración **no** cambia el flujo de recorte ni las 
 
 ### ¿Supabase?
 
-No todavía. Cardify procesa imágenes en el cliente.
+No todavía. CardPDF procesa imágenes en el cliente.
 
 Úsalo el día que pida una de estas: login, plantillas en la nube, historial entre dispositivos, compartir un layout. Hasta entonces es costo y superficie de auth de más.
 
