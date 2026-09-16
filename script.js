@@ -658,15 +658,6 @@ function flipSingleCard(cardId, axis = 'h') {
         card.flipV = !card.flipV;
     }
     card.dirty = true;
-    if (STATE.syncCards) {
-        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
-        if (axis === 'h') {
-            STATE.cards[otherId].flipH = card.flipH;
-        } else {
-            STATE.cards[otherId].flipV = card.flipV;
-        }
-        STATE.cards[otherId].dirty = true;
-    }
 }
 
 function resetActiveCardAdjustments() {
@@ -677,10 +668,6 @@ function resetActiveCardAdjustments() {
         showToast('Ajustes de ambos carnets restablecidos a valores iniciales', 'info');
     } else {
         resetCardToFactory(STATE.activeCardId);
-        if (STATE.syncCards) {
-            const otherId = STATE.activeCardId === 'frente' ? 'dorso' : 'frente';
-            resetCardToFactory(otherId);
-        }
         saveHistoryState(`Restablecer ${STATE.cards[STATE.activeCardId].name}`);
         showToast(`Ajustes de ${STATE.cards[STATE.activeCardId].name} restablecidos`, 'info');
     }
@@ -878,7 +865,8 @@ function setupEventListeners() {
     // Sincronización Automática
     DOM.checkSyncCards.addEventListener('change', (e) => {
         STATE.syncCards = e.target.checked;
-        showToast(STATE.syncCards ? 'Ajustes sincronizados entre caras' : 'Ajustes independientes activados', 'info');
+        updateCopyButtonVisibility();
+        showToast(STATE.syncCards ? 'Tamaño y filtros se copian entre caras' : 'Cada cara se ajusta por separado', 'info');
     });
 
     // Plantilla y Papel
@@ -1205,18 +1193,6 @@ function rotateSingleCard(cardId, angleDeg = 90) {
     }
 
     card.dirty = true;
-
-    // Si la sincronización está activa, rotar también la otra cara
-    if (STATE.syncCards) {
-        const otherId = cardId === 'frente' ? 'dorso' : 'frente';
-        const otherCard = STATE.cards[otherId];
-        if (otherCard.rawImage) {
-            otherCard.rotation = card.rotation;
-            otherCard.widthMm = card.widthMm;
-            otherCard.heightMm = card.heightMm;
-            otherCard.dirty = true;
-        }
-    }
 }
 
 function swapCards() {
@@ -1365,38 +1341,45 @@ function handleGlobalKeydown(e) {
 // 10. CONTROLES Y SINCRONIZACIÓN REACTIVA
 // =============================================================================
 
+function editingBothCards() {
+    return STATE.activeCardId === 'both' || STATE.selectedCardId === 'both';
+}
+
 function setActiveTab(cardId) {
     STATE.activeCardId = cardId;
-    if (cardId === 'both') {
-        STATE.selectedCardId = 'both';
-    } else if (STATE.selectedCardId === 'both') {
-        STATE.selectedCardId = cardId;
-    }
+    STATE.selectedCardId = cardId;
 
-    const inactiveClass = 'flex-1 py-1 text-xs font-bold rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all';
-    const activeClass = 'flex-1 py-1 text-xs font-bold rounded-md bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
+    const inactiveClass = 'flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-600 dark:text-slate-400 transition-all';
+    const activeClass = 'flex-1 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition-all';
 
-    DOM.tabBtnFrente.className = (cardId === 'frente') ? activeClass : inactiveClass;
-    DOM.tabBtnDorso.className = (cardId === 'dorso') ? activeClass : inactiveClass;
-    if (DOM.tabBtnBoth) {
-        DOM.tabBtnBoth.className = (cardId === 'both') ? activeClass : inactiveClass;
-    }
+    if (DOM.tabBtnFrente) DOM.tabBtnFrente.className = (cardId === 'frente') ? activeClass : inactiveClass;
+    if (DOM.tabBtnDorso) DOM.tabBtnDorso.className = (cardId === 'dorso') ? activeClass : inactiveClass;
+    if (DOM.tabBtnBoth) DOM.tabBtnBoth.className = (cardId === 'both') ? activeClass : inactiveClass;
 
+    updateCopyButtonVisibility();
     syncControlsFromActiveCard();
     scheduleRender();
 }
 
-function applyToActiveCards(mutator) {
-    if (STATE.activeCardId === 'both' || STATE.selectedCardId === 'both') {
+function updateCopyButtonVisibility() {
+    if (!DOM.btnCopyToOther) return;
+    const hide = STATE.syncCards || editingBothCards();
+    DOM.btnCopyToOther.classList.toggle('hidden', hide);
+    DOM.btnCopyToOther.classList.toggle('flex', !hide);
+}
+
+function applyToActiveCards(mutator, options) {
+    const mirror = !!(options && options.mirror && STATE.syncCards);
+    if (editingBothCards()) {
         mutator(STATE.cards.frente, 'frente');
         mutator(STATE.cards.dorso, 'dorso');
-    } else {
-        const id = STATE.activeCardId || 'frente';
-        mutator(STATE.cards[id], id);
-        if (STATE.syncCards) {
-            const otherId = id === 'frente' ? 'dorso' : 'frente';
-            mutator(STATE.cards[otherId], otherId);
-        }
+        return;
+    }
+    const id = STATE.activeCardId === 'dorso' ? 'dorso' : 'frente';
+    mutator(STATE.cards[id], id);
+    if (mirror) {
+        const otherId = id === 'frente' ? 'dorso' : 'frente';
+        mutator(STATE.cards[otherId], otherId);
     }
 }
 
@@ -1426,11 +1409,12 @@ function syncControlsFromActiveCard() {
 
     DOM.filterPresetBtns.forEach(btn => {
         if (btn.dataset.filter === card.filter) {
-            btn.className = 'filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+            btn.className = 'filter-preset-btn min-h-[32px] py-1 px-1 text-[11px] font-bold rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
         } else {
-            btn.className = 'filter-preset-btn min-h-[38px] py-1.5 px-1 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+            btn.className = 'filter-preset-btn min-h-[32px] py-1 px-1 text-[11px] font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
         }
     });
+    updateCopyButtonVisibility();
 
     if (STATE.selectedCardId === 'both') {
         DOM.selectedCardIndicator.textContent = 'Editando Ambos (Frente + Dorso)';
@@ -1465,7 +1449,7 @@ function syncControlsFromActiveCard() {
 }
 
 function centerCardsHorizontal() {
-    const isBoth = STATE.activeCardId === 'both' || STATE.selectedCardId === 'both' || STATE.syncCards;
+    const isBoth = editingBothCards();
     if (isBoth) {
         STATE.cards.frente.xMm = 0;
         STATE.cards.dorso.xMm = 0;
@@ -1480,7 +1464,7 @@ function centerCardsHorizontal() {
 }
 
 function centerCardsVertical() {
-    const isBoth = STATE.activeCardId === 'both' || STATE.selectedCardId === 'both' || STATE.syncCards;
+    const isBoth = editingBothCards();
     if (isBoth) {
         if (STATE.layout.arrange === 'horizontal') {
             STATE.cards.frente.yMm = 0;
@@ -1500,7 +1484,7 @@ function centerCardsVertical() {
 }
 
 function centerCardsBoth() {
-    const isBoth = STATE.activeCardId === 'both' || STATE.selectedCardId === 'both' || STATE.syncCards;
+    const isBoth = editingBothCards();
     if (isBoth) {
         STATE.cards.frente.xMm = 0;
         STATE.cards.dorso.xMm = 0;
@@ -1541,7 +1525,7 @@ function toggleSelectBoth() {
 function setupCardControls() {
     // Escala
     const onScaleChange = (val) => {
-        applyToActiveCards((c) => { c.scale = val; });
+        applyToActiveCards((c) => { c.scale = val; }, { mirror: true });
         syncControlsFromActiveCard();
         scheduleRender();
     };
@@ -1593,7 +1577,7 @@ function setupCardControls() {
     // Esquinas Redondeadas con Input Numérico y Reset
     DOM.cardRadiusRange.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
-        applyToActiveCards((c) => { c.borderRadiusMm = val; });
+        applyToActiveCards((c) => { c.borderRadiusMm = val; }, { mirror: true });
         if (DOM.cardRadiusNum) DOM.cardRadiusNum.value = val;
         scheduleRender();
     });
@@ -1601,7 +1585,7 @@ function setupCardControls() {
     if (DOM.cardRadiusNum) {
         DOM.cardRadiusNum.addEventListener('input', (e) => {
             const val = Math.min(15, Math.max(0, parseFloat(e.target.value) || 0));
-            applyToActiveCards((c) => { c.borderRadiusMm = val; });
+            applyToActiveCards((c) => { c.borderRadiusMm = val; }, { mirror: true });
             DOM.cardRadiusRange.value = val;
             scheduleRender();
         });
@@ -1611,7 +1595,7 @@ function setupCardControls() {
         DOM.btnResetRadius.addEventListener('click', () => {
             applyToActiveCards((c, id) => {
                 c.borderRadiusMm = FACTORY_DEFAULTS.cards[id].borderRadiusMm;
-            });
+            }, { mirror: true });
             syncControlsFromActiveCard();
             scheduleRender();
         });
@@ -1624,7 +1608,7 @@ function setupCardControls() {
             applyToActiveCards((c) => {
                 c.filter = filterMode;
                 c.dirty = true;
-            });
+            }, { mirror: true });
             syncControlsFromActiveCard();
             saveHistoryState(`Filtro ${filterMode}`);
             scheduleRender();
@@ -1637,7 +1621,7 @@ function setupCardControls() {
         applyToActiveCards((c) => {
             c.brightness = val;
             c.dirty = true;
-        });
+        }, { mirror: true });
         if (DOM.cardBrightnessNum) DOM.cardBrightnessNum.value = val;
         scheduleRender();
     });
@@ -1648,7 +1632,7 @@ function setupCardControls() {
             applyToActiveCards((c) => {
                 c.brightness = val;
                 c.dirty = true;
-            });
+            }, { mirror: true });
             DOM.cardBrightnessRange.value = val;
             scheduleRender();
         });
@@ -1659,7 +1643,7 @@ function setupCardControls() {
             applyToActiveCards((c) => {
                 c.brightness = 0;
                 c.dirty = true;
-            });
+            }, { mirror: true });
             syncControlsFromActiveCard();
             scheduleRender();
         });
@@ -1671,7 +1655,7 @@ function setupCardControls() {
         applyToActiveCards((c) => {
             c.contrast = val;
             c.dirty = true;
-        });
+        }, { mirror: true });
         if (DOM.cardContrastNum) DOM.cardContrastNum.value = val;
         scheduleRender();
     });
@@ -1682,7 +1666,7 @@ function setupCardControls() {
             applyToActiveCards((c) => {
                 c.contrast = val;
                 c.dirty = true;
-            });
+            }, { mirror: true });
             DOM.cardContrastRange.value = val;
             scheduleRender();
         });
@@ -1693,7 +1677,7 @@ function setupCardControls() {
             applyToActiveCards((c) => {
                 c.contrast = 0;
                 c.dirty = true;
-            });
+            }, { mirror: true });
             syncControlsFromActiveCard();
             scheduleRender();
         });
@@ -1728,7 +1712,7 @@ function applyCr80Preset() {
         card.heightMm = 53.98;
         card.scale = 100;
         card.borderRadiusMm = 3.18;
-    });
+    }, { mirror: true });
 
     syncControlsFromActiveCard();
     saveHistoryState('Aplicar Estándar CR80');
@@ -2646,11 +2630,6 @@ function setupCanvasPointerEvents() {
 
                 card.xMm = Math.min(100, Math.max(-100, newX));
                 card.yMm = Math.min(100, Math.max(-100, newY));
-
-                if (STATE.syncCards) {
-                    const otherId = STATE.selectedCardId === 'frente' ? 'dorso' : 'frente';
-                    STATE.cards[otherId].xMm = card.xMm;
-                }
             }
 
             syncControlsFromActiveCard();
@@ -4142,7 +4121,6 @@ function applyCroppedResult() {
         const otherId = cropState.cardId === 'frente' ? 'dorso' : 'frente';
         STATE.cards[otherId].scale = 150;
         STATE.cards[otherId].borderRadiusMm = 5;
-        STATE.cards[otherId].xMm = 0;
     }
 
     STATE.selectedCardId = cropState.cardId;
@@ -4372,8 +4350,7 @@ function autoProcessCardFromImage(cardId, sourceImg) {
     if (STATE.syncCards) {
         const otherId = cardId === 'frente' ? 'dorso' : 'frente';
         STATE.cards[otherId].scale = 150;
-        STATE.cards[otherId].borderRadiusMm = 6;
-        STATE.cards[otherId].xMm = 0;
+        STATE.cards[otherId].borderRadiusMm = 5;
     }
 
     // 5. Actualizar interfaz y renderizar
