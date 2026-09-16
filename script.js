@@ -80,18 +80,20 @@ STATE.darkPaper = false;
 STATE.mobileView = 'canvas'; // 'canvas' | 'controls' | 'export'
 
 const SVG_ICONS = {
-    check: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg>',
-    close: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
-    target: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3.5"></circle><circle cx="12" cy="12" r="1" fill="currentColor"></circle></svg>',
-    moon: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15.2A8.2 8.2 0 018.8 4 8.4 8.4 0 0012 20.5 8.4 8.4 0 0020 15.2z"></path></svg>',
-    sun: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.6"></circle><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"></path></svg>',
-    star: '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l2.2 5.4 5.8.5-4.4 3.8 1.4 5.6L12 15.7 6.99 18.5l1.4-5.6L4 9.1l5.8-.5L12 3.2z"></path></svg>',
-    sparkle: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.8L18.5 9.5 13.6 12.2 12 17l-1.6-4.8L5.5 9.5l4.9-1.7L12 3z"></path></svg>',
-    search: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>',
-    ruler: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V8.5L8.5 4H20"></path><path d="M4 16h4v4M16 4v4h4"></path></svg>',
-    cards: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="8" rx="1.5"></rect><rect x="9" y="11" width="12" height="8" rx="1.5"></rect></svg>',
-    flipH: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"></path></svg>',
-    flipV: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4"></path></svg>',
+    check: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    close: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+    target: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>',
+    moon: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>',
+    sun: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>',
+    star: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
+    sparkle: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"></path></svg>',
+    search: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+    ruler: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 7.85-5.58-5.58a2.5 2.5 0 0 0-3.54 0L2.27 12.61a2.5 2.5 0 0 0 0 3.54l5.58 5.58a2.5 2.5 0 0 0 3.54 0l10.34-10.34a2.5 2.5 0 0 0 0-3.54z"></path><line x1="7.5" y1="10.5" x2="10.5" y2="7.5"></line><line x1="10.5" y1="13.5" x2="13.5" y2="10.5"></line><line x1="13.5" y1="16.5" x2="16.5" y2="13.5"></line></svg>',
+    cards: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="8" rx="1.5"></rect><rect x="9" y="11" width="12" height="8" rx="1.5"></rect></svg>',
+    flipH: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3"></path><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"></path><line x1="12" y1="20" x2="12" y2="4"></line></svg>',
+    flipV: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3"></path><path d="M3 16v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"></path><line x1="4" y1="12" x2="20" y2="12"></line></svg>',
+    maximize: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>',
+    minimize: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6m0 0v6m0-6-7 7m17-11h-6m0 0V4m0 6 7-7m-7 17v-6m0 0h6m-6 0 7 7M10 4v6m0 0H4m0 0 7-7"></path></svg>',
 };
 
 // Historial para Deshacer / Rehacer
@@ -215,7 +217,10 @@ const DOM = {
     btnZoomOut: document.getElementById('btn-zoom-out'),
     btnZoomIn: document.getElementById('btn-zoom-in'),
     btnZoomFit: document.getElementById('btn-zoom-fit'),
+    zoomFitIcon: document.getElementById('zoom-fit-icon'),
+    zoomFitLabel: document.getElementById('zoom-fit-label'),
     zoomLevelLabel: document.getElementById('zoom-level-label'),
+    panelCanvas: document.getElementById('panel-canvas'),
     canvasQuickBar: document.getElementById('canvas-quick-bar'),
     quickCardBadge: document.getElementById('quick-card-badge'),
     btnQuickSelectBoth: document.getElementById('btn-quick-select-both'),
@@ -932,7 +937,12 @@ function setupEventListeners() {
     DOM.btnToggleSnap.addEventListener('click', toggleSnap);
     DOM.btnZoomIn.addEventListener('click', () => changeZoom(0.15));
     DOM.btnZoomOut.addEventListener('click', () => changeZoom(-0.15));
-    DOM.btnZoomFit.addEventListener('click', fitZoomToContainer);
+    if (DOM.btnZoomFit) {
+        DOM.btnZoomFit.addEventListener('click', () => toggleCanvasFullscreen());
+    }
+    if (DOM.zoomLevelLabel) {
+        DOM.zoomLevelLabel.addEventListener('click', resetZoomTo100);
+    }
 
     if (DOM.btnQuickSelectBoth) {
         DOM.btnQuickSelectBoth.addEventListener('click', (e) => {
@@ -1287,6 +1297,12 @@ function deselectCards() {
 function handleGlobalKeydown(e) {
     if (e.key === 'Escape') {
         if (isBlockingModalOpen()) return;
+        const panel = DOM.panelCanvas || document.getElementById('panel-canvas');
+        if (panel && panel.classList.contains('canvas-fullscreen')) {
+            e.preventDefault();
+            toggleCanvasFullscreen(false);
+            return;
+        }
         if (STATE.selectedCardId) {
             e.preventDefault();
             deselectCards();
@@ -2869,11 +2885,41 @@ function changeZoom(delta) {
     scheduleRender();
 }
 
-function fitZoomToContainer() {
+function resetZoomTo100() {
     STATE.zoom = 1.0;
-    DOM.zoomLevelLabel.textContent = '100%';
+    if (DOM.zoomLevelLabel) DOM.zoomLevelLabel.textContent = '100%';
     resizeCanvasViewport();
     scheduleRender();
+    showToast('Zoom restablecido al 100%', 'info');
+}
+
+function toggleCanvasFullscreen(forceState) {
+    const panel = DOM.panelCanvas || document.getElementById('panel-canvas');
+    if (!panel) return;
+
+    const isFullscreen = forceState !== undefined ? forceState : !panel.classList.contains('canvas-fullscreen');
+    panel.classList.toggle('canvas-fullscreen', isFullscreen);
+
+    if (DOM.zoomFitIcon) {
+        DOM.zoomFitIcon.innerHTML = isFullscreen ? SVG_ICONS.minimize : SVG_ICONS.maximize;
+    }
+    if (DOM.zoomFitLabel) {
+        DOM.zoomFitLabel.textContent = isFullscreen ? 'Restaurar' : 'Maximizar';
+    }
+    if (DOM.btnZoomFit) {
+        DOM.btnZoomFit.title = isFullscreen ? 'Restaurar vista normal (Esc)' : 'Expandir hoja a pantalla completa';
+    }
+
+    showToast(isFullscreen ? 'Modo hoja completa activado (Esc para salir)' : 'Vista normal restaurada', 'info');
+
+    setTimeout(() => {
+        resizeCanvasViewport();
+        scheduleRender();
+    }, 60);
+}
+
+function fitZoomToContainer() {
+    toggleCanvasFullscreen();
 }
 
 // =============================================================================
