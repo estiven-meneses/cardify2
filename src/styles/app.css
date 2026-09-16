@@ -21,16 +21,17 @@
             /* Alto comun de los controles de arriba (modo, idioma, tema/reset).
                Antes cada grupo traia el suyo -38px, 48px y 36px- y por eso no
                alineaba ninguno. Ahora los tres salen de aqui. */
-            --ctl-h: 36px;
-            --ctl-pad: 3px;
+            --ctl-h: 32px;
+            --ctl-pad: 2px;
             --topbar-pad: 8px;
             --topbar-h: calc(var(--ctl-h) + 2 * var(--ctl-pad));
             --topbar-total: calc(var(--topbar-h) + 2 * var(--topbar-pad) + var(--safe-area-top));
         }
         @media screen and (max-width: 1023px) {
             :root {
-                /* En el movil manda el dedo, no el raton. */
-                --ctl-h: 40px;
+                --ctl-h: 32px;
+                --ctl-pad: 2px;
+                --topbar-pad: 6px;
             }
         }
 
@@ -224,6 +225,125 @@
             box-sizing: border-box;
         }
 
+        @media screen and (max-width: 1023px) {
+            #canvas-quick-bar {
+                position: fixed !important;
+                top: auto !important;
+                bottom: var(--tabbar-total);
+                left: 10px !important;
+                right: 10px !important;
+                transform: none !important;
+                width: auto;
+                max-width: none;
+                border-radius: 18px;
+                z-index: 45;
+                padding: 10px 12px 12px;
+            }
+            #canvas-quick-bar .quick-bar-advanced,
+            #btn-quick-select-both,
+            #btn-quick-center-x,
+            #btn-quick-center-y,
+            #btn-quick-to-settings,
+            #canvas-quick-bar .quick-bar-sep {
+                display: none !important;
+            }
+            #canvas-quick-bar .quick-bar-inner,
+            #canvas-quick-bar:not(.hidden) {
+                display: flex;
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: stretch;
+                gap: 8px;
+            }
+            #canvas-quick-bar .quick-bar-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+            }
+            #canvas-quick-bar .quick-bar-hint {
+                display: block;
+                flex: 1;
+                margin: 0;
+                font-size: 11px;
+                font-weight: 600;
+                line-height: 1.25;
+                color: #475569;
+            }
+            .dark #canvas-quick-bar .quick-bar-hint {
+                color: #cbd5e1;
+            }
+            #canvas-quick-bar .quick-bar-actions {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+            #canvas-quick-bar .quick-bar-action,
+            #btn-quick-crop, #btn-quick-rotate, #btn-quick-center {
+                min-height: 52px;
+                flex-direction: column;
+                font-size: 11px;
+                font-weight: 700;
+                padding: 6px 4px;
+                background: #f1f5f9;
+            }
+            .dark #canvas-quick-bar .quick-bar-action,
+            .dark #btn-quick-crop, .dark #btn-quick-rotate, .dark #btn-quick-center {
+                background: #1e293b;
+            }
+            #btn-quick-deselect {
+                min-height: 36px;
+                flex-direction: row;
+                background: transparent;
+                padding: 4px 8px;
+            }
+            #quick-card-badge {
+                min-width: 64px;
+                justify-content: center;
+                font-size: 12px;
+            }
+            #canvas-quick-bar .quick-bar-size {
+                grid-column: 1 / -1;
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                min-height: 44px;
+                background: #f8fafc;
+                border-radius: 12px;
+            }
+            .dark #canvas-quick-bar .quick-bar-size {
+                background: #0f172a;
+            }
+            body.quick-bar-open #canvas-footer {
+                display: none;
+            }
+            #panel-canvas {
+                padding-top: var(--topbar-total);
+            }
+            #viewport-stage {
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+            body.quick-bar-open #viewport-stage {
+                padding-bottom: 132px;
+            }
+        }
+        @media screen and (min-width: 1024px) {
+            #canvas-quick-bar .quick-bar-head,
+            #canvas-quick-bar .quick-bar-actions {
+                display: contents;
+            }
+            #canvas-quick-bar .quick-bar-hint {
+                display: none;
+            }
+            #btn-quick-rotate .quick-bar-label,
+            #btn-quick-deselect .quick-bar-label,
+            .quick-size-caption {
+                display: none;
+            }
+        }
+
         #canvas-quick-bar .quick-bar-sep {
             width: 1px;
             align-self: stretch;
@@ -328,8 +448,8 @@
         }
         .app-mode-btn {
             min-height: var(--ctl-h);
-            padding: 0 12px;
-            font-size: 11px;
+            padding: 0 9px;
+            font-size: 10px;
             font-weight: 700;
             border-radius: 999px;
             color: #64748b;
@@ -362,36 +482,41 @@
         .dark .app-lang-btn.is-on {
             box-shadow: inset 0 0 0 2px #60a5fa;
         }
-        /* El encabezado vive en la columna derecha, que da ~294px. El bloque
-           izquierdo pide 187px y las acciones 160px: no caben en una fila.
-           Antes el switch de modo se comprimia de 143px a 82px y, con overflow
-           visible, "Advanced" se derramaba sobre las banderas. Mejor dos filas
-           que texto recortado encima de otro control. */
         .app-chrome-inner {
-            flex-wrap: wrap;
-            row-gap: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+        .app-chrome-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .app-chrome-tools {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            min-width: 0;
         }
         .app-chrome .app-mode-switch {
-            flex-shrink: 0;
+            flex-shrink: 1;
+            min-width: 0;
         }
         .app-chrome-actions {
+            display: flex;
+            align-items: center;
+            gap: 2px;
             flex-shrink: 0;
-            margin-left: auto;
         }
-
-        /* Escritorio: los botones del encabezado traen w-9/h-9 desde el HTML y
-           el carril de idioma media 48px, asi que tema y reset quedaban 12px
-           mas bajos. Todos al mismo alto. */
         .app-chrome-actions > button {
             width: var(--ctl-h);
             height: var(--ctl-h);
         }
-        .app-chrome-actions {
-            align-items: center;
-        }
         .app-flag {
-            width: 22px;
-            height: 15px;
+            width: 18px;
+            height: 12px;
             border-radius: 2px;
             display: block;
             overflow: hidden;
@@ -427,11 +552,12 @@
             #app-utils .app-utils-actions {
                 display: flex;
                 align-items: center;
-                gap: 2px;
+                flex-shrink: 0;
+                gap: 1px;
                 padding: var(--ctl-pad);
                 border-radius: 999px;
-                background: rgba(255, 255, 255, 0.18);
-                border: 1px solid rgba(255, 255, 255, 0.32);
+                background: rgba(255, 255, 255, 0.72);
+                border: 1px solid rgba(148, 163, 184, 0.35);
                 backdrop-filter: blur(48px) saturate(190%);
                 -webkit-backdrop-filter: blur(48px) saturate(190%);
             }
@@ -442,7 +568,7 @@
                 height: var(--ctl-h);
             }
             .dark #app-utils .app-utils-actions {
-                background: rgba(255, 255, 255, 0.07);
+                background: rgba(15, 23, 42, 0.72);
                 border-color: rgba(255, 255, 255, 0.14);
             }
             #app-utils .app-mode-switch {
@@ -451,14 +577,13 @@
                 -webkit-backdrop-filter: blur(48px) saturate(190%);
             }
             #app-utils .app-lang-switch {
-                border: 1px solid rgba(255, 255, 255, 0.32);
-                background: rgba(255, 255, 255, 0.18);
-                backdrop-filter: blur(48px) saturate(190%);
-                -webkit-backdrop-filter: blur(48px) saturate(190%);
+                padding: 0;
+                background: transparent;
+                border: 0;
             }
             .dark #app-utils .app-lang-switch {
-                background: rgba(255, 255, 255, 0.07);
-                border-color: rgba(255, 255, 255, 0.14);
+                background: transparent;
+                border: 0;
             }
             #panel-sidebar,
             #panel-output {
@@ -470,7 +595,7 @@
                 padding-top: var(--topbar-total);
             }
             #canvas-toolbar {
-                top: var(--topbar-total);
+                top: 8px;
                 left: 10px;
                 right: 10px;
                 background: transparent;
@@ -588,6 +713,7 @@
                 border-color: rgb(51 65 85);
             }
             header.app-chrome {
+                flex-direction: column;
                 border-bottom-color: rgb(226 232 240);
                 border-radius: 16px 16px 0 0;
             }

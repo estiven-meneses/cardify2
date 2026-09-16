@@ -30,6 +30,7 @@
             <button type="button" class="app-mode-btn is-on" data-app-mode-btn="simple" data-i18n="simple">Simple</button>
             <button type="button" class="app-mode-btn" data-app-mode-btn="advanced" data-i18n="advanced">Advanced</button>
         </div>
+        <div class="app-utils-actions">
         <div class="app-lang-switch" role="group" aria-label="Language" data-i18n-aria="language">
             <button type="button" class="app-lang-btn is-on" data-lang-btn="en" title="English" aria-label="English">
                 <svg class="app-flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169"/><path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="10"/><path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="6"/><path fill="#fff" d="M25 0h10v30H25zM0 10h60v10H0z"/><path fill="#C8102E" d="M27 0h6v30h-6zM0 12h60v6H0z"/></svg>
@@ -38,10 +39,9 @@
                 <svg class="app-flag" viewBox="0 0 60 40" aria-hidden="true"><rect width="60" height="40" fill="#AA151B"/><rect y="10" width="60" height="20" fill="#F1BF00"/></svg>
             </button>
         </div>
-        <div class="app-utils-actions">
             <button id="btn-theme-toggle-mobile" title="Theme" data-i18n-title="theme"
-                    class="w-11 h-11 flex items-center justify-center text-slate-600 dark:text-slate-300 rounded-full">
-                <svg id="theme-icon-dark-mobile" class="w-5 h-5 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    class="flex items-center justify-center text-slate-600 dark:text-slate-300 rounded-full">
+                <svg id="theme-icon-dark-mobile" class="w-4 h-4 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="4"></circle>
                     <path d="M12 2v2"></path>
                     <path d="M12 20v2"></path>
@@ -52,13 +52,13 @@
                     <path d="m6.34 17.66-1.41 1.41"></path>
                     <path d="m19.07 4.93-1.41 1.41"></path>
                 </svg>
-                <svg id="theme-icon-light-mobile" class="w-5 h-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg id="theme-icon-light-mobile" class="w-4 h-4 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
                 </svg>
             </button>
             <button id="btn-reset-all-mobile" title="Reset app" data-i18n-title="resetApp"
-                    class="w-11 h-11 flex items-center justify-center text-slate-500 hover:text-red-600 dark:hover:text-red-400 rounded-full">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    class="flex items-center justify-center text-slate-500 hover:text-red-600 dark:hover:text-red-400 rounded-full">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                     <path d="M3 3v5h5"></path>
                 </svg>
@@ -547,55 +547,60 @@
             </div>
 
                 <!-- Barra Rápida Flotante (zonas separadas, táctil y espaciosa) -->
-                <div id="canvas-quick-bar" class="hidden absolute top-14 left-1/2 -translate-x-1/2 bg-white/97 dark:bg-dark-surface/97 backdrop-blur-md rounded-2xl shadow-xl border border-blue-500/30 px-2 py-1.5 sm:px-3 sm:py-2 flex items-center flex-wrap justify-center gap-1.5 sm:gap-2 z-20 transition-all pointer-events-auto max-w-[min(96vw,920px)]">
-                    <span id="quick-card-badge" class="min-h-[36px] px-3 inline-flex items-center bg-blue-600 text-white font-bold text-xs rounded-xl shrink-0" data-i18n="front">Front</span>
-                    <button id="btn-quick-select-both" title="Select both cards" data-i18n-title="selectBoth" class="min-h-[36px] px-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
-                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="8" rx="1.5"></rect><rect x="9" y="11" width="12" height="8" rx="1.5"></rect></svg>
-                        <span id="quick-select-both-label" data-i18n="both">Both</span>
+                <div id="canvas-quick-bar" class="hidden absolute top-14 left-1/2 -translate-x-1/2 bg-white/97 dark:bg-dark-surface/97 backdrop-blur-md rounded-2xl shadow-xl border border-blue-500/30 px-2 py-1.5 sm:px-3 sm:py-2 z-20 transition-all pointer-events-auto max-w-[min(96vw,920px)]">
+                  <div class="quick-bar-inner flex items-center flex-wrap justify-center gap-1.5 sm:gap-2">
+                    <div class="quick-bar-head">
+                    <span id="quick-card-badge" class="min-h-[36px] px-3 inline-flex items-center justify-center bg-blue-600 text-white font-bold text-xs rounded-xl shrink-0" data-i18n="front">Front</span>
+                    <p class="quick-bar-hint" data-i18n="tapCardHint">Crop, rotate or center</p>
+                    <button id="btn-quick-deselect" title="Close" data-i18n-title="close" class="quick-bar-action min-h-[36px] px-2.5 text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 dark:hover:text-red-400 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+                        <span class="quick-bar-label" data-i18n="close">Close</span>
                     </button>
-
-                    <span class="quick-bar-sep hidden sm:block" aria-hidden="true"></span>
-
-                    <button id="btn-quick-scale-down" title="Achicar carnet (-5%)" class="w-9 h-9 flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path></svg>
-                    </button>
-                    <span id="quick-scale-label" class="min-w-[3rem] text-center font-mono text-sm font-bold text-slate-800 dark:text-slate-100 tabular-nums">150%</span>
-                    <button id="btn-quick-scale-up" title="Agrandar carnet (+5%)" class="w-9 h-9 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl active:scale-95 transition-all shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
-                    </button>
-
-                    <span class="quick-bar-sep hidden sm:block" aria-hidden="true"></span>
-
-                    <button id="btn-quick-rotate" title="Rotar 90°" class="w-9 h-9 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0">
-                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
-                    </button>
-                    <button id="btn-quick-crop" title="Crop" data-i18n-title="crop" class="min-h-[36px] px-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl flex items-center gap-1 active:scale-95 transition-all shrink-0">
+                    </div>
+                    <div class="quick-bar-actions">
+                    <button id="btn-quick-crop" title="Crop" data-i18n-title="crop" class="quick-bar-action min-h-[36px] px-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"></path><path d="M18 22V8a2 2 0 0 0-2-2H2"></path></svg>
                         <span data-i18n="crop">Crop</span>
                     </button>
-                    <button id="btn-quick-center-x" title="Centrar horizontalmente (Eje X)" class="min-h-[36px] px-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
+                    <button id="btn-quick-rotate" title="Rotate" data-i18n-title="rotate" class="quick-bar-action min-h-[36px] px-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all shrink-0">
+                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+                        <span class="quick-bar-label" data-i18n="rotate">Rotate</span>
+                    </button>
+                    <button id="btn-quick-center" title="Center" data-i18n-title="center" class="quick-bar-action min-h-[36px] px-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" x2="18" y1="12" y2="12"></line><line x1="6" x2="2" y1="12" y2="12"></line><line x1="12" x2="12" y1="6" y2="2"></line><line x1="12" x2="12" y1="22" y2="18"></line></svg>
+                        <span class="quick-bar-label lg:hidden" data-i18n="center">Center</span>
+                        <span class="hidden lg:inline">X/Y</span>
+                    </button>
+                    <div class="quick-bar-size flex items-center gap-0.5 shrink-0">
+                    <span class="quick-size-caption text-[10px] font-bold text-slate-500 lg:hidden" data-i18n="sizeShort">Size</span>
+                    <button id="btn-quick-scale-down" title="Size −" data-i18n-title="sizeDown" class="w-9 h-9 flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+                    </button>
+                    <span id="quick-scale-label" class="min-w-[3rem] text-center font-mono text-sm font-bold text-slate-800 dark:text-slate-100 tabular-nums">150%</span>
+                    <button id="btn-quick-scale-up" title="Size +" data-i18n-title="sizeUp" class="w-9 h-9 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl active:scale-95 transition-all shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                    </button>
+                    </div>
+                    </div>
+
+                    <span class="quick-bar-sep quick-bar-advanced hidden sm:block" aria-hidden="true"></span>
+                    <button id="btn-quick-select-both" title="Select both cards" data-i18n-title="selectBoth" class="quick-bar-advanced min-h-[36px] px-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="12" height="8" rx="1.5"></rect><rect x="9" y="11" width="12" height="8" rx="1.5"></rect></svg>
+                        <span id="quick-select-both-label" data-i18n="both">Both</span>
+                    </button>
+                    <button id="btn-quick-center-x" title="Centrar horizontalmente (Eje X)" class="quick-bar-advanced min-h-[36px] px-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="3" y2="21"></line><path d="m18 8 4 4-4 4"></path><path d="m6 8-4 4 4 4"></path></svg>
                         <span>X</span>
                     </button>
-                    <button id="btn-quick-center-y" title="Centrar verticalmente (Eje Y)" class="min-h-[36px] px-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
+                    <button id="btn-quick-center-y" title="Centrar verticalmente (Eje Y)" class="quick-bar-advanced min-h-[36px] px-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="12" y2="12"></line><path d="m8 6 4-4 4 4"></path><path d="m8 18 4 4 4-4"></path></svg>
                         <span>Y</span>
                     </button>
-                    <button id="btn-quick-center" title="Centrar tanto en X como en Y" class="min-h-[36px] px-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl active:scale-95 transition-all shrink-0 flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" x2="18" y1="12" y2="12"></line><line x1="6" x2="2" y1="12" y2="12"></line><line x1="12" x2="12" y1="6" y2="2"></line><line x1="12" x2="12" y1="22" y2="18"></line></svg>
-                        <span>X/Y</span>
-                    </button>
-
-                    <button id="btn-quick-to-settings" title="Settings" data-i18n-title="settings" class="lg:hidden min-h-[36px] px-2.5 text-xs font-bold bg-blue-600 text-white rounded-xl active:scale-95 shadow flex items-center gap-1 shrink-0">
+                    <button id="btn-quick-to-settings" title="Settings" data-i18n-title="settings" class="quick-bar-advanced hidden min-h-[36px] px-2.5 text-xs font-bold bg-blue-600 text-white rounded-xl active:scale-95 shadow flex items-center gap-1 shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="21" y2="21"></line><line x1="4" x2="20" y1="14" y2="14"></line><line x1="4" x2="20" y1="7" y2="7"></line><circle cx="8" cy="7" r="2.5"></circle><circle cx="16" cy="14" r="2.5"></circle><circle cx="10" cy="21" r="2.5"></circle></svg>
                         <span data-i18n="settings">Settings</span>
                     </button>
-
-                    <span class="quick-bar-sep hidden sm:block" aria-hidden="true"></span>
-
-                    <button id="btn-quick-deselect" title="Deseleccionar" class="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 dark:hover:text-red-400 rounded-xl active:scale-95 transition-all shrink-0">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
-                    </button>
+                  </div>
                 </div>
                 <div id="viewport-scroller" class="absolute inset-0">
                     <div id="viewport-stage" class="min-h-full min-w-full flex items-center justify-center">
@@ -623,22 +628,21 @@
         </div>
 
         <aside id="panel-output" class="w-full lg:w-[300px] xl:w-[320px] shrink-0 flex flex-col min-h-0 lg:h-full">
-            <header class="app-chrome hidden lg:flex bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-10 px-3 py-2.5 w-full shrink-0">
-                <div class="app-chrome-inner flex items-center justify-between gap-2 w-full">
-                    <div class="flex items-center gap-2 min-w-0">
-                        <img src="/icon.svg" width="36" height="36" alt="" class="w-9 h-9 rounded-xl shadow-md shrink-0">
-                        <div class="min-w-0">
-                            <h1 class="text-[15px] font-extrabold tracking-tight text-slate-900 dark:text-white">
-                                CardPDF
-                            </h1>
-                            <div class="app-mode-switch mt-1" role="group" aria-label="Mode" data-i18n-aria="mode">
+            <header class="app-chrome hidden lg:flex bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-10 px-3 py-2 w-full shrink-0">
+                <div class="app-chrome-inner w-full">
+                    <div class="app-chrome-brand">
+                        <img src="/icon.svg" width="28" height="28" alt="" class="w-7 h-7 rounded-lg shadow-md shrink-0">
+                        <h1 class="text-sm font-extrabold tracking-tight text-slate-900 dark:text-white">
+                            CardPDF
+                        </h1>
+                    </div>
+                    <div class="app-chrome-tools">
+                            <div class="app-mode-switch" role="group" aria-label="Mode" data-i18n-aria="mode">
                                 <button type="button" class="app-mode-btn is-on" data-app-mode-btn="simple" data-i18n="simple">Simple</button>
                                 <button type="button" class="app-mode-btn" data-app-mode-btn="advanced" data-i18n="advanced">Advanced</button>
                             </div>
-                        </div>
-                    </div>
 
-                    <div class="app-chrome-actions flex items-center gap-1 shrink-0">
+                    <div class="app-chrome-actions">
                         <div class="app-lang-switch" role="group" aria-label="Language" data-i18n-aria="language">
                             <button type="button" class="app-lang-btn is-on" data-lang-btn="en" title="English" aria-label="English">
                                 <svg class="app-flag" viewBox="0 0 60 30" aria-hidden="true"><rect width="60" height="30" fill="#012169"/><path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="10"/><path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="6"/><path fill="#fff" d="M25 0h10v30H25zM0 10h60v10H0z"/><path fill="#C8102E" d="M27 0h6v30h-6zM0 12h60v6H0z"/></svg>
@@ -648,8 +652,8 @@
                             </button>
                         </div>
                         <button id="btn-theme-toggle" title="Theme" data-i18n-title="theme"
-                                class="w-9 h-9 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors shrink-0">
-                            <svg id="theme-icon-dark" class="w-5 h-5 hidden text-amber-400 transition-transform hover:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                class="flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0">
+                            <svg id="theme-icon-dark" class="w-4 h-4 hidden text-amber-400 transition-transform hover:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="4"></circle>
                                 <path d="M12 2v2"></path>
                                 <path d="M12 20v2"></path>
@@ -660,17 +664,18 @@
                                 <path d="m6.34 17.66-1.41 1.41"></path>
                                 <path d="m19.07 4.93-1.41 1.41"></path>
                             </svg>
-                            <svg id="theme-icon-light" class="w-5 h-5 text-slate-700 dark:text-slate-200 transition-transform hover:-rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg id="theme-icon-light" class="w-4 h-4 text-slate-700 dark:text-slate-200 transition-transform hover:-rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
                             </svg>
                         </button>
                         <button id="btn-reset-all" title="Reset app" data-i18n-title="resetApp"
-                                class="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors shrink-0">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                class="flex items-center justify-center text-slate-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                                 <path d="M3 3v5h5"></path>
                             </svg>
                         </button>
+                    </div>
                     </div>
                 </div>
             </header>

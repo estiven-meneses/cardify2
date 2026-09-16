@@ -1431,6 +1431,7 @@ function applyLoadedImage(img, cardId) {
     if (window.innerWidth < 1024) {
         setMobileView('canvas');
     }
+    if (cardId === 'dorso' || hasDorsoImage()) dismissDorsoPrompt();
 }
 
 async function loadFileIntoCard(file, cardId) {
@@ -1446,6 +1447,7 @@ async function loadFileIntoCard(file, cardId) {
         try {
             const img = await loadImageFromUrl(URL.createObjectURL(file));
             applyLoadedImage(img, cardId);
+            if (cardId === 'dorso' || hasDorsoImage()) dismissDorsoPrompt();
             return;
         } catch (_) { /* HEIC en Chrome/Firefox no se abre nativo */ }
 
@@ -1453,6 +1455,7 @@ async function loadFileIntoCard(file, cardId) {
         const jpeg = await convertHeicToJpegBlob(file);
         const img = await loadImageFromUrl(URL.createObjectURL(jpeg));
         applyLoadedImage(img, cardId);
+        if (cardId === 'dorso' || hasDorsoImage()) dismissDorsoPrompt();
     } catch (err) {
         console.error('Carga de imagen:', err);
         showToast(looksHeic
@@ -1619,12 +1622,14 @@ function isBlockingModalOpen() {
 function deselectCards() {
     if (!STATE.selectedCardId) {
         if (DOM.canvasQuickBar) DOM.canvasQuickBar.classList.add('hidden');
+        if (hasFrenteImage() && !hasDorsoImage()) showDorsoPrompt();
         return;
     }
     STATE.selectedCardId = null;
     if (DOM.selectedCardIndicator) DOM.selectedCardIndicator.textContent = t('dragToMove');
     syncControlsFromActiveCard();
     scheduleRender();
+    if (hasFrenteImage() && !hasDorsoImage()) showDorsoPrompt();
 }
 
 function handleGlobalKeydown(e) {
@@ -1745,6 +1750,7 @@ function applyToActiveCards(mutator, options) {
 }
 
 function syncControlsFromActiveCard() {
+    if (hasDorsoImage()) dismissDorsoPrompt();
     const isBoth = (STATE.activeCardId === 'both' || STATE.selectedCardId === 'both');
     const card = (STATE.activeCardId === 'dorso' && !isBoth) ? STATE.cards.dorso : STATE.cards.frente;
 
@@ -1792,12 +1798,15 @@ function syncControlsFromActiveCard() {
     // Barra Rápida: solo visible si hay un carnet seleccionado en el lienzo
     if (DOM.canvasQuickBar) {
         const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
-        if (STATE.selectedCardId && hasAnyImage) {
+        const barOpen = !!(STATE.selectedCardId && hasAnyImage);
+        const isMobile = window.innerWidth < 1024;
+        if (barOpen) {
             DOM.canvasQuickBar.classList.remove('hidden');
+            if (isMobile || hasDorsoImage()) dismissDorsoPrompt();
             if (DOM.quickCardBadge) {
                 DOM.quickCardBadge.textContent = STATE.selectedCardId === 'both'
-                    ? 'Ambos'
-                    : STATE.cards[STATE.selectedCardId].name;
+                    ? t('both')
+                    : STATE.selectedCardId === 'dorso' ? t('back') : t('front');
             }
             if (DOM.quickSelectBothLabel) {
                 DOM.quickSelectBothLabel.textContent = isBoth ? t('onlyOne') : t('both');
@@ -1808,6 +1817,7 @@ function syncControlsFromActiveCard() {
         } else {
             DOM.canvasQuickBar.classList.add('hidden');
         }
+        document.body.classList.toggle('quick-bar-open', barOpen && isMobile);
     }
 
     updateDefaultConfigBadge();
@@ -2377,6 +2387,7 @@ function applyPixelFilters(ctx, width, height, filterType, brightness, contrast)
 // =============================================================================
 
 function scheduleRender() {
+    if (hasDorsoImage()) dismissDorsoPrompt();
     if (!renderScheduled) {
         renderScheduled = true;
         requestAnimationFrame(renderLoop);
@@ -2399,8 +2410,13 @@ function resizeCanvasViewport() {
     const toolbarH = toolbar ? Math.ceil(toolbar.getBoundingClientRect().height) : (isMobile ? 40 : 44);
     const footerVisible = footer && getComputedStyle(footer).display !== 'none';
     const footerH = footerVisible ? Math.ceil(footer.getBoundingClientRect().height) : (isMobile ? 40 : 36);
+    const appUtils = document.getElementById('app-utils');
+    const appUtilsH = (isMobile && appUtils && getComputedStyle(appUtils).display !== 'none')
+        ? Math.ceil(appUtils.getBoundingClientRect().height) : 0;
+    const safeTop = isMobile ? 12 : 0;
+    const sheetPad = (isMobile && STATE.selectedCardId) ? 72 : 0;
     const paddingX = isMobile ? 20 : 28;
-    const paddingY = toolbarH + footerH + (isMobile ? 28 : 32);
+    const paddingY = toolbarH + footerH + appUtilsH + (isMobile ? 36 : 32) + safeTop + sheetPad;
     const availWidth = Math.max(80, cWidth - paddingX);
     const availHeight = Math.max(100, cHeight - paddingY);
 
@@ -5159,8 +5175,12 @@ function applyCroppedResult() {
         STATE.cards[otherId].borderRadiusMm = 5;
     }
 
-    STATE.selectedCardId = cropState.cardId;
     setActiveTab(cropState.cardId);
+    if (window.innerWidth < 1024) {
+        STATE.selectedCardId = null;
+    } else {
+        STATE.selectedCardId = cropState.cardId;
+    }
     syncControlsFromActiveCard();
 
     DOM.cropModal.classList.add('hidden');
@@ -5170,7 +5190,8 @@ function applyCroppedResult() {
     scheduleRender();
     showToast(t('cropped', { name: card.name }), 'success');
 
-    if (cropState.cardId === 'frente' && !STATE.cards.dorso.rawImage) {
+    if (cropState.cardId === 'dorso' || hasDorsoImage()) dismissDorsoPrompt();
+    if (cropState.cardId === 'frente' && !hasDorsoImage()) {
         setTimeout(() => {
             showDorsoPrompt();
         }, 800);
@@ -5392,31 +5413,44 @@ function autoProcessCardFromImage(cardId, sourceImg) {
     // 5. Actualizar interfaz y renderizar
     updateDropzoneUI(cardId, unwarpedCanvas.toDataURL('image/jpeg', 0.94));
     setActiveTab(cardId);
-    STATE.selectedCardId = cardId;
-    updateSelectedCardUI();
+    if (window.innerWidth < 1024) {
+        STATE.selectedCardId = null;
+        setMobileView('canvas');
+    } else {
+        STATE.selectedCardId = cardId;
+    }
+    if (typeof syncControlsFromActiveCard === 'function') syncControlsFromActiveCard();
+    if (cardId === 'dorso' || hasDorsoImage()) dismissDorsoPrompt();
 
     saveHistoryState(`Auto-escaneo ${card.name} (150% CR80 centrado)`);
     scheduleRender();
 
     showToast(t('autoStraight', { name: card.name }), 'success', 'sparkle');
 
-    // En móvil, cambiar a la vista de la hoja para ver el resultado
-    if (window.innerWidth < 1024) {
-        setMobileView('canvas');
-    }
-
     // 6. Si fue el frente y el dorso aún está vacío, sugerir de inmediato escanear el dorso
-    if (cardId === 'frente' && !STATE.cards.dorso.rawImage) {
+    if (cardId === 'frente' && !hasDorsoImage()) {
         setTimeout(() => {
             showDorsoPrompt();
         }, 900);
     }
 }
 
+function hasDorsoImage() {
+    const dorso = STATE.cards && STATE.cards.dorso;
+    return !!(dorso && (dorso.rawImage || dorso.croppedCanvas));
+}
+
+function hasFrenteImage() {
+    const frente = STATE.cards && STATE.cards.frente;
+    return !!(frente && (frente.rawImage || frente.croppedCanvas));
+}
+
 function showDorsoPrompt() {
-    if (DOM.bannerScanDorso) {
-        DOM.bannerScanDorso.classList.remove('hidden');
+    if (hasDorsoImage() || STATE.selectedCardId) {
+        dismissDorsoPrompt();
+        return;
     }
+    if (DOM.bannerScanDorso) DOM.bannerScanDorso.classList.remove('hidden');
 }
 
 function dismissDorsoPrompt() {
