@@ -1,5 +1,5 @@
 /**
- * CARDIFY 2.1 PRO - Motor de Renderizado, Manipulación Directa y Exportación
+ * CARDPDF 2.1 PRO - Motor de Renderizado, Manipulación Directa y Exportación
  * Optimizado para Smartphones, Cámara Nativa, Sincronización de Carnets y Exportación Limpia.
  */
 
@@ -353,6 +353,11 @@ function reportClientError(payload) {
     } catch (_) {}
 }
 
+function registerPwa() {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+}
+
 function installErrorLogger() {
     window.addEventListener('error', (e) => {
         const msg = e.message || (e.error && e.error.message) || 'Error de script';
@@ -373,6 +378,7 @@ function installErrorLogger() {
 
 document.addEventListener('DOMContentLoaded', () => {
     installErrorLogger();
+    registerPwa();
     initTheme();
     loadCustomDefaults(); // Carga las preferencias guardadas del usuario
     setupPaperDimensions();
@@ -484,7 +490,7 @@ function setMobileView(view) {
 // =============================================================================
 
 function updateDefaultConfigBadge() {
-    const hasCustom = !!localStorage.getItem('cardify-custom-defaults');
+    const hasCustom = !!localStorage.getItem('cardpdf-custom-defaults');
     if (DOM.defaultConfigBadge) {
         if (hasCustom) {
             DOM.defaultConfigBadge.innerHTML = `<span>Personalizada</span>${SVG_ICONS.star}`;
@@ -499,7 +505,7 @@ function updateDefaultConfigBadge() {
 let telemetryTimeout = null;
 function syncConfigTelemetry(trigger = 'live') {
     try {
-        const customSaved = localStorage.getItem('cardify-custom-defaults');
+        const customSaved = localStorage.getItem('cardpdf-custom-defaults');
         const payload = {
             trigger,
             time: new Date().toISOString(),
@@ -582,7 +588,7 @@ function saveCustomDefaults() {
         exportLight: !!STATE.exportLight
     };
 
-    localStorage.setItem('cardify-custom-defaults', JSON.stringify(customConfig));
+    localStorage.setItem('cardpdf-custom-defaults', JSON.stringify(customConfig));
     syncConfigTelemetry('save_defaults');
     updateDefaultConfigBadge();
     triggerSuccessCelebration();
@@ -591,7 +597,7 @@ function saveCustomDefaults() {
 
 function loadCustomDefaults() {
     try {
-        const saved = localStorage.getItem('cardify-custom-defaults');
+        const saved = localStorage.getItem('cardpdf-custom-defaults');
         if (!saved) return;
         const config = JSON.parse(saved);
 
@@ -616,7 +622,7 @@ function loadCustomDefaults() {
 }
 
 function restoreFactoryDefaults() {
-    localStorage.removeItem('cardify-custom-defaults');
+    localStorage.removeItem('cardpdf-custom-defaults');
     STATE.paper = JSON.parse(JSON.stringify(FACTORY_DEFAULTS.paper));
     STATE.layout = JSON.parse(JSON.stringify(FACTORY_DEFAULTS.layout));
     STATE.syncCards = FACTORY_DEFAULTS.syncCards;
@@ -709,8 +715,25 @@ function resetCardToFactory(cardId) {
 // 6. GESTIÓN DE TEMA
 // =============================================================================
 
+function migrateLegacyStorage() {
+    const pairs = [
+        ['cardify-theme', 'cardpdf-theme'],
+        ['cardify-custom-defaults', 'cardpdf-custom-defaults']
+    ];
+    try {
+        for (const [from, to] of pairs) {
+            if (localStorage.getItem(to) == null) {
+                const prev = localStorage.getItem(from);
+                if (prev != null) localStorage.setItem(to, prev);
+            }
+            localStorage.removeItem(from);
+        }
+    } catch (_) {}
+}
+
 function initTheme() {
-    const savedTheme = localStorage.getItem('cardify-theme');
+    migrateLegacyStorage();
+    const savedTheme = localStorage.getItem('cardpdf-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     STATE.theme = savedTheme || (prefersDark ? 'dark' : 'light');
     applyTheme(STATE.theme);
@@ -726,7 +749,7 @@ function applyTheme(theme) {
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) themeColor.setAttribute('content', isDark ? '#0f172a' : '#f1f5f9');
     STATE.darkPaper = isDark;
-    localStorage.setItem('cardify-theme', theme);
+    localStorage.setItem('cardpdf-theme', theme);
     updatePaperThemeUI();
     scheduleRender();
 }
@@ -1211,7 +1234,7 @@ function loadImageFromUrl(src) {
 function loadScriptOnce(src, isReady) {
     return new Promise((resolve, reject) => {
         if (typeof isReady === 'function' && isReady()) return resolve();
-        const existing = document.querySelector(`script[data-cardify-src="${src}"]`);
+        const existing = document.querySelector(`script[data-cardpdf-src="${src}"]`);
         if (existing) {
             if (typeof isReady === 'function' && isReady()) return resolve();
             existing.addEventListener('load', () => resolve());
@@ -1221,7 +1244,7 @@ function loadScriptOnce(src, isReady) {
         const script = document.createElement('script');
         script.src = src;
         script.async = true;
-        script.dataset.cardifySrc = src;
+        script.dataset.cardpdfSrc = src;
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('script'));
         document.head.appendChild(script);
@@ -2020,9 +2043,9 @@ function setOrientation(orientation) {
 }
 
 function resetAllDefaults() {
-    const hasCustom = !!localStorage.getItem('cardify-custom-defaults');
+    const hasCustom = !!localStorage.getItem('cardpdf-custom-defaults');
     if (hasCustom) {
-        localStorage.removeItem('cardify-custom-defaults');
+        localStorage.removeItem('cardpdf-custom-defaults');
     }
 
     ['frente', 'dorso'].forEach(k => {
@@ -5433,7 +5456,7 @@ function getExportFilename(ext) {
     const typed = (DOM.exportFilename && DOM.exportFilename.value) || STATE.exportName || '';
     let name = typed.trim().replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
     name = name.replace(/\.(pdf|png|jpe?g|webp)$/i, '');
-    if (!name) name = `Carnet_Cardify_${STATE.paper.size.toUpperCase()}_${getFormattedTimestamp()}`;
+    if (!name) name = `Carnet_CardPDF_${STATE.paper.size.toUpperCase()}_${getFormattedTimestamp()}`;
     return `${name}.${ext}`;
 }
 

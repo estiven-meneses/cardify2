@@ -1,4 +1,4 @@
-# CODEX.md — Cardify (OpenAI Codex)
+# CODEX.md — CardPDF (OpenAI Codex)
 
 Al **primer turno**, antes de editar: lee `docs/START.md` y entra a tu rama. No preguntes la rama.
 
@@ -10,7 +10,7 @@ Eres **Codex**. Rama `feature/codex`. Worktree `.worktrees/codex`. Créala desde
 
 También lee `AGENTS.md`, `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
 
-Cardify es **app**, no web. Celular tipo iPhone: Hoja / Ajustes / Salida, sin encabezado. Escritorio: Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
+CardPDF es **app**, no web. Celular tipo iPhone: Hoja / Ajustes / Salida, sin encabezado. Escritorio: Ajustes | Hoja | Salida a la derecha. No metas export en Ajustes.
 
 - Español, compacto.
 - Cero emojis en UI. SVG propio. Cero botones duplicados.

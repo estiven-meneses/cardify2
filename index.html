@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
-    <title>Cardify 2.1 - Maquetador y Convertidor Profesional de Carnets</title>
+    <title>CardPDF 2.1 - Maquetador y Convertidor Profesional de Carnets</title>
     <meta name="description" content="Maqueta, ajusta y convierte carnets e identificaciones a PDF, JPG y PNG en alta definición (300 DPI). Optimizado para móviles, cámara nativa, recorte y filtros.">
     <meta name="theme-color" content="#f1f5f9">
+    <meta name="application-name" content="CardPDF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Cardify">
+    <meta name="apple-mobile-web-app-title" content="CardPDF">
+    <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
-    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -398,10 +401,10 @@
                 position: sticky;
                 bottom: 0;
                 padding-bottom: 4px;
-                background: linear-gradient(to top, rgb(241 245 249) 70%, rgb(241 245 249 / 0));
+                background: linear-gradient(to top, #fff 75%, rgb(255 255 255 / 0));
             }
             .dark #panel-export .export-cta {
-                background: linear-gradient(to top, #0f172a 70%, rgb(15 23 42 / 0));
+                background: linear-gradient(to top, #1e293b 75%, rgb(30 41 59 / 0));
             }
         }
         #panel-canvas.canvas-fullscreen {
@@ -453,8 +456,8 @@
                 border-radius: 16px;
             }
             .dark #panel-output {
-                background: rgb(30 41 59 / 0.95);
-                border-color: rgb(30 41 59);
+                background: rgb(15 23 42 / 0.98);
+                border-color: rgb(51 65 85);
             }
             header.app-chrome {
                 border-bottom-color: rgb(226 232 240);
@@ -905,7 +908,7 @@
                 </div>
                 
                 <p class="text-xs text-slate-600 dark:text-slate-300 mb-3 leading-relaxed">
-                    Guarda tus ajustes actuales (tamaño de hoja, orientación, escala %, filtros y resolución) como tu <strong>plantilla predeterminada</strong>. Cada vez que abras Cardify, cargará automáticamente esta configuración.
+                    Guarda tus ajustes actuales (tamaño de hoja, orientación, escala %, filtros y resolución) como tu <strong>plantilla predeterminada</strong>. Cada vez que abras CardPDF, cargará automáticamente esta configuración.
                 </p>
 
                 <div class="flex flex-col gap-2">
@@ -1076,17 +1079,10 @@
             <header class="app-chrome hidden lg:flex bg-white/95 dark:bg-dark-surface/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-10 px-3 py-2.5 w-full shrink-0">
                 <div class="app-chrome-inner flex items-center justify-between gap-2 w-full">
                     <div class="flex items-center gap-2">
-                        <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 shadow-md shadow-blue-500/20 text-white font-bold shrink-0">
-                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="16" rx="3"></rect>
-                                <line x1="7" y1="8" x2="13" y2="8"></line>
-                                <line x1="7" y1="12" x2="11" y2="12"></line>
-                                <circle cx="16" cy="12" r="2"></circle>
-                            </svg>
-                        </div>
+                        <img src="icon.svg" width="36" height="36" alt="" class="w-9 h-9 rounded-xl shadow-md shrink-0">
                         <div class="brand-copy flex items-center gap-1.5">
-                            <h1 class="text-[15px] font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                                Cardify
+                            <h1 class="text-[15px] font-extrabold tracking-tight text-slate-900 dark:text-white">
+                                CardPDF
                             </h1>
                         </div>
                     </div>
@@ -1130,12 +1126,12 @@
                     <p class="text-[13px] lg:text-xs text-slate-500 dark:text-slate-400 mt-0.5 hidden lg:block">Descarga, imprime o copia la hoja.</p>
                 </div>
 
-                <div class="bg-white dark:bg-dark-surface rounded-2xl px-4 py-3 shadow-sm border border-slate-200/80 dark:border-slate-800">
+                <div class="bg-white dark:bg-slate-800 rounded-2xl px-4 py-3 shadow-sm border border-slate-200/80 dark:border-slate-600">
                     <p class="text-[11px] font-medium text-slate-500 mb-0.5">Hoja actual</p>
                     <p id="export-sheet-summary" class="font-mono text-sm font-bold text-slate-800 dark:text-slate-100">A4 • 210 × 297 mm</p>
                 </div>
 
-                <div class="bg-white dark:bg-dark-surface rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-600">
                     <div class="mb-3">
                         <label class="block text-[11px] font-medium text-slate-500 mb-1" for="export-filename">Nombre del archivo</label>
                         <input id="export-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false"
@@ -1170,13 +1166,13 @@
                         </span>
                         <span class="relative inline-flex items-center shrink-0">
                             <input type="checkbox" id="check-export-light" class="sr-only peer">
-                            <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-500 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500 dark:peer-checked:bg-blue-500"></div>
                         </span>
                     </label>
 
                     <div class="export-cta">
                         <button id="btn-generate-download"
-                                class="min-h-[44px] w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-bold text-sm py-2.5 px-4 rounded-xl shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+                                class="min-h-[44px] w-full bg-blue-600 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white font-bold text-sm py-2.5 px-4 rounded-xl shadow-sm dark:shadow-none ring-1 ring-black/5 dark:ring-white/15 active:scale-[0.99] transition-all flex items-center justify-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                 <polyline points="7 10 12 15 17 10"></polyline>
@@ -1187,8 +1183,8 @@
 
                         <div class="grid grid-cols-2 gap-2 mt-2">
                             <button id="btn-direct-print" title="Imprimir directamente sin descargar"
-                                    class="min-h-[36px] py-1.5 px-3 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 transition-colors">
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    class="min-h-[36px] py-1.5 px-3 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-100 border border-slate-200 dark:border-slate-500 flex items-center justify-center gap-1.5 transition-colors">
+                                <svg class="w-4 h-4 text-slate-500 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 6 2 18 2 18 9"></polyline>
                                     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
                                     <rect width="12" height="8" x="6" y="14"></rect>
@@ -1197,8 +1193,8 @@
                             </button>
 
                             <button id="btn-copy-clipboard" title="Copiar hoja al portapapeles"
-                                    class="min-h-[36px] py-1.5 px-3 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 transition-colors">
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    class="min-h-[36px] py-1.5 px-3 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-100 border border-slate-200 dark:border-slate-500 flex items-center justify-center gap-1.5 transition-colors">
+                                <svg class="w-4 h-4 text-slate-500 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
                                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                                     <path d="M21 14H11"></path>

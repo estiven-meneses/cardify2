@@ -1,4 +1,4 @@
-# Plan de Implementación: Cardify Pro (Rediseño, Blueprint Visual, Recorte Inmediato y Deselección)
+# Plan de Implementación: CardPDF Pro (Rediseño, Blueprint Visual, Recorte Inmediato y Deselección)
 
 Plan de trabajo estructurado en **dos bloques independientes** para atender con máxima precisión y sin redundancias todas las solicitudes del usuario.
 
@@ -94,14 +94,14 @@ Plan de trabajo estructurado en **dos bloques independientes** para atender con 
 ## Proposed Changes
 
 ### Bloque 1
-- `[NEW]` [GEMINI.md](file:///Users/estivenmeneses/vsCode/personal/cardify2/GEMINI.md)
+- `[NEW]` [GEMINI.md](file:///Users/estivenmeneses/vsCode/personal/cardpdf/GEMINI.md)
 - `[DELETE]` `recursos/carnet confa 1.png` y `recursos/carnet confa 2.png`
-- `[MODIFY]` [index.html](file:///Users/estivenmeneses/vsCode/personal/cardify2/index.html)
-- `[MODIFY]` [script.js](file:///Users/estivenmeneses/vsCode/personal/cardify2/script.js)
+- `[MODIFY]` [index.html](file:///Users/estivenmeneses/vsCode/personal/cardpdf/index.html)
+- `[MODIFY]` [script.js](file:///Users/estivenmeneses/vsCode/personal/cardpdf/script.js)
 
 ### Bloque 2
-- `[MODIFY]` [index.html](file:///Users/estivenmeneses/vsCode/personal/cardify2/index.html)
-- `[MODIFY]` [script.js](file:///Users/estivenmeneses/vsCode/personal/cardify2/script.js)
+- `[MODIFY]` [index.html](file:///Users/estivenmeneses/vsCode/personal/cardpdf/index.html)
+- `[MODIFY]` [script.js](file:///Users/estivenmeneses/vsCode/personal/cardpdf/script.js)
 
 ---
 

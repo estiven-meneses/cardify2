@@ -1,4 +1,4 @@
-# AGENTS.md — Cardify
+# AGENTS.md — CardPDF
 
 **Antes de editar:** lee `docs/START.md` y entra a tu rama. No preguntes la rama.
 
@@ -16,7 +16,7 @@ Identifícate por el producto (Cursor vs Codex). Claude lee `CLAUDE.md`. Anti-Gr
 
 También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md` y `docs/LOGS.md`.
 
-Cardify es **app**, no web. Celular = iPhone (Hoja / Ajustes / Salida). Escritorio = tres columnas (Ajustes | Hoja | Salida a la derecha). Detalle: `docs/SHELL.md`.
+CardPDF es **app**, no web. Celular = iPhone (Hoja / Ajustes / Salida). Escritorio = tres columnas (Ajustes | Hoja | Salida a la derecha). Detalle: `docs/SHELL.md`.
 
 ## Logs (al empezar)
 

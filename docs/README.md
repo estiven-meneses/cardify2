@@ -1,4 +1,4 @@
-# Docs de Cardify
+# Docs de CardPDF
 
 Guía para humanos e inteligencias artificiales que toquen este repo.
 
