@@ -1,20 +1,22 @@
 ---
-description: Reglas permanentes de Cardify (UI, bloques, IAs)
+description: Reglas permanentes de Cardify (UI, ramas, IAs)
 alwaysApply: true
 ---
 
 # Cardify
 
-Antes de editar, lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/LOGS.md`.
+Al **primer turno** de cada chat, antes de editar: lee `docs/START.md` y entra a tu rama. No preguntes.
 
-- Al empezar: abre `logs/local/_pending.json`. Arregla solo `pending` de tu bloque. Marca `resolved` + nota. Ignora los ya resolved.
+- Eres Cursor → rama `feature/cursor`, worktree `.worktrees/cursor`. Créala desde `origin/main` si no existe.
+- Anti-Gravity usa `feature/antigravity`. No la toques.
+- No trabajes en `main`. Mezcla a `main` solo si Estiven lo pide. Tras mezclar, se borran las dos features.
+- Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/LOGS.md`.
+- Al empezar: `logs/local/_pending.json`. Solo `pending` de tu zona. Resolved se ignoran.
 
-- La rama principal es `main`. Bloques 1 y 2 ya están mezclados. Nueva IA: `git checkout -b feature/<tarea> origin/main`.
-- No reutilices `feature/bloque-1` ni `feature/bloque-2`. No hagas merge entre features hermanas.
-- Responde en español, compacto.
-- Cero emojis en UI/toasts/tooltips. Solo SVG vectorial propio.
-- Cero redundancia: un botón = una acción por pantalla. Nada de pastilla dentro de pastilla.
-- No pises el otro bloque: carga/perspectiva/blueprint (Bloque 1) vs barra/deselección/zoom/iconos (Bloque 2).
-- No instales framework ni backend en un arreglo puntual. Migración Vite+React+TS en Vercel solo si Estiven la pide. Supabase solo si pide cuentas o plantillas en la nube.
-- No commitees ni hagas push sin que lo pida.
+- Español, compacto.
+- Cero emojis en UI/toasts/tooltips. Solo SVG propio.
+- Cero redundancia: un botón = una acción por pantalla.
+- No pises carga/perspectiva/blueprint (Anti-Gravity). Tú: barra, deselección, zoom, iconos, logs, shell.
+- No instales framework ni backend en un arreglo puntual. Vite+React+TS / Supabase solo si Estiven lo pide.
+- No commitees ni hagas push sin que lo pida. Nunca push a `main` salvo la mezcla pedida.
 - No subas fotos ni datos personales.

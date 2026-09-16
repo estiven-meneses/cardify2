@@ -1,5 +1,17 @@
 # Directrices de Inteligencia Artificial - Cardify
 
+## 0. Rama (automático, primer turno)
+
+Eres **Anti-Gravity**. No preguntes la rama.
+
+1. Lee `docs/START.md` y ejecútalo.
+2. Tu rama es `feature/antigravity` (worktree `.worktrees/antigravity`). Créala desde `origin/main` si no existe.
+3. No trabajes en `main` ni en `feature/cursor`.
+4. Mezcla a `main` **solo** si Estiven lo pide. Después se borra tu feature.
+
+Zona tuya: carga, cámara, recorte, blueprint, reset, perspectiva.  
+No toques: barra rápida, deselección, zoom, iconos, logs, shell (eso es Cursor).
+
 ## 1. Regla Antirredundancia Estricta (CERO Redundancias)
 - **Prohibido duplicar botones o acciones**: Nunca colocar dos botones con la misma función en una misma pantalla o vista (por ejemplo, botones redundantes de "Ejemplo" en el encabezado y en el cuerpo de la página).
 - **Cero textos o títulos repetitivos**: Evitar repetir frases o descripciones en encabezados, modales o notificaciones que ya sean evidentes para el usuario.

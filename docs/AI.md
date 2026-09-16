@@ -39,11 +39,11 @@ Contéstales en silencio (y al usuario solo si hay duda real):
 
 | Zona | Archivos / funciones típicas | Quién la toca |
 |---|---|---|
-| Carga, cámara, recorte inmediato, blueprint, reset total | `loadFileIntoCard`, `captureCameraPhoto`, `detectDocumentQuad`, `#empty-state` | Bloque 1 |
-| Barra rápida, deselección, zoom/scroll, iconos SVG | `#canvas-quick-bar`, `deselectCards`, `#viewport-scroller` | Bloque 2 |
+| Carga, cámara, recorte inmediato, blueprint, reset total | `loadFileIntoCard`, `captureCameraPhoto`, `detectDocumentQuad` | Anti-Gravity (`feature/antigravity`) |
+| Barra rápida, deselección, zoom/scroll, iconos, logs, shell | `#canvas-quick-bar`, `deselectCards`, `#viewport-scroller` | Cursor (`feature/cursor`) |
 | Homografía / perspectiva / lupa | `openCropModal`, `warpQuadToRectangle`, `cropState` | No reescribir “de paso” |
 
-Si tu tarea es de un bloque, no “aprovechas” para rehacer el otro.
+Si tu tarea es de una zona, no “aprovechas” para rehacer la otra.
 
 ## Canvas y medidas
 
@@ -57,14 +57,14 @@ Si tu tarea es de un bloque, no “aprovechas” para rehacer el otro.
 - Deploy previsto: **Vercel** (estático o Vite). No asumas Netlify como requisito.
 - **Supabase** solo si pide cuentas, plantillas en la nube o historial. Hasta entonces, `localStorage` está bien.
 
-## Git y dos IAs (léete `docs/BRANCHING.md`)
+## Git y dos IAs (léete `docs/START.md` y `docs/BRANCHING.md`)
 
-- La rama principal es `main`. Bloques 1 y 2 ya están mezclados ahí.
-- Una IA nueva = una rama `feature/<tarea>` desde `origin/main`. Nunca desde otra feature.
-- No reutilices `feature/bloque-1` ni `feature/bloque-2` (se eliminan).
-- **Prohibido** merge/rebase entre features hermanas. El cruce es solo vía PR a `main`.
+- Al primer turno: entra a tu rama. Cursor = `feature/cursor`. Anti-Gravity = `feature/antigravity`.
+- Créala desde `origin/main` si no existe. Usa worktree (`.worktrees/cursor` o `.worktrees/antigravity`).
+- `main` no se edita. Mezcla **solo** si Estiven lo pide. Después se borran esas dos features.
+- **Prohibido** merge/rebase entre features hermanas.
 - Si no estás en tu rama, cámbiate. No “arregles” un conflicto de la otra.
-- Commit y push **solo si lo pide**.
+- Commit y push **solo si lo pide**. Nunca push a `main` salvo la mezcla pedida.
 - No force-push a `main` ni a la rama ajena. No `--no-verify`.
 - Mensajes cortos, estilo del repo: el *por qué*, no el listado de archivos.
 
