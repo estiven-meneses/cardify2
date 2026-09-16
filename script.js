@@ -24,7 +24,7 @@ const FACTORY_DEFAULTS = {
     cards: {
         frente: {
             id: 'frente',
-            name: 'Frente',
+            name: 'Front',
             rawImage: null,
             croppedCanvas: null,
             cropRect: null,
@@ -45,7 +45,7 @@ const FACTORY_DEFAULTS = {
         },
         dorso: {
             id: 'dorso',
-            name: 'Dorso',
+            name: 'Back',
             rawImage: null,
             croppedCanvas: null,
             cropRect: null,
@@ -80,6 +80,7 @@ STATE.zoom = 1.0;
 STATE.theme = 'light';
 STATE.darkPaper = false;
 STATE.mobileView = 'canvas'; // 'canvas' | 'controls' | 'export'
+STATE.appMode = 'simple'; // 'simple' | 'advanced'
 
 const SVG_ICONS = {
     check: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
@@ -380,7 +381,9 @@ document.addEventListener('DOMContentLoaded', () => {
     installErrorLogger();
     registerPwa();
     initTheme();
-    loadCustomDefaults(); // Carga las preferencias guardadas del usuario
+    initLang();
+    initAppMode();
+    if (STATE.appMode === 'advanced') loadCustomDefaults();
     setupPaperDimensions();
     setupEventListeners();
     setupSheetZoomWheel();
@@ -426,11 +429,12 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
 
 function setupResponsiveMobile() {
     const isMobile = window.innerWidth < 1024;
+    const showSidebar = STATE.appMode !== 'simple';
     if (isMobile) {
         setMobileView(STATE.mobileView);
     } else {
-        if (DOM.panelSidebar) DOM.panelSidebar.style.display = 'flex';
-        if (DOM.panelControls) DOM.panelControls.style.display = 'flex';
+        if (DOM.panelSidebar) DOM.panelSidebar.style.display = showSidebar ? 'flex' : 'none';
+        if (DOM.panelControls) DOM.panelControls.style.display = showSidebar ? 'flex' : 'none';
         if (DOM.panelOutput) DOM.panelOutput.style.display = 'flex';
         if (DOM.panelExport) DOM.panelExport.style.display = 'flex';
         if (DOM.panelCanvas) DOM.panelCanvas.style.display = 'flex';
@@ -454,13 +458,15 @@ function applyMobileTabStyles(active) {
 }
 
 function setMobileView(view) {
+    if (STATE.appMode === 'simple' && view === 'controls') view = 'canvas';
     STATE.mobileView = view;
     const isMobile = window.innerWidth < 1024;
     document.body.dataset.mobileView = isMobile ? view : 'desktop';
+    const showSidebar = STATE.appMode !== 'simple';
 
     if (!isMobile) {
-        if (DOM.panelSidebar) DOM.panelSidebar.style.display = 'flex';
-        if (DOM.panelControls) DOM.panelControls.style.display = 'flex';
+        if (DOM.panelSidebar) DOM.panelSidebar.style.display = showSidebar ? 'flex' : 'none';
+        if (DOM.panelControls) DOM.panelControls.style.display = showSidebar ? 'flex' : 'none';
         if (DOM.panelOutput) DOM.panelOutput.style.display = 'flex';
         if (DOM.panelExport) DOM.panelExport.style.display = 'flex';
         if (DOM.panelCanvas) DOM.panelCanvas.style.display = 'flex';
@@ -493,10 +499,10 @@ function updateDefaultConfigBadge() {
     const hasCustom = !!localStorage.getItem('cardpdf-custom-defaults');
     if (DOM.defaultConfigBadge) {
         if (hasCustom) {
-            DOM.defaultConfigBadge.innerHTML = `<span>Personalizada</span>${SVG_ICONS.star}`;
+            DOM.defaultConfigBadge.innerHTML = `<span>${t('custom')}</span>${SVG_ICONS.star}`;
             DOM.defaultConfigBadge.className = 'inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
         } else {
-            DOM.defaultConfigBadge.textContent = 'Fábrica';
+            DOM.defaultConfigBadge.textContent = t('factory');
             DOM.defaultConfigBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
         }
     }
@@ -592,7 +598,7 @@ function saveCustomDefaults() {
     syncConfigTelemetry('save_defaults');
     updateDefaultConfigBadge();
     triggerSuccessCelebration();
-    showToast('¡Configuración guardada como tu plantilla predeterminada!', 'success', 'star');
+    showToast(t('savedDefault'), 'success', 'star');
 }
 
 function loadCustomDefaults() {
@@ -648,7 +654,7 @@ function restoreFactoryDefaults() {
     syncControlsFromActiveCard();
     resizeCanvasViewport();
     scheduleRender();
-    showToast('Valores de fábrica restablecidos', 'info');
+    showToast(t('factoryRestored'), 'info');
 }
 
 function flipCard(cardId, axis = 'h') {
@@ -658,14 +664,14 @@ function flipCard(cardId, axis = 'h') {
         syncControlsFromActiveCard();
         scheduleRender();
         saveHistoryState(`Voltear Ambos ${axis.toUpperCase()}`);
-        showToast(`Ambos carnets: Volteo ${axis === 'h' ? 'Horizontal' : 'Vertical'}`, 'info');
+        showToast(t('flipBoth', { axis: t(axis === 'h' ? 'axisH' : 'axisV') }), 'info');
         return;
     }
     flipSingleCard(cardId, axis);
     syncControlsFromActiveCard();
     scheduleRender();
     saveHistoryState(`Voltear ${axis.toUpperCase()} ${STATE.cards[cardId].name}`);
-    showToast(`${STATE.cards[cardId].name}: Volteo ${axis === 'h' ? 'Horizontal' : 'Vertical'}`, 'info');
+    showToast(t('flipOne', { name: STATE.cards[cardId].name, axis: t(axis === 'h' ? 'axisH' : 'axisV') }), 'info');
 }
 
 function flipSingleCard(cardId, axis = 'h') {
@@ -684,11 +690,11 @@ function resetActiveCardAdjustments() {
         resetCardToFactory('frente');
         resetCardToFactory('dorso');
         saveHistoryState('Restablecer Ambos Carnets');
-        showToast('Ajustes de ambos carnets restablecidos a valores iniciales', 'info');
+        showToast(t('resetBoth'), 'info');
     } else {
         resetCardToFactory(STATE.activeCardId);
         saveHistoryState(`Restablecer ${STATE.cards[STATE.activeCardId].name}`);
-        showToast(`Ajustes de ${STATE.cards[STATE.activeCardId].name} restablecidos`, 'info');
+        showToast(t('resetOne', { name: STATE.cards[STATE.activeCardId].name }), 'info');
     }
     syncControlsFromActiveCard();
     scheduleRender();
@@ -731,6 +737,63 @@ function migrateLegacyStorage() {
     } catch (_) {}
 }
 
+function initAppMode() {
+    const saved = localStorage.getItem('cardpdf-app-mode');
+    STATE.appMode = saved === 'advanced' ? 'advanced' : 'simple';
+    applyAppMode(STATE.appMode, { persist: false, applyLayout: false });
+}
+
+function applyFactoryMetricsKeepImages() {
+    STATE.paper = JSON.parse(JSON.stringify(FACTORY_DEFAULTS.paper));
+    STATE.layout = JSON.parse(JSON.stringify(FACTORY_DEFAULTS.layout));
+    STATE.syncCards = FACTORY_DEFAULTS.syncCards;
+    ['frente', 'dorso'].forEach((id) => {
+        const f = FACTORY_DEFAULTS.cards[id];
+        const card = STATE.cards[id];
+        card.scale = f.scale;
+        card.xMm = f.xMm;
+        card.yMm = f.yMm;
+        card.borderRadiusMm = f.borderRadiusMm;
+        card.filter = f.filter;
+        card.brightness = f.brightness;
+        card.contrast = f.contrast;
+        card.dirty = true;
+    });
+    setupPaperDimensions();
+    updateUIFromState();
+    if (typeof syncControlsFromActiveCard === 'function') syncControlsFromActiveCard();
+}
+
+function applyAppMode(mode, opts = {}) {
+    const persist = opts.persist !== false;
+    const applyLayout = opts.applyLayout !== false;
+    const next = mode === 'advanced' ? 'advanced' : 'simple';
+    const prev = STATE.appMode;
+    STATE.appMode = next;
+    document.body.dataset.appMode = next;
+    if (persist) localStorage.setItem('cardpdf-app-mode', next);
+    document.querySelectorAll('[data-app-mode-btn]').forEach((btn) => {
+        btn.classList.toggle('is-on', btn.getAttribute('data-app-mode-btn') === next);
+    });
+    if (applyLayout) {
+        if (next === 'simple') applyFactoryMetricsKeepImages();
+        else if (prev === 'simple') {
+            loadCustomDefaults();
+            updateUIFromState();
+            if (typeof syncControlsFromActiveCard === 'function') syncControlsFromActiveCard();
+        }
+    }
+    if (next === 'simple' && STATE.mobileView === 'controls') STATE.mobileView = 'canvas';
+    setupResponsiveMobile();
+    resizeCanvasViewport();
+    scheduleRender();
+}
+
+function setAppMode(mode) {
+    if (mode === STATE.appMode) return;
+    applyAppMode(mode);
+}
+
 function initTheme() {
     migrateLegacyStorage();
     const savedTheme = localStorage.getItem('cardpdf-theme');
@@ -763,18 +826,18 @@ function togglePaperTheme() {
     STATE.darkPaper = !STATE.darkPaper;
     updatePaperThemeUI();
     scheduleRender();
-    showToast(STATE.darkPaper ? 'Modo Papel Oscuro activado (anti-deslumbramiento)' : 'Modo Papel Blanco activado', 'info', STATE.darkPaper ? 'moon' : 'sun');
+    showToast(STATE.darkPaper ? t('paperDarkOn') : t('paperLightOn'), 'info', STATE.darkPaper ? 'moon' : 'sun');
 }
 
 function updatePaperThemeUI() {
     if (!DOM.btnTogglePaperTheme) return;
     if (STATE.darkPaper) {
         if (DOM.paperThemeIcon) DOM.paperThemeIcon.innerHTML = SVG_ICONS.sun;
-        if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = 'Papel Blanco';
+        if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = t('paperLight');
         DOM.btnTogglePaperTheme.title = 'Cambiar vista previa a hoja blanca';
     } else {
         if (DOM.paperThemeIcon) DOM.paperThemeIcon.innerHTML = SVG_ICONS.moon;
-        if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = 'Papel Oscuro';
+        if (DOM.paperThemeLabel) DOM.paperThemeLabel.textContent = t('paperDark');
         DOM.btnTogglePaperTheme.title = 'Cambiar vista previa a hoja oscura (anti-deslumbramiento)';
     }
 }
@@ -865,6 +928,12 @@ function setupEventListeners() {
     if (DOM.btnThemeToggleMobile) DOM.btnThemeToggleMobile.addEventListener('click', toggleTheme);
     if (DOM.btnResetAll) DOM.btnResetAll.addEventListener('click', resetAllDefaults);
     if (DOM.btnResetAllMobile) DOM.btnResetAllMobile.addEventListener('click', resetAllDefaults);
+    document.querySelectorAll('[data-app-mode-btn]').forEach((btn) => {
+        btn.addEventListener('click', () => setAppMode(btn.getAttribute('data-app-mode-btn')));
+    });
+    document.querySelectorAll('[data-lang-btn]').forEach((btn) => {
+        btn.addEventListener('click', () => setLang(btn.getAttribute('data-lang-btn')));
+    });
     if (DOM.mobileTabCanvas) DOM.mobileTabCanvas.addEventListener('click', () => setMobileView('canvas'));
     if (DOM.mobileTabControls) DOM.mobileTabControls.addEventListener('click', () => setMobileView('controls'));
     if (DOM.mobileTabExport) DOM.mobileTabExport.addEventListener('click', () => setMobileView('export'));
@@ -942,7 +1011,7 @@ function setupEventListeners() {
     DOM.checkSyncCards.addEventListener('change', (e) => {
         STATE.syncCards = e.target.checked;
         updateCopyButtonVisibility();
-        showToast(STATE.syncCards ? 'Tamaño y filtros se copian entre caras' : 'Cada cara se ajusta por separado', 'info');
+        showToast(STATE.syncCards ? t('syncOn') : t('syncOff'), 'info');
     });
 
     // Plantilla y Papel
@@ -1126,6 +1195,7 @@ function setupEventListeners() {
     if (DOM.btnQuickToSettings) {
         DOM.btnQuickToSettings.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (STATE.appMode === 'simple') return;
             setMobileView('controls');
         });
     }
@@ -1368,7 +1438,7 @@ async function loadFileIntoCard(file, cardId) {
 
     const looksHeic = await fileLooksLikeHeic(file);
     if (!looksHeic && !isSupportedImageFile(file)) {
-        showToast('Usa JPG, PNG, WebP, HEIC u otra imagen.', 'warning');
+        showToast(t('badImage'), 'warning');
         return;
     }
 
@@ -1379,7 +1449,7 @@ async function loadFileIntoCard(file, cardId) {
             return;
         } catch (_) { /* HEIC en Chrome/Firefox no se abre nativo */ }
 
-        showToast('Leyendo HEIC…', 'info');
+        showToast(t('readingHeic'), 'info');
         const jpeg = await convertHeicToJpegBlob(file);
         const img = await loadImageFromUrl(URL.createObjectURL(jpeg));
         applyLoadedImage(img, cardId);
@@ -1438,7 +1508,7 @@ function removeCard(cardId) {
     updateEmptyStateVisibility();
     saveHistoryState(`Eliminar ${card.name}`);
     scheduleRender();
-    showToast(`${card.name} eliminado`, 'info');
+    showToast(t('cardRemoved', { name: card.name }), 'info');
 }
 
 function rotateCard(cardId, angleDeg = 90) {
@@ -1450,14 +1520,14 @@ function rotateCard(cardId, angleDeg = 90) {
         syncControlsFromActiveCard();
         saveHistoryState(`Rotar Ambos ${angleDeg}°`);
         scheduleRender();
-        showToast(`Ambos carnets rotados ${angleDeg}°`, 'info');
+        showToast(t('rotatedBoth', { deg: angleDeg }), 'info');
         return;
     }
     rotateSingleCard(cardId, angleDeg);
     syncControlsFromActiveCard();
     saveHistoryState(`Rotar ${STATE.cards[cardId].name} ${angleDeg}°`);
     scheduleRender();
-    showToast(`${STATE.cards[cardId].name} rotado`, 'info');
+    showToast(t('rotatedOne', { name: STATE.cards[cardId].name }), 'info');
 }
 
 function rotateSingleCard(cardId, angleDeg = 90) {
@@ -1476,7 +1546,7 @@ function rotateSingleCard(cardId, angleDeg = 90) {
 
 function swapCards() {
     if (!STATE.cards.frente.rawImage && !STATE.cards.dorso.rawImage) {
-        showToast('Carga al menos un carnet para intercambiar', 'warning');
+        showToast(t('swapNeed'), 'warning');
         return;
     }
 
@@ -1520,7 +1590,7 @@ function swapCards() {
 
     saveHistoryState('Intercambiar Frente y Dorso');
     scheduleRender();
-    showToast('Frente y Dorso intercambiados', 'success');
+    showToast(t('swapped'), 'success');
 }
 
 function handleGlobalPaste(e) {
@@ -1552,7 +1622,7 @@ function deselectCards() {
         return;
     }
     STATE.selectedCardId = null;
-    if (DOM.selectedCardIndicator) DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
+    if (DOM.selectedCardIndicator) DOM.selectedCardIndicator.textContent = t('dragToMove');
     syncControlsFromActiveCard();
     scheduleRender();
 }
@@ -1712,11 +1782,11 @@ function syncControlsFromActiveCard() {
     updateCopyButtonVisibility();
 
     if (STATE.selectedCardId === 'both') {
-        DOM.selectedCardIndicator.textContent = 'Editando Ambos (Frente + Dorso)';
+        DOM.selectedCardIndicator.textContent = t('editingBoth');
     } else if (STATE.selectedCardId) {
-        DOM.selectedCardIndicator.textContent = `Editando ${STATE.cards[STATE.selectedCardId].name}`;
+        DOM.selectedCardIndicator.textContent = t('editingCard', { name: STATE.cards[STATE.selectedCardId].name });
     } else {
-        DOM.selectedCardIndicator.textContent = 'Arrastra para mover';
+        DOM.selectedCardIndicator.textContent = t('dragToMove');
     }
 
     // Barra Rápida: solo visible si hay un carnet seleccionado en el lienzo
@@ -1730,7 +1800,7 @@ function syncControlsFromActiveCard() {
                     : STATE.cards[STATE.selectedCardId].name;
             }
             if (DOM.quickSelectBothLabel) {
-                DOM.quickSelectBothLabel.textContent = isBoth ? 'Solo Uno' : 'Ambos';
+                DOM.quickSelectBothLabel.textContent = isBoth ? t('onlyOne') : t('both');
             }
             if (DOM.quickScaleLabel) {
                 DOM.quickScaleLabel.textContent = `${card.scale}%`;
@@ -1755,7 +1825,7 @@ function centerCardsHorizontal() {
     syncControlsFromActiveCard();
     saveHistoryState('Centrar Horizontalmente (X=0)');
     scheduleRender();
-    showToast('Centrado en el eje horizontal (X = 0 mm)', 'success', 'flipH');
+    showToast(t('centeredX'), 'success', 'flipH');
 }
 
 function centerCardsVertical() {
@@ -1775,7 +1845,7 @@ function centerCardsVertical() {
     syncControlsFromActiveCard();
     saveHistoryState('Centrar Verticalmente (Eje Y)');
     scheduleRender();
-    showToast('Centrado en el eje vertical (Y óptimo)', 'success', 'flipV');
+    showToast(t('centeredY'), 'success', 'flipV');
 }
 
 function centerCardsBoth() {
@@ -1798,7 +1868,7 @@ function centerCardsBoth() {
     syncControlsFromActiveCard();
     saveHistoryState('Centrar Ambos Ejes (X/Y)');
     scheduleRender();
-    showToast('Centrado en ambos ejes (X e Y)', 'success', 'target');
+    showToast(t('centeredXY'), 'success', 'target');
 }
 
 function centerCard(cardId) {
@@ -1809,11 +1879,11 @@ function toggleSelectBoth() {
     if (STATE.selectedCardId === 'both' || STATE.activeCardId === 'both') {
         STATE.selectedCardId = 'frente';
         setActiveTab('frente');
-        showToast('Editando cara Frente individualmente', 'info');
+        showToast(t('editingFrontOnly'), 'info');
     } else {
         STATE.selectedCardId = 'both';
         setActiveTab('both');
-        showToast('Ambos carnets seleccionados (Frente + Dorso)', 'info', 'cards');
+        showToast(t('bothSelected'), 'info', 'cards');
     }
 }
 
@@ -1906,14 +1976,14 @@ function setupCardControls() {
             }, { mirror: true });
             syncControlsFromActiveCard();
             const filterNames = {
-                normal: 'Original',
-                magic: 'Color Mágico (Fondo blanco y color vivo)',
-                portrait: 'Retrato Vívido (Optimizado para fotos)',
-                sharp_scan: 'Texto Nítido (Microtextos y firmas)',
-                photocopy: 'Fotocopia B/N',
-                contrast_bw: 'B/N Puro (Sin reflejos de plástico)'
+                normal: t('filterOriginal'),
+                magic: t('filterMagic'),
+                portrait: t('filterPortrait'),
+                sharp_scan: t('filterSharp'),
+                photocopy: t('filterCopy'),
+                contrast_bw: t('filterBw')
             };
-            showToast(`Filtro aplicado: ${filterNames[filterMode] || filterMode}`, 'info');
+            showToast(t('filterApplied', { name: filterNames[filterMode] || filterMode }), 'info');
             saveHistoryState(`Filtro ${filterNames[filterMode] || filterMode}`);
             scheduleRender();
         });
@@ -2007,7 +2077,7 @@ function copyActiveCardSettingsToOther() {
 
     saveHistoryState(`Copiar ajustes a ${other.name}`);
     scheduleRender();
-    showToast(`Ajustes copiados de ${current.name} a ${other.name}`, 'success');
+    showToast(t('copiedTo', { from: current.name, to: other.name }), 'success');
 }
 
 function applyCr80Preset() {
@@ -2021,7 +2091,7 @@ function applyCr80Preset() {
     syncControlsFromActiveCard();
     saveHistoryState('Aplicar Estándar CR80');
     scheduleRender();
-    showToast('Ajustado a tamaño estándar de tarjeta de crédito (CR80)', 'success');
+    showToast(t('cr80Applied'), 'success');
 }
 
 function setOrientation(orientation) {
@@ -2093,7 +2163,7 @@ function resetAllDefaults() {
     updateEmptyStateVisibility();
     saveHistoryState('Reiniciar aplicación');
     scheduleRender();
-    showToast('Aplicación reiniciada a nuevo', 'info');
+    showToast(t('appReset'), 'info');
 }
 
 function updateUIFromState() {
@@ -2661,8 +2731,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
                 const yMm = 30 + f.yMm;
                 placeholders.push({
                     cardId: 'frente',
-                    title: 'CARNET FRONTAL (150%)',
-                    sub: 'Toca o haz clic para subir o escanear',
+                    title: t('idFront', { pct: Math.round(f.scale || 150) }),
+                    sub: t('tapUpload'),
                     tag: '85.6 × 54 mm • R5 mm',
                     borderRadiusMm: f.borderRadiusMm || 5,
                     xMm, yMm, wMm, hMm,
@@ -2676,8 +2746,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
                 const yMm = (paperH / 2) + 15 + d.yMm;
                 placeholders.push({
                     cardId: 'dorso',
-                    title: 'CARNET DORSO (150%)',
-                    sub: 'Toca o haz clic para subir o escanear',
+                    title: t('idBack', { pct: Math.round(d.scale || 150) }),
+                    sub: t('tapUpload'),
                     tag: '85.6 × 54 mm • R5 mm',
                     borderRadiusMm: d.borderRadiusMm || 5,
                     xMm, yMm, wMm, hMm,
@@ -2693,8 +2763,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
                 const yMm = (paperH - hMm) / 2 + f.yMm;
                 placeholders.push({
                     cardId: 'frente',
-                    title: 'CARNET FRONTAL (150%)',
-                    sub: 'Toca o haz clic para subir o escanear',
+                    title: t('idFront', { pct: Math.round(f.scale || 150) }),
+                    sub: t('tapUpload'),
                     tag: '85.6 × 54 mm • R5 mm',
                     borderRadiusMm: f.borderRadiusMm || 5,
                     xMm, yMm, wMm, hMm,
@@ -2708,8 +2778,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
                 const yMm = (paperH - hMm) / 2 + d.yMm;
                 placeholders.push({
                     cardId: 'dorso',
-                    title: 'CARNET DORSO (150%)',
-                    sub: 'Toca o haz clic para subir o escanear',
+                    title: t('idBack', { pct: Math.round(d.scale || 150) }),
+                    sub: t('tapUpload'),
                     tag: '85.6 × 54 mm • R5 mm',
                     borderRadiusMm: d.borderRadiusMm || 5,
                     xMm, yMm, wMm, hMm,
@@ -2725,8 +2795,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
             const yMm = (paperH - hMm) / 2 + f.yMm;
             placeholders.push({
                 cardId: 'frente',
-                title: 'CARNET FRONTAL (150%)',
-                sub: 'Toca o haz clic para subir o escanear',
+                title: t('idFront', { pct: Math.round(f.scale || 150) }),
+                sub: t('tapUpload'),
                 tag: '85.6 × 54 mm • R5 mm',
                 borderRadiusMm: f.borderRadiusMm || 5,
                 xMm, yMm, wMm, hMm,
@@ -2741,8 +2811,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
             const yMm = (paperH - hMm) / 2 + d.yMm;
             placeholders.push({
                 cardId: 'dorso',
-                title: 'CARNET DORSO (150%)',
-                sub: 'Toca o haz clic para subir o escanear',
+                title: t('idBack', { pct: Math.round(d.scale || 150) }),
+                sub: t('tapUpload'),
                 tag: '85.6 × 54 mm • R5 mm',
                 borderRadiusMm: d.borderRadiusMm || 5,
                 xMm, yMm, wMm, hMm,
@@ -2757,8 +2827,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
             const yMm = 15 + f.yMm;
             placeholders.push({
                 cardId: 'frente',
-                title: 'CARNET FRONTAL (150%)',
-                sub: 'Toca o haz clic para subir o escanear',
+                title: t('idFront', { pct: Math.round(f.scale || 150) }),
+                sub: t('tapUpload'),
                 tag: '85.6 × 54 mm • R5 mm',
                 borderRadiusMm: f.borderRadiusMm || 5,
                 xMm, yMm, wMm, hMm,
@@ -2772,8 +2842,8 @@ function getBlueprintPlaceholders(mmToPx, canvasWidth, canvasHeight) {
             const yMm = 15 + d.yMm;
             placeholders.push({
                 cardId: 'dorso',
-                title: 'CARNET DORSO (150%)',
-                sub: 'Toca o haz clic para subir o escanear',
+                title: t('idBack', { pct: Math.round(d.scale || 150) }),
+                sub: t('tapUpload'),
                 tag: '85.6 × 54 mm • R5 mm',
                 borderRadiusMm: d.borderRadiusMm || 5,
                 xMm, yMm, wMm, hMm,
@@ -3299,7 +3369,7 @@ function toggleSnap() {
     DOM.btnToggleSnap.className = STATE.snapEnabled
         ? 'p-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80'
         : 'p-1 rounded text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800';
-    showToast(STATE.snapEnabled ? 'Guías magnéticas activadas' : 'Guías magnéticas desactivadas', 'info');
+    showToast(STATE.snapEnabled ? t('snapOn') : t('snapOff'), 'info');
 }
 
 function updateZoomLabel() {
@@ -3329,7 +3399,7 @@ function resetZoomTo100() {
     updateZoomLabel();
     resizeCanvasViewport();
     scheduleRender();
-    showToast('Zoom al 100%', 'info');
+    showToast(t('zoomReset'), 'info');
 }
 
 function toggleCanvasFullscreen(forceState) {
@@ -3343,7 +3413,7 @@ function toggleCanvasFullscreen(forceState) {
         DOM.zoomFitIcon.innerHTML = isFullscreen ? SVG_ICONS.minimize : SVG_ICONS.maximize;
     }
     if (DOM.zoomFitLabel) {
-        DOM.zoomFitLabel.textContent = isFullscreen ? 'Restaurar' : 'Maximizar';
+        DOM.zoomFitLabel.textContent = isFullscreen ? t('restore') : t('maximize');
     }
     if (DOM.btnZoomFit) {
         DOM.btnZoomFit.title = isFullscreen ? 'Restaurar vista y zoom al 100%' : 'Expandir hoja a pantalla completa';
@@ -3352,9 +3422,9 @@ function toggleCanvasFullscreen(forceState) {
     if (!isFullscreen) {
         STATE.zoom = 1.0;
         updateZoomLabel();
-        showToast('Vista restaurada al 100%', 'info');
+        showToast(t('viewRestored'), 'info');
     } else {
-        showToast('Hoja completa. Restaurar vuelve al 100%', 'info');
+        showToast(t('sheetFull'), 'info');
     }
 
     setTimeout(() => {
@@ -3407,7 +3477,7 @@ function undo() {
 
     updateHistoryButtons();
     scheduleRender();
-    showToast(`Deshecho: ${prevState.actionName || ''}`, 'info');
+    showToast(t('undone', { name: prevState.actionName || '' }), 'info');
 }
 
 function redo() {
@@ -3423,7 +3493,7 @@ function redo() {
 
     updateHistoryButtons();
     scheduleRender();
-    showToast(`Rehecho: ${nextState.actionName || ''}`, 'info');
+    showToast(t('redone', { name: nextState.actionName || '' }), 'info');
 }
 
 function applySnapshot(snap) {
@@ -3511,13 +3581,13 @@ function cycleLoupeZoom() {
     else if (cur < 2.5) next = 3.0;
     else next = 1.0;
     setLoupeZoom(next);
-    showToast(`Lupa: aumento ${next}X`, 'info', 'search');
+    showToast(t('loupeZoom', { n: next }), 'info', 'search');
 }
 
 function openCropModal(cardId, options = {}) {
     const card = STATE.cards[cardId];
     if (!card || (!card.rawImage && !card.croppedCanvas)) {
-        showToast('Carga o escanea una imagen primero para recortarla.', 'warning');
+        showToast(t('cropNeedImage'), 'warning');
         return;
     }
 
@@ -3641,7 +3711,7 @@ function rotateCrop90(angleDelta = 90) {
     }
 
     drawCropCanvas();
-    showToast(`Giro de 90° aplicado (${cropState.rotation90}°)`, 'info');
+    showToast(t('rotated90', { deg: cropState.rotation90 }), 'info');
 }
 
 function setFineCropAngle(angleDeg) {
@@ -4309,10 +4379,10 @@ function detectDocumentBounds() {
             w: detectedW,
             h: detectedH
         };
-        showToast('Contorno de carnet detectado', 'success', 'target');
+        showToast(t('outlineFound'), 'success', 'target');
     } else {
         resetBoxAndQuadBounds();
-        showToast('Encuadre estándar CR80 centrado', 'info');
+        showToast(t('cr80Centered'), 'info');
     }
 
     drawCropCanvas();
@@ -4918,13 +4988,13 @@ function detectDocumentQuad(showNotification = true) {
 
     if (best && bestScore >= 0.18) {
         applyDetectedQuad(best, cw, ch, sw, sh);
-        if (showNotification) showToast('Esquinas del carnet ajustadas al borde', 'success', 'target');
+        if (showNotification) showToast(t('cornersSnapped'), 'success', 'target');
         drawCropCanvas();
         return;
     }
 
     resetQuadPoints();
-    if (showNotification) showToast('No se vio un borde claro. Ajusta las esquinas a mano', 'info', 'ruler');
+    if (showNotification) showToast(t('noEdge'), 'info', 'ruler');
     drawCropCanvas();
 }
 
@@ -5098,7 +5168,7 @@ function applyCroppedResult() {
     updateDropzoneUI(cropState.cardId, croppedCanvas.toDataURL('image/jpeg', 0.94));
     saveHistoryState(`Recortar & Enderezar ${card.name}`);
     scheduleRender();
-    showToast(`${card.name} recortado al 150% y radio de 5 mm`, 'success');
+    showToast(t('cropped', { name: card.name }), 'success');
 
     if (cropState.cardId === 'frente' && !STATE.cards.dorso.rawImage) {
         setTimeout(() => {
@@ -5213,13 +5283,13 @@ function startCameraStream() {
     }).catch(err => {
         console.error('Error abriendo cámara:', err);
         closeCameraModal();
-        showToast('No se pudo acceder a la cámara o no diste permiso.', 'warning');
+        showToast(t('noCamera'), 'warning');
     });
 }
 
 function switchCameraFacingMode() {
     cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
-    showToast(cameraFacingMode === 'environment' ? 'Cámara Trasera activa' : 'Cámara Frontal activa', 'info');
+    showToast(cameraFacingMode === 'environment' ? t('camRear') : t('camFront'), 'info');
     startCameraStream();
 }
 
@@ -5328,7 +5398,7 @@ function autoProcessCardFromImage(cardId, sourceImg) {
     saveHistoryState(`Auto-escaneo ${card.name} (150% CR80 centrado)`);
     scheduleRender();
 
-    showToast(`${card.name} enderezado y centrado al 150% automáticamente`, 'success', 'sparkle');
+    showToast(t('autoStraight', { name: card.name }), 'success', 'sparkle');
 
     // En móvil, cambiar a la vista de la hoja para ver el resultado
     if (window.innerWidth < 1024) {
@@ -5400,7 +5470,7 @@ function captureCameraPhoto() {
 async function generateAndDownload() {
     const hasAnyImage = !!(STATE.cards.frente.rawImage || STATE.cards.dorso.rawImage);
     if (!hasAnyImage) {
-        showToast('Por favor sube al menos una imagen de carnet antes de exportar.', 'warning');
+        showToast(t('needImageExport'), 'warning');
         return;
     }
 
@@ -5425,11 +5495,11 @@ async function generateAndDownload() {
             hideLoader();
             triggerSuccessCelebration();
             const sizeNote = result && result.bytes ? ` (${formatFileSize(result.bytes)})` : '';
-            showToast(`Documento ${format.toUpperCase()} descargado${sizeNote}`, 'success');
+            showToast(t('downloaded', { format: format.toUpperCase(), size: sizeNote || '' }), 'success');
         } catch (err) {
             console.error('Error al exportar:', err);
             hideLoader();
-            showToast('Ocurrió un error al generar el archivo.', 'error');
+            showToast(t('exportError'), 'error');
         }
     }, 120);
 }
@@ -5707,11 +5777,11 @@ async function copyToClipboard() {
             await navigator.clipboard.write([
                 new ClipboardItem({ 'image/png': blob })
             ]);
-            showToast('¡Hoja copiada al portapapeles!', 'success');
+            showToast(t('copiedSheet'), 'success');
         });
     } catch (err) {
         console.error('Error al copiar al portapapeles:', err);
-        showToast('No se pudo copiar al portapapeles en este navegador.', 'warning');
+        showToast(t('copyFail'), 'warning');
     }
 }
 
@@ -5750,8 +5820,8 @@ function showToast(message, type = 'info', iconName = null) {
 }
 
 function showLoader(title, subtitle) {
-    DOM.loaderTitle.textContent = title || 'Procesando...';
-    DOM.loaderSubtitle.textContent = subtitle || 'Por favor espera';
+    DOM.loaderTitle.textContent = title || t('processing');
+    DOM.loaderSubtitle.textContent = subtitle || t('pleaseWait');
     DOM.loaderOverlay.classList.remove('hidden');
 }
 

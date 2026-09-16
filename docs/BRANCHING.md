@@ -20,8 +20,9 @@ Worktrees: `.worktrees/cursor`, `.worktrees/antigravity`, `.worktrees/claude`, `
 
 1. Lee `docs/START.md`.
 2. Identifícate y entra a **tu** rama / worktree. Créala desde `origin/main` si no existe.
-3. No preguntes “¿en qué rama trabajo?”. Ya está definida.
-4. Si ves suciedad o un merge a medias de otra IA: no lo toques.
+3. Lee `docs/TASKS.md` (solo `pending`).
+4. No preguntes “¿en qué rama trabajo?”. Ya está definida.
+5. Si ves suciedad o un merge a medias de otra IA: no lo toques.
 
 ## Prohibido
 
