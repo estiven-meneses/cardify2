@@ -76,7 +76,7 @@ const STATE = JSON.parse(JSON.stringify(FACTORY_DEFAULTS));
 STATE.activeCardId = 'frente';
 STATE.selectedCardId = null;
 STATE.snapEnabled = true;
-STATE.zoom = 1.0;
+STATE.zoom = defaultSheetZoom();
 STATE.theme = 'light';
 STATE.darkPaper = false;
 STATE.mobileView = 'canvas'; // 'canvas' | 'controls' | 'export'
@@ -389,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSheetZoomWheel();
     updateUIFromState();
     setupResponsiveMobile();
+    updateZoomLabel();
     resizeCanvasViewport();
     saveHistoryState('Inicial');
     scheduleRender();
@@ -3388,6 +3389,10 @@ function toggleSnap() {
     showToast(STATE.snapEnabled ? t('snapOn') : t('snapOff'), 'info');
 }
 
+function defaultSheetZoom() {
+    return window.innerWidth < 1024 ? 0.85 : 1.0;
+}
+
 function updateZoomLabel() {
     if (DOM.zoomLevelLabel) DOM.zoomLevelLabel.textContent = `${Math.round(STATE.zoom * 100)}%`;
 }
@@ -3411,11 +3416,11 @@ function changeZoom(delta) {
 }
 
 function resetZoomTo100() {
-    STATE.zoom = 1.0;
+    STATE.zoom = defaultSheetZoom();
     updateZoomLabel();
     resizeCanvasViewport();
     scheduleRender();
-    showToast(t('zoomReset'), 'info');
+    showToast(t('zoomReset', { pct: Math.round(STATE.zoom * 100) }), 'info');
 }
 
 function toggleCanvasFullscreen(forceState) {
@@ -3436,11 +3441,11 @@ function toggleCanvasFullscreen(forceState) {
     }
 
     if (!isFullscreen) {
-        STATE.zoom = 1.0;
+        STATE.zoom = defaultSheetZoom();
         updateZoomLabel();
-        showToast(t('viewRestored'), 'info');
+        showToast(t('viewRestored', { pct: Math.round(STATE.zoom * 100) }), 'info');
     } else {
-        showToast(t('sheetFull'), 'info');
+        showToast(t('sheetFull', { pct: Math.round(defaultSheetZoom() * 100) }), 'info');
     }
 
     setTimeout(() => {
