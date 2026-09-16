@@ -13,8 +13,8 @@ Identifícate por el producto (Cursor vs Codex). Claude lee `CLAUDE.md`. Anti-Gr
 
 **Sincroniza siempre:** `git fetch origin && git merge origin/main` al empezar, antes de commitear y cuando otra IA haya mezclado. `main` se mueve mientras trabajas. Mezclar `origin/main` a tu rama sí; la rama de otra IA nunca.
 
-- `main` no se edita. Mezcla **solo** si Estiven lo pide. Después se borran esas features.
-- Claude/Codex: zona la que Estiven asigne. Cursor no toca carga/perspectiva. Anti-Gravity no toca barra/zoom/iconos.
+- `main` no se edita a mano: integras ahí tu rama cuando compile y esté probada.
+- Claude/Codex: la zona del encargo. Cursor no toca carga/perspectiva. Anti-Gravity no toca barra/zoom/iconos.
 
 También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md` y `docs/LOGS.md`.
 
@@ -32,6 +32,6 @@ CardPDF es **app**, no web. Celular = iPhone (Hoja / Ajustes / Salida). Escritor
 - Cero emojis en UI. SVG propio.
 - Cero botones o textos duplicados en la misma pantalla.
 - No agregues framework, backend ni dependencias en un parche.
-- Deploy: Vercel. Supabase solo si Estiven lo pide.
+- Deploy: Vercel (`npm run build` a `dist/`). Supabase opcional: sin variables de entorno la app corre 100% en el cliente.
 - Commit/push solo con pedido explícito. Nunca push a `main` salvo la mezcla pedida.
 - No subas fotos ni datos personales.

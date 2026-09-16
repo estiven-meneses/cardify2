@@ -94,21 +94,21 @@ Plan de trabajo estructurado en **dos bloques independientes** para atender con 
 ## Proposed Changes
 
 ### Bloque 1
-- `[NEW]` [GEMINI.md](file:///Users/estivenmeneses/vsCode/personal/cardpdf/GEMINI.md)
+- `[NEW]` [GEMINI.md](GEMINI.md)
 - `[DELETE]` `recursos/carnet confa 1.png` y `recursos/carnet confa 2.png`
-- `[MODIFY]` [index.html](file:///Users/estivenmeneses/vsCode/personal/cardpdf/index.html)
-- `[MODIFY]` [script.js](file:///Users/estivenmeneses/vsCode/personal/cardpdf/script.js)
+- `[MODIFY]` [index.html](index.html)
+- `[MODIFY]` [src/legacy/app.js](src/legacy/app.js)
 
 ### Bloque 2
-- `[MODIFY]` [index.html](file:///Users/estivenmeneses/vsCode/personal/cardpdf/index.html)
-- `[MODIFY]` [script.js](file:///Users/estivenmeneses/vsCode/personal/cardpdf/script.js)
+- `[MODIFY]` [index.html](index.html)
+- `[MODIFY]` [src/legacy/app.js](src/legacy/app.js)
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- Validación de sintaxis JavaScript: `node --check script.js`.
+- Validación de sintaxis JavaScript: `npm run build`.
 - Verificación de ausencia de emojis residuales en el código: script regex de búsqueda.
 
 ### Manual Verification

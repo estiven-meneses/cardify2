@@ -20,7 +20,7 @@ Contéstales en silencio (y al usuario solo si hay duda real):
 
 ## Estructura y orden
 
-- Un archivo = una responsabilidad. No sigas hinchando `script.js` ni `index.html` si el cambio es un módulo nuevo.
+- Un archivo = una responsabilidad. No sigas hinchando `src/legacy/app.js` ni `index.html`: si el cambio es un módulo nuevo, créalo en `src/`.
 - Nombres en español para copy de UI; en inglés para IDs, funciones y archivos (`deselectCards`, `viewport-scroller`).
 - Funciones pequeñas, con nombre que diga qué hacen. Cero comentarios que repitan el código.
 - No dejes código muerto, `console.log` ni TODOs eternos.
@@ -43,7 +43,7 @@ Contéstales en silencio (y al usuario solo si hay duda real):
 |---|---|---|
 | Carga, cámara, recorte inmediato, blueprint, reset total | `loadFileIntoCard`, `captureCameraPhoto`, `detectDocumentQuad` | Anti-Gravity (`feature/antigravity`) |
 | Barra rápida, deselección, zoom/scroll, iconos, logs, shell | `#canvas-quick-bar`, `deselectCards`, `#viewport-scroller` | Cursor (`feature/cursor`) |
-| Lo que Estiven asigne en el chat | — | Claude (`feature/claude`), Codex (`feature/codex`) |
+| La del encargo del chat | — | Claude (`feature/claude`), Codex (`feature/codex`) |
 | Homografía / perspectiva / lupa | `openCropModal`, `warpQuadToRectangle`, `cropState` | No reescribir “de paso” |
 
 Si tu tarea es de una zona, no “aprovechas” para rehacer la otra.
@@ -56,18 +56,21 @@ Si tu tarea es de una zona, no “aprovechas” para rehacer la otra.
 
 ## Hosting y backend
 
-- Hoy es **100% frontend**. No metas backend, auth ni base de datos sin que Estiven lo pida.
-- Deploy previsto: **Vercel** (estático o Vite). No asumas Netlify como requisito.
-- **Supabase** solo si pide cuentas, plantillas en la nube o historial. Hasta entonces, `localStorage` está bien.
+- **Vite + TypeScript**, con React para las superficies nuevas. El lienzo y el
+  recorte siguen en `src/legacy/`, sin tipar todavía.
+- Deploy: **Vercel**, build `npm run build` a `dist/`. No hay nada de Netlify.
+- `api/logs.js` recoge los errores del cliente en producción (ver `docs/LOGS.md`).
+- **Supabase** para login y fotos privadas. Sin las variables de entorno la app
+  corre igual, 100% en el cliente: el backend es opcional, no obligatorio.
 
 ## Git y varias IAs (léete `docs/START.md` y `docs/BRANCHING.md`)
 
 - Al primer turno: entra a tu rama. Cursor `feature/cursor`. Anti-Gravity `feature/antigravity`. Claude `feature/claude`. Codex `feature/codex`.
 - Créala desde `origin/main` si no existe. Usa tu worktree en `.worktrees/<id>`.
-- `main` no se edita. Mezcla **solo** si Estiven lo pide. Después se borran esas features.
+- `main` no se edita a mano: se llega ahí integrando tu rama ya verificada.
 - **Prohibido** merge/rebase entre features hermanas.
 - Si no estás en tu rama, cámbiate. No “arregles” un conflicto de la otra.
-- Commit y push **solo si lo pide**. Nunca push a `main` salvo la mezcla pedida.
+- Commitea y pushea tu rama al terminar. A `main` se llega con merge, nunca editándola.
 - No force-push a `main` ni a la rama ajena. No `--no-verify`.
 - Mensajes cortos, estilo del repo: el *por qué*, no el listado de archivos.
 
