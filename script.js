@@ -67,6 +67,7 @@ const FACTORY_DEFAULTS = {
     },
     exportFormat: 'pdf',
     exportDpi: 300,
+    exportLight: false,
 };
 
 // Estado mutable actual
@@ -205,6 +206,9 @@ const DOM = {
     // Exportación
     exportFormatSelect: document.getElementById('export-format-select'),
     exportDpiSelect: document.getElementById('export-dpi-select'),
+    exportDpiWrap: document.getElementById('export-dpi-wrap'),
+    exportFields: document.getElementById('export-fields'),
+    checkExportLight: document.getElementById('check-export-light'),
     btnGenerateDownload: document.getElementById('btn-generate-download'),
     btnGenerateText: document.getElementById('btn-generate-text'),
     btnDirectPrint: document.getElementById('btn-direct-print'),
@@ -375,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveHistoryState('Inicial');
     scheduleRender();
     syncConfigTelemetry('init');
+    preloadHeicDecoder();
 });
 
 window.addEventListener('resize', () => {
@@ -524,6 +529,7 @@ function syncConfigTelemetry(trigger = 'live') {
             },
             exportFormat: STATE.exportFormat,
             exportDpi: STATE.exportDpi,
+            exportLight: !!STATE.exportLight,
             savedCustom: customSaved ? JSON.parse(customSaved) : null
         };
         fetch('/__sync_defaults__?payload=' + encodeURIComponent(JSON.stringify(payload))).catch(() => {});
@@ -567,7 +573,8 @@ function saveCustomDefaults() {
             }
         },
         exportFormat: STATE.exportFormat,
-        exportDpi: STATE.exportDpi
+        exportDpi: STATE.exportDpi,
+        exportLight: !!STATE.exportLight
     };
 
     localStorage.setItem('cardify-custom-defaults', JSON.stringify(customConfig));
@@ -588,6 +595,7 @@ function loadCustomDefaults() {
         if (config.syncCards !== undefined) STATE.syncCards = config.syncCards;
         if (config.exportFormat) STATE.exportFormat = config.exportFormat;
         if (config.exportDpi) STATE.exportDpi = config.exportDpi;
+        if (config.exportLight !== undefined) STATE.exportLight = !!config.exportLight;
 
         if (config.cards) {
             ['frente', 'dorso'].forEach(key => {
@@ -915,8 +923,17 @@ function setupEventListeners() {
     setupCardControls();
 
     // Exportación
-    DOM.exportFormatSelect.addEventListener('change', (e) => STATE.exportFormat = e.target.value);
+    DOM.exportFormatSelect.addEventListener('change', (e) => {
+        STATE.exportFormat = e.target.value;
+        updateExportOptionsUI();
+    });
     DOM.exportDpiSelect.addEventListener('change', (e) => STATE.exportDpi = parseInt(e.target.value, 10));
+    if (DOM.checkExportLight) {
+        DOM.checkExportLight.addEventListener('change', (e) => {
+            STATE.exportLight = e.target.checked;
+            updateExportOptionsUI();
+        });
+    }
     DOM.btnGenerateDownload.addEventListener('click', generateAndDownload);
     DOM.btnDirectPrint.addEventListener('click', directPrintDocument);
     DOM.btnCopyClipboard.addEventListener('click', copyToClipboard);
@@ -1087,28 +1104,44 @@ function setupDropzone(dropzoneEl, inputEl, cardId) {
 }
 
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1', 'miaf']);
+const HEIC_TO_URLS = [
+    'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js',
+    'https://unpkg.com/heic-to@1.5.2/dist/iife/heic-to.js'
+];
+const HEIC2ANY_URLS = [
+    'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js'
+];
+let heicToLoader = null;
 let heic2anyLoader = null;
 
 function isHeicFile(file) {
     const type = (file.type || '').toLowerCase();
     const name = (file.name || '').toLowerCase();
     return type.includes('heic') || type.includes('heif')
-        || name.endsWith('.heic') || name.endsWith('.heif');
+        || /\.(heic|heif|heics|hif)$/i.test(name);
 }
 
 function isSupportedImageFile(file) {
     if (!file) return false;
     if (isHeicFile(file)) return true;
     if ((file.type || '').startsWith('image/')) return true;
-    return /\.(jpe?g|png|webp|gif|bmp|tiff?|avif)$/i.test(file.name || '');
+    return /\.(jpe?g|jfif|png|webp|gif|bmp|tiff?|avif|heic|heif|hif)$/i.test(file.name || '');
+}
+
+function canDecodeHeicNative() {
+    const ua = navigator.userAgent;
+    return /Safari/i.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox|Android/i.test(ua);
 }
 
 async function fileLooksLikeHeic(file) {
     if (isHeicFile(file)) return true;
-    if (file.type) return false;
     try {
-        const buf = await file.slice(4, 12).arrayBuffer();
-        const brand = String.fromCharCode(...new Uint8Array(buf).slice(4, 8)).toLowerCase();
+        const buf = await file.slice(0, 16).arrayBuffer();
+        const u8 = new Uint8Array(buf);
+        const tag = String.fromCharCode(u8[4], u8[5], u8[6], u8[7]);
+        if (tag !== 'ftyp') return false;
+        const brand = String.fromCharCode(u8[8], u8[9], u8[10], u8[11]).toLowerCase();
         return HEIC_BRANDS.has(brand);
     } catch (_) {
         return false;
@@ -1118,45 +1151,129 @@ async function fileLooksLikeHeic(file) {
 function loadImageFromUrl(src) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve(img);
+        img.onload = () => {
+            if (!img.width || !img.height) reject(new Error('decode'));
+            else resolve(img);
+        };
         img.onerror = () => reject(new Error('decode'));
         img.src = src;
     });
 }
 
-function ensureHeic2Any() {
-    if (typeof window.heic2any === 'function') return Promise.resolve(window.heic2any);
-    if (heic2anyLoader) return heic2anyLoader;
-    heic2anyLoader = new Promise((resolve, reject) => {
+function loadScriptOnce(src, isReady) {
+    return new Promise((resolve, reject) => {
+        if (typeof isReady === 'function' && isReady()) return resolve();
+        const existing = document.querySelector(`script[data-cardify-src="${src}"]`);
+        if (existing) {
+            if (typeof isReady === 'function' && isReady()) return resolve();
+            existing.addEventListener('load', () => resolve());
+            existing.addEventListener('error', () => reject(new Error('script')));
+            return;
+        }
         const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+        script.src = src;
         script.async = true;
-        script.onload = () => {
-            if (typeof window.heic2any === 'function') resolve(window.heic2any);
-            else reject(new Error('heic2any'));
-        };
-        script.onerror = () => reject(new Error('heic2any'));
+        script.dataset.cardifySrc = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('script'));
         document.head.appendChild(script);
+    });
+}
+
+function getHeicToFn() {
+    const api = window.HeicTo;
+    if (typeof api === 'function') return api;
+    if (api && typeof api.heicTo === 'function') return api.heicTo;
+    return null;
+}
+
+function preloadHeicDecoder() {
+    const run = () => { ensureHeicTo().catch(() => {}); };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 4000 });
+    else setTimeout(run, 800);
+}
+
+async function ensureHeicTo() {
+    const existing = getHeicToFn();
+    if (existing) return existing;
+    if (heicToLoader) return heicToLoader;
+    heicToLoader = (async () => {
+        let lastErr = null;
+        for (const url of HEIC_TO_URLS) {
+            try {
+                await loadScriptOnce(url, () => !!getHeicToFn());
+                const fn = getHeicToFn();
+                if (fn) return fn;
+            } catch (err) {
+                lastErr = err;
+            }
+        }
+        throw lastErr || new Error('HeicTo');
+    })().catch((err) => {
+        heicToLoader = null;
+        throw err;
+    });
+    return heicToLoader;
+}
+
+async function ensureHeic2Any() {
+    if (typeof window.heic2any === 'function') return window.heic2any;
+    if (heic2anyLoader) return heic2anyLoader;
+    heic2anyLoader = (async () => {
+        let lastErr = null;
+        for (const url of HEIC2ANY_URLS) {
+            try {
+                await loadScriptOnce(url, () => typeof window.heic2any === 'function');
+                if (typeof window.heic2any === 'function') return window.heic2any;
+            } catch (err) {
+                lastErr = err;
+            }
+        }
+        throw lastErr || new Error('heic2any');
+    })().catch((err) => {
+        heic2anyLoader = null;
+        throw err;
     });
     return heic2anyLoader;
 }
 
-async function convertHeicToJpegBlob(file) {
-    try {
-        const bitmap = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        canvas.getContext('2d').drawImage(bitmap, 0, 0);
-        if (bitmap.close) bitmap.close();
-        const nativeBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
-        if (nativeBlob) return nativeBlob;
-    } catch (_) { /* Chrome y Firefox no decodifican HEIC de forma nativa */ }
+async function jpegBlobFromBitmap(source) {
+    const bitmap = await createImageBitmap(source);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    if (bitmap.close) bitmap.close();
+    const nativeBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (nativeBlob && nativeBlob.size > 32) return nativeBlob;
+    throw new Error('bitmap');
+}
 
-    const heic2any = await ensureHeic2Any();
-    let converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
-    if (Array.isArray(converted)) converted = converted[0];
-    return converted;
+async function convertHeicToJpegBlob(file) {
+    const blob = file instanceof Blob ? file : new Blob([await file.arrayBuffer()]);
+
+    try {
+        return await jpegBlobFromBitmap(blob);
+    } catch (_) { /* Chrome/Firefox no decodifican HEIC nativo */ }
+
+    try {
+        const HeicTo = await ensureHeicTo();
+        const out = await HeicTo({ blob, type: 'image/jpeg', quality: 0.92 });
+        if (out) return out;
+    } catch (err) {
+        console.warn('HEIC HeicTo:', err);
+    }
+
+    try {
+        const heic2any = await ensureHeic2Any();
+        let converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.92 });
+        if (Array.isArray(converted)) converted = converted[0];
+        if (converted) return converted;
+    } catch (err) {
+        console.warn('HEIC heic2any:', err);
+    }
+
+    throw new Error('heic');
 }
 
 function applyLoadedImage(img, cardId) {
@@ -1180,24 +1297,25 @@ async function loadFileIntoCard(file, cardId) {
 
     const looksHeic = await fileLooksLikeHeic(file);
     if (!looksHeic && !isSupportedImageFile(file)) {
-        showToast('Selecciona una imagen (JPG, PNG, WebP o HEIC).', 'warning');
+        showToast('Usa JPG, PNG, WebP, HEIC u otra imagen.', 'warning');
         return;
     }
 
     try {
-        let source = file;
-        if (looksHeic) {
-            showToast('Leyendo HEIC…', 'info');
-            source = await convertHeicToJpegBlob(file);
-            if (!source) throw new Error('heic');
-        }
+        try {
+            const img = await loadImageFromUrl(URL.createObjectURL(file));
+            applyLoadedImage(img, cardId);
+            return;
+        } catch (_) { /* HEIC en Chrome/Firefox no se abre nativo */ }
 
-        const url = URL.createObjectURL(source);
-        const img = await loadImageFromUrl(url);
+        showToast('Leyendo HEIC…', 'info');
+        const jpeg = await convertHeicToJpegBlob(file);
+        const img = await loadImageFromUrl(URL.createObjectURL(jpeg));
         applyLoadedImage(img, cardId);
     } catch (err) {
+        console.error('Carga de imagen:', err);
         showToast(looksHeic
-            ? 'No se pudo leer el HEIC. Intenta de nuevo o usa JPG/PNG.'
+            ? 'No se pudo leer el HEIC. Recarga e intenta otra vez.'
             : 'No se pudo abrir esa imagen.', 'error');
     }
 }
@@ -1902,6 +2020,10 @@ function updateUIFromState() {
     DOM.checkCutLines.checked = STATE.layout.showCutLines;
     DOM.checkCardBorder.checked = STATE.layout.showBorder;
     DOM.checkSyncCards.checked = STATE.syncCards;
+    if (DOM.exportFormatSelect) DOM.exportFormatSelect.value = STATE.exportFormat;
+    if (DOM.exportDpiSelect) DOM.exportDpiSelect.value = String(STATE.exportDpi);
+    if (DOM.checkExportLight) DOM.checkExportLight.checked = !!STATE.exportLight;
+    updateExportOptionsUI();
     setActiveTab(STATE.activeCardId);
     syncControlsFromActiveCard();
 }
@@ -4072,105 +4194,613 @@ function detectDocumentBounds() {
     drawCropCanvas();
 }
 
+function convexHullPoints(points) {
+    if (points.length < 3) return points.slice();
+    const pts = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lower = [];
+    for (const p of pts) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+        lower.push(p);
+    }
+    const upper = [];
+    for (let i = pts.length - 1; i >= 0; i--) {
+        const p = pts[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+        upper.push(p);
+    }
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
+}
+
+function orderQuadCorners(pts) {
+    let tl = pts[0], tr = pts[0], br = pts[0], bl = pts[0];
+    let minTL = Infinity, maxTR = -Infinity, maxBR = -Infinity, minBL = Infinity;
+    for (const p of pts) {
+        const sum = p.x + p.y;
+        const diff = p.x - p.y;
+        if (sum < minTL) { minTL = sum; tl = p; }
+        if (diff > maxTR) { maxTR = diff; tr = p; }
+        if (sum > maxBR) { maxBR = sum; br = p; }
+        if (diff < minBL) { minBL = diff; bl = p; }
+    }
+    return { tl: { ...tl }, tr: { ...tr }, br: { ...br }, bl: { ...bl } };
+}
+
+function minAreaRectCorners(hull) {
+    if (hull.length < 3) return null;
+    let best = null;
+    const n = hull.length;
+    for (let i = 0; i < n; i++) {
+        const a = hull[i];
+        const b = hull[(i + 1) % n];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const ux = dx / len;
+        const uy = dy / len;
+        const vx = -uy;
+        const vy = ux;
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        for (const p of hull) {
+            const u = p.x * ux + p.y * uy;
+            const v = p.x * vx + p.y * vy;
+            if (u < minU) minU = u;
+            if (u > maxU) maxU = u;
+            if (v < minV) minV = v;
+            if (v > maxV) maxV = v;
+        }
+        const area = (maxU - minU) * (maxV - minV);
+        if (!best || area < best.area) best = { area, minU, maxU, minV, maxV, ux, uy, vx, vy };
+    }
+    const corner = (u, v) => ({ x: u * best.ux + v * best.vx, y: u * best.uy + v * best.vy });
+    return orderQuadCorners([
+        corner(best.minU, best.minV),
+        corner(best.maxU, best.minV),
+        corner(best.maxU, best.maxV),
+        corner(best.minU, best.maxV)
+    ]);
+}
+
+function leastSquaresLine(points) {
+    if (!points || points.length < 2) return null;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    const n = points.length;
+    for (const p of points) {
+        sx += p.x;
+        sy += p.y;
+        sxx += p.x * p.x;
+        sxy += p.x * p.y;
+    }
+    const denom = n * sxx - sx * sx;
+    if (Math.abs(denom) < 1e-6) {
+        return { vertical: true, x: sx / n };
+    }
+    const m = (n * sxy - sx * sy) / denom;
+    const b = (sy - m * sx) / n;
+    return { vertical: false, m, b };
+}
+
+function intersectLines(l1, l2) {
+    if (!l1 || !l2) return null;
+    if (l1.vertical && l2.vertical) return null;
+    if (l1.vertical) return { x: l1.x, y: l2.m * l1.x + l2.b };
+    if (l2.vertical) return { x: l2.x, y: l1.m * l2.x + l1.b };
+    const denom = l1.m - l2.m;
+    if (Math.abs(denom) < 1e-6) return null;
+    const x = (l2.b - l1.b) / denom;
+    return { x, y: l1.m * x + l1.b };
+}
+
+function fitEdgeLine(p, q, mag, w, h) {
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const pts = [];
+    const steps = Math.max(36, Math.round(len * 1.4));
+    const band = 12;
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = p.x + dx * t;
+        const cy = p.y + dy * t;
+        let best = null;
+        let bestM = 0;
+        for (let k = -band; k <= band; k++) {
+            const x = Math.round(cx + nx * k);
+            const y = Math.round(cy + ny * k);
+            if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+            const m = mag[y * w + x];
+            if (m > bestM) {
+                bestM = m;
+                best = { x, y };
+            }
+        }
+        if (best && bestM > 8) pts.push(best);
+    }
+    return leastSquaresLine(pts);
+}
+
+function refineQuadOnEdges(quad, mag, w, h) {
+    const sides = [
+        [quad.tl, quad.tr],
+        [quad.tr, quad.br],
+        [quad.br, quad.bl],
+        [quad.bl, quad.tl]
+    ];
+    const lines = sides.map(([a, b]) => fitEdgeLine(a, b, mag, w, h) || leastSquaresLine([a, b]));
+    const tl = intersectLines(lines[3], lines[0]);
+    const tr = intersectLines(lines[0], lines[1]);
+    const br = intersectLines(lines[1], lines[2]);
+    const bl = intersectLines(lines[2], lines[3]);
+    if (!tl || !tr || !br || !bl) return quad;
+    if (![tl, tr, br, bl].every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) return quad;
+    return { tl, tr, br, bl };
+}
+
+function cardQuadArea(quad) {
+    return Math.abs(
+        quad.tl.x * quad.tr.y - quad.tr.x * quad.tl.y +
+        quad.tr.x * quad.br.y - quad.br.x * quad.tr.y +
+        quad.br.x * quad.bl.y - quad.bl.x * quad.br.y +
+        quad.bl.x * quad.tl.y - quad.tl.x * quad.bl.y
+    ) / 2;
+}
+
+function cardQuadSize(quad) {
+    const width = (Math.hypot(quad.tr.x - quad.tl.x, quad.tr.y - quad.tl.y) + Math.hypot(quad.br.x - quad.bl.x, quad.br.y - quad.bl.y)) / 2;
+    const height = (Math.hypot(quad.bl.x - quad.tl.x, quad.bl.y - quad.tl.y) + Math.hypot(quad.br.x - quad.tr.x, quad.br.y - quad.tr.y)) / 2;
+    return { width, height };
+}
+
+function isConvexQuad(quad) {
+    const pts = [quad.tl, quad.tr, quad.br, quad.bl];
+    let sign = 0;
+    for (let i = 0; i < 4; i++) {
+        const a = pts[i];
+        const b = pts[(i + 1) % 4];
+        const c = pts[(i + 2) % 4];
+        const z = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+        if (Math.abs(z) < 1e-6) continue;
+        const s = Math.sign(z);
+        if (!sign) sign = s;
+        else if (s !== sign) return false;
+    }
+    return true;
+}
+
+function isValidCardQuad(quad, w, h) {
+    const pts = [quad.tl, quad.tr, quad.br, quad.bl];
+    for (const p of pts) {
+        if (p.x < -12 || p.y < -12 || p.x > w + 12 || p.y > h + 12) return false;
+    }
+    if (!isConvexQuad(quad)) return false;
+    const { width, height } = cardQuadSize(quad);
+    if (width < w * 0.14 || height < h * 0.12) return false;
+    const area = cardQuadArea(quad);
+    if (area < w * h * 0.055 || area > w * h * 0.97) return false;
+    const ratio = Math.max(width, height) / Math.max(1, Math.min(width, height));
+    return ratio > 1.12 && ratio < 2.7;
+}
+
+function meanSideMagnitude(quad, mag, w, h) {
+    const sides = [[quad.tl, quad.tr], [quad.tr, quad.br], [quad.br, quad.bl], [quad.bl, quad.tl]];
+    let sum = 0;
+    let n = 0;
+    for (const [a, b] of sides) {
+        const steps = 28;
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const x = Math.round(a.x + (b.x - a.x) * t);
+            const y = Math.round(a.y + (b.y - a.y) * t);
+            if (x < 0 || y < 0 || x >= w || y >= h) continue;
+            sum += mag[y * w + x];
+            n++;
+        }
+    }
+    return n ? sum / n : 0;
+}
+
+function scoreCardQuad(quad, mag, w, h) {
+    const { width, height } = cardQuadSize(quad);
+    const fill = cardQuadArea(quad) / (w * h);
+    const cr80 = 85.6 / 53.98;
+    const ratio = Math.max(width, height) / Math.max(1, Math.min(width, height));
+    const ratioScore = 1 - Math.min(1, Math.abs(ratio - cr80) / 0.75);
+    const fillScore = (fill > 0.16 && fill < 0.88) ? 1 : (fill > 0.08 && fill < 0.95 ? 0.45 : 0.12);
+    const edgeScore = Math.min(1, meanSideMagnitude(quad, mag, w, h) / 42);
+    const oppW = Math.hypot(quad.tr.x - quad.tl.x, quad.tr.y - quad.tl.y) / Math.max(1, Math.hypot(quad.br.x - quad.bl.x, quad.br.y - quad.bl.y));
+    const oppH = Math.hypot(quad.bl.x - quad.tl.x, quad.bl.y - quad.tl.y) / Math.max(1, Math.hypot(quad.br.x - quad.tr.x, quad.br.y - quad.tr.y));
+    const parallelScore = 1 - Math.min(1, (Math.abs(1 - oppW) + Math.abs(1 - oppH)) / 1.8);
+    return ratioScore * 0.32 + fillScore * 0.22 + edgeScore * 0.34 + parallelScore * 0.12;
+}
+
+function thetaDiffDeg(a, b) {
+    let d = Math.abs(a - b) % 180;
+    if (d > 90) d = 180 - d;
+    return d;
+}
+
+function intersectRhoTheta(l1, l2) {
+    const c1 = Math.cos(l1.rad);
+    const s1 = Math.sin(l1.rad);
+    const c2 = Math.cos(l2.rad);
+    const s2 = Math.sin(l2.rad);
+    const det = c1 * s2 - c2 * s1;
+    if (Math.abs(det) < 1e-6) return null;
+    return {
+        x: (l1.rho * s2 - l2.rho * s1) / det,
+        y: (c1 * l2.rho - c2 * l1.rho) / det
+    };
+}
+
+function computeCardEdges(data, w, h) {
+    const gray = new Float32Array(w * h);
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        gray[p] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    }
+
+    const blur = new Float32Array(w * h);
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            const i = y * w + x;
+            blur[i] = (
+                gray[i - w - 1] + 2 * gray[i - w] + gray[i - w + 1] +
+                2 * gray[i - 1] + 4 * gray[i] + 2 * gray[i + 1] +
+                gray[i + w - 1] + 2 * gray[i + w] + gray[i + w + 1]
+            ) / 16;
+        }
+    }
+
+    const mag = new Float32Array(w * h);
+    const gxA = new Float32Array(w * h);
+    const gyA = new Float32Array(w * h);
+    let magSum = 0;
+    let magSq = 0;
+    let magCount = 0;
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            const i = y * w + x;
+            const gx = -blur[i - w - 1] + blur[i - w + 1] - 2 * blur[i - 1] + 2 * blur[i + 1] - blur[i + w - 1] + blur[i + w + 1];
+            const gy = -blur[i - w - 1] - 2 * blur[i - w] - blur[i - w + 1] + blur[i + w - 1] + 2 * blur[i + w] + blur[i + w + 1];
+            const r = data[i * 4];
+            const g = data[i * 4 + 1];
+            const b = data[i * 4 + 2];
+            const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+            const m = Math.hypot(gx, gy) + chroma * 0.22;
+            gxA[i] = gx;
+            gyA[i] = gy;
+            mag[i] = m;
+            magSum += m;
+            magSq += m * m;
+            magCount++;
+        }
+    }
+
+    const mean = magSum / Math.max(1, magCount);
+    const std = Math.sqrt(Math.max(0, magSq / Math.max(1, magCount) - mean * mean));
+    const high = Math.max(22, mean + 1.15 * std);
+    const low = Math.max(10, high * 0.38);
+
+    const keep = new Uint8Array(w * h);
+    const strong = [];
+    for (let y = 2; y < h - 2; y++) {
+        for (let x = 2; x < w - 2; x++) {
+            const i = y * w + x;
+            const m = mag[i];
+            if (m < low) continue;
+            const gx = gxA[i];
+            const gy = gyA[i];
+            const ax = Math.abs(gx);
+            const ay = Math.abs(gy);
+            let n1;
+            let n2;
+            if (ax >= ay) {
+                n1 = mag[i - 1];
+                n2 = mag[i + 1];
+            } else {
+                n1 = mag[i - w];
+                n2 = mag[i + w];
+            }
+            if (m < n1 || m < n2) continue;
+            if (m >= high) {
+                keep[i] = 2;
+                strong.push(i);
+            } else {
+                keep[i] = 1;
+            }
+        }
+    }
+
+    for (let s = 0; s < strong.length; s++) {
+        const i = strong[s];
+        const x = i % w;
+        const y = (i / w) | 0;
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                if (!dx && !dy) continue;
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= h - 1) continue;
+                const ni = ny * w + nx;
+                if (keep[ni] === 1) {
+                    keep[ni] = 2;
+                    strong.push(ni);
+                }
+            }
+        }
+    }
+
+    const edges = [];
+    for (let s = 0; s < strong.length; s++) {
+        const i = strong[s];
+        edges.push({ x: i % w, y: (i / w) | 0 });
+    }
+    return { mag, gx: gxA, gy: gyA, edges };
+}
+
+function houghDetectLines(edges, mag, w, h, maxLines) {
+    const numTheta = 180;
+    const maxRho = Math.hypot(w, h);
+    const numRho = Math.ceil(maxRho * 2) + 3;
+    const acc = new Float32Array(numTheta * numRho);
+    const cosT = new Float32Array(numTheta);
+    const sinT = new Float32Array(numTheta);
+    for (let t = 0; t < numTheta; t++) {
+        const a = t * Math.PI / numTheta;
+        cosT[t] = Math.cos(a);
+        sinT[t] = Math.sin(a);
+    }
+
+    const margin = 3;
+    for (const p of edges) {
+        const border = (p.x < margin || p.y < margin || p.x >= w - margin || p.y >= h - margin) ? 0.28 : 1;
+        const weight = (mag[p.y * w + p.x] + 6) * border;
+        for (let t = 0; t < numTheta; t++) {
+            const rho = p.x * cosT[t] + p.y * sinT[t];
+            const r = Math.round(rho + maxRho);
+            if (r < 0 || r >= numRho) continue;
+            acc[t * numRho + r] += weight;
+        }
+    }
+
+    const peaks = [];
+    for (let t = 0; t < numTheta; t++) {
+        for (let r = 2; r < numRho - 2; r++) {
+            const v = acc[t * numRho + r];
+            if (v < 80) continue;
+            let isMax = true;
+            for (let dt = -4; dt <= 4 && isMax; dt++) {
+                for (let dr = -5; dr <= 5; dr++) {
+                    if (!dt && !dr) continue;
+                    let tt = t + dt;
+                    let rr = r + dr;
+                    if (tt < 0) tt += numTheta;
+                    if (tt >= numTheta) tt -= numTheta;
+                    if (rr < 0 || rr >= numRho) continue;
+                    if (acc[tt * numRho + rr] > v) { isMax = false; break; }
+                }
+            }
+            if (isMax) peaks.push({ theta: t, rad: t * Math.PI / numTheta, rho: r - maxRho, votes: v });
+        }
+    }
+
+    peaks.sort((a, b) => b.votes - a.votes);
+    const lines = [];
+    for (const p of peaks) {
+        if (lines.some((l) => thetaDiffDeg(l.theta, p.theta) < 8 && Math.abs(l.rho - p.rho) < 8)) continue;
+        lines.push(p);
+        if (lines.length >= maxLines) break;
+    }
+    return lines;
+}
+
+function quadFromLinePair(a, b, c, d) {
+    const pts = [
+        intersectRhoTheta(a, c),
+        intersectRhoTheta(a, d),
+        intersectRhoTheta(b, c),
+        intersectRhoTheta(b, d)
+    ];
+    if (pts.some((p) => !p || !Number.isFinite(p.x) || !Number.isFinite(p.y))) return null;
+    return orderQuadCorners(pts);
+}
+
+function quadFromHoughLines(edges, mag, w, h) {
+    if (edges.length < 60) return null;
+    const lines = houghDetectLines(edges, mag, w, h, 18);
+    if (lines.length < 4) return null;
+    let best = null;
+    let bestScore = -1;
+    const n = lines.length;
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            if (thetaDiffDeg(lines[i].theta, lines[j].theta) > 14) continue;
+            if (Math.abs(lines[i].rho - lines[j].rho) < Math.min(w, h) * 0.12) continue;
+            for (let k = 0; k < n; k++) {
+                if (k === i || k === j) continue;
+                if (Math.abs(thetaDiffDeg(lines[i].theta, lines[k].theta) - 90) > 24) continue;
+                for (let m = k + 1; m < n; m++) {
+                    if (m === i || m === j) continue;
+                    if (thetaDiffDeg(lines[k].theta, lines[m].theta) > 14) continue;
+                    if (Math.abs(lines[k].rho - lines[m].rho) < Math.min(w, h) * 0.10) continue;
+                    const quad = quadFromLinePair(lines[i], lines[j], lines[k], lines[m]);
+                    if (!quad || !isValidCardQuad(quad, w, h)) continue;
+                    const s = scoreCardQuad(quad, mag, w, h);
+                    if (s > bestScore) {
+                        bestScore = s;
+                        best = quad;
+                    }
+                }
+            }
+        }
+    }
+    return best;
+}
+
+function quadFromForegroundMask(data, w, h) {
+    let rs = 0, gs = 0, bs = 0, n = 0;
+    const add = (x, y) => {
+        const i = (y * w + x) * 4;
+        rs += data[i]; gs += data[i + 1]; bs += data[i + 2]; n++;
+    };
+    for (let x = 0; x < w; x++) { add(x, 0); add(x, h - 1); }
+    for (let y = 0; y < h; y++) { add(0, y); add(w - 1, y); }
+    const br = rs / n, bg = gs / n, bb = bs / n;
+    let varSum = 0;
+    const varAdd = (x, y) => {
+        const i = (y * w + x) * 4;
+        varSum += Math.abs(data[i] - br) + Math.abs(data[i + 1] - bg) + Math.abs(data[i + 2] - bb);
+    };
+    for (let x = 0; x < w; x++) { varAdd(x, 0); varAdd(x, h - 1); }
+    for (let y = 0; y < h; y++) { varAdd(0, y); varAdd(w - 1, y); }
+    const thresh = Math.max(34, Math.min(88, (varSum / n) * 2.8 + 22));
+
+    const bgMask = new Uint8Array(w * h);
+    const stack = [];
+    const push = (x, y) => {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        const p = y * w + x;
+        if (bgMask[p]) return;
+        const i = p * 4;
+        const dist = Math.abs(data[i] - br) + Math.abs(data[i + 1] - bg) + Math.abs(data[i + 2] - bb);
+        if (dist > thresh) return;
+        bgMask[p] = 1;
+        stack.push(x, y);
+    };
+    for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+    for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+    while (stack.length) {
+        const y = stack.pop();
+        const x = stack.pop();
+        push(x - 1, y);
+        push(x + 1, y);
+        push(x, y - 1);
+        push(x, y + 1);
+    }
+
+    let fg = 0;
+    const contour = [];
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            const p = y * w + x;
+            if (bgMask[p]) continue;
+            fg++;
+            if (bgMask[p - 1] || bgMask[p + 1] || bgMask[p - w] || bgMask[p + w]) {
+                contour.push({ x, y });
+            }
+        }
+    }
+    const fill = fg / (w * h);
+    if (fill < 0.08 || fill > 0.92 || contour.length < 24) return null;
+    const hull = convexHullPoints(contour);
+    return minAreaRectCorners(hull);
+}
+
+function quadFromEdgeHull(edges, mag, w, h) {
+    if (edges.length < 40) return null;
+    const inner = edges.filter((p) => p.x > 4 && p.y > 4 && p.x < w - 5 && p.y < h - 5);
+    const pts = inner.length > 40 ? inner : edges;
+    const hull = convexHullPoints(pts);
+    return minAreaRectCorners(hull);
+}
+
+function snapQuadCorners(quad, mag, gx, gy, w, h) {
+    const keys = ['tl', 'tr', 'br', 'bl'];
+    const snapped = [];
+    const win = 11;
+    for (const key of keys) {
+        const p = quad[key];
+        let best = { x: p.x, y: p.y, s: -1 };
+        const x0 = Math.round(p.x);
+        const y0 = Math.round(p.y);
+        for (let dy = -win; dy <= win; dy++) {
+            for (let dx = -win; dx <= win; dx++) {
+                const x = x0 + dx;
+                const y = y0 + dy;
+                if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2) continue;
+                const i = y * w + x;
+                const corner = Math.abs(gx[i]) * Math.abs(gy[i]);
+                const s = mag[i] * 0.65 + corner * 0.08;
+                if (s > best.s) best = { x, y, s };
+            }
+        }
+        snapped.push({ x: best.x, y: best.y });
+    }
+    return orderQuadCorners(snapped);
+}
+
+function applyDetectedQuad(quad, cw, ch, sw, sh) {
+    const sx = cw / sw;
+    const sy = ch / sh;
+    const map = (p) => ({
+        x: Math.max(-2, Math.min(cw + 2, p.x * sx)),
+        y: Math.max(-2, Math.min(ch + 2, p.y * sy))
+    });
+    cropState.quadPoints = {
+        tl: map(quad.tl),
+        tr: map(quad.tr),
+        br: map(quad.br),
+        bl: map(quad.bl)
+    };
+    const xs = [quad.tl.x, quad.tr.x, quad.br.x, quad.bl.x].map((v) => v * sx);
+    const ys = [quad.tl.y, quad.tr.y, quad.br.y, quad.bl.y].map((v) => v * sy);
+    const minX = Math.max(0, Math.min(...xs));
+    const maxX = Math.min(cw, Math.max(...xs));
+    const minY = Math.max(0, Math.min(...ys));
+    const maxY = Math.min(ch, Math.max(...ys));
+    cropState.cropBox = { x: minX, y: minY, w: Math.max(8, maxX - minX), h: Math.max(8, maxY - minY) };
+}
+
 function detectDocumentQuad(showNotification = true) {
     if (!cropState.cachedRotatedImg) return;
     const cw = DOM.cropCanvas.width;
     const ch = DOM.cropCanvas.height;
+    const src = cropState.cachedRotatedImg;
+    const maxSide = 800;
+    const scale = Math.min(1, maxSide / Math.max(src.width, src.height));
+    const sw = Math.max(140, Math.round(src.width * scale));
+    const sh = Math.max(140, Math.round(src.height * scale));
 
-    // Muestreo rápido a resolución reducida para análisis de bordes
-    const sw = 280;
-    const sh = Math.round(sw * (ch / cw));
-    const sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = sw;
-    sampleCanvas.height = sh;
-    const sCtx = sampleCanvas.getContext('2d');
-    sCtx.drawImage(cropState.cachedRotatedImg, 0, 0, sw, sh);
-
+    const sample = document.createElement('canvas');
+    sample.width = sw;
+    sample.height = sh;
+    const sCtx = sample.getContext('2d', { willReadFrequently: true });
+    sCtx.drawImage(src, 0, 0, sw, sh);
     const imgData = sCtx.getImageData(0, 0, sw, sh);
-    const data = imgData.data;
-    const lum = new Float32Array(sw * sh);
+    const d = imgData.data;
+    const { mag, gx, gy, edges } = computeCardEdges(d, sw, sh);
 
-    for (let i = 0; i < data.length; i += 4) {
-        lum[i / 4] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-    }
+    const raw = [
+        quadFromHoughLines(edges, mag, sw, sh),
+        quadFromForegroundMask(d, sw, sh),
+        quadFromEdgeHull(edges, mag, sw, sh)
+    ].filter(Boolean);
 
-    // Muestreo perimetral del color de fondo (8% exterior)
-    const marginX = Math.max(2, Math.round(sw * 0.08));
-    const marginY = Math.max(2, Math.round(sh * 0.08));
-    let borderLumSum = 0, borderCount = 0;
-
-    for (let y = 0; y < sh; y++) {
-        for (let x = 0; x < sw; x++) {
-            if (x < marginX || x >= sw - marginX || y < marginY || y >= sh - marginY) {
-                borderLumSum += lum[y * sw + x];
-                borderCount++;
-            }
-        }
-    }
-    const bgLum = borderLumSum / Math.max(1, borderCount);
-
-    // Muestreo del área central
-    let centerLumSum = 0, centerCount = 0;
-    for (let y = marginY * 2; y < sh - marginY * 2; y++) {
-        for (let x = marginX * 2; x < sw - marginX * 2; x++) {
-            centerLumSum += lum[y * sw + x];
-            centerCount++;
-        }
-    }
-    const centerLum = centerLumSum / Math.max(1, centerCount);
-    const docIsBrighter = centerLum >= bgLum;
-    const diffThreshold = Math.max(12, Math.abs(centerLum - bgLum) * 0.32);
-
-    const points = [];
-    for (let y = marginY; y < sh - marginY; y++) {
-        for (let x = marginX; x < sw - marginX; x++) {
-            const val = lum[y * sw + x];
-            const isDoc = docIsBrighter ? (val - bgLum > diffThreshold) : (bgLum - val > diffThreshold);
-            if (isDoc) {
-                points.push({ x, y });
-            }
+    let best = null;
+    let bestScore = -1;
+    for (let quad of raw) {
+        quad = refineQuadOnEdges(quad, mag, sw, sh);
+        quad = snapQuadCorners(quad, mag, gx, gy, sw, sh);
+        if (!isValidCardQuad(quad, sw, sh)) continue;
+        const s = scoreCardQuad(quad, mag, sw, sh);
+        if (s > bestScore) {
+            bestScore = s;
+            best = quad;
         }
     }
 
-    const scaleX = cw / sw;
-    const scaleY = ch / sh;
-
-    // Encontrar 4 esquinas extremas (min(x+y), max(x-y), max(x+y), min(x-y))
-    if (points.length > (sw * sh * 0.08)) {
-        let bestTL = points[0], minTL = Infinity;
-        let bestTR = points[0], maxTR = -Infinity;
-        let bestBR = points[0], maxBR = -Infinity;
-        let bestBL = points[0], minBL = Infinity;
-
-        for (let i = 0; i < points.length; i++) {
-            const p = points[i];
-            const sum = p.x + p.y;
-            const diff = p.x - p.y;
-
-            if (sum < minTL) { minTL = sum; bestTL = p; }
-            if (diff > maxTR) { maxTR = diff; bestTR = p; }
-            if (sum > maxBR) { maxBR = sum; bestBR = p; }
-            if (diff < minBL) { minBL = diff; bestBL = p; }
-        }
-
-        const wTop = bestTR.x - bestTL.x;
-        const hLeft = bestBL.y - bestTL.y;
-
-        if (wTop > sw * 0.22 && hLeft > sh * 0.22) {
-            cropState.quadPoints = {
-                tl: { x: Math.max(0, Math.min(cw, bestTL.x * scaleX)), y: Math.max(0, Math.min(ch, bestTL.y * scaleY)) },
-                tr: { x: Math.max(0, Math.min(cw, bestTR.x * scaleX)), y: Math.max(0, Math.min(ch, bestTR.y * scaleY)) },
-                br: { x: Math.max(0, Math.min(cw, bestBR.x * scaleX)), y: Math.max(0, Math.min(ch, bestBR.y * scaleY)) },
-                bl: { x: Math.max(0, Math.min(cw, bestBL.x * scaleX)), y: Math.max(0, Math.min(ch, bestBL.y * scaleY)) }
-            };
-            if (showNotification) showToast('Esquinas de carnet detectadas automáticamente', 'success', 'target');
-            drawCropCanvas();
-            return;
-        }
+    if (best && bestScore >= 0.18) {
+        applyDetectedQuad(best, cw, ch, sw, sh);
+        if (showNotification) showToast('Esquinas del carnet ajustadas al borde', 'success', 'target');
+        drawCropCanvas();
+        return;
     }
 
     resetQuadPoints();
-    if (showNotification) showToast('Esquinas centradas estándar CR80', 'info', 'ruler');
+    if (showNotification) showToast('No se vio un borde claro. Ajusta las esquinas a mano', 'info', 'ruler');
     drawCropCanvas();
 }
 
@@ -4651,21 +5281,27 @@ async function generateAndDownload() {
     }
 
     const format = STATE.exportFormat;
-    const dpi = STATE.exportDpi;
+    const light = !!STATE.exportLight;
+    const dpi = light ? 300 : (format === 'pdf' ? STATE.exportDpi : 300);
+    const loaderHint = light
+        ? 'Alta calidad, comprimiendo a menos de 1 MB'
+        : `Renderizando a ${dpi} DPI en formato ${format.toUpperCase()}`;
 
-    showLoader('Generando Documento...', `Renderizando a ${dpi} DPI en formato ${format.toUpperCase()}`);
+    showLoader('Generando Documento...', loaderHint);
 
     setTimeout(async () => {
         try {
+            let result;
             if (format === 'pdf') {
-                await exportPDFDocument();
+                result = await exportPDFDocument({ light, dpi });
             } else {
-                await exportImageDocument(format, dpi);
+                result = await exportImageDocument(format, dpi, { light });
             }
 
             hideLoader();
             triggerSuccessCelebration();
-            showToast(`¡Documento ${format.toUpperCase()} descargado exitosamente!`, 'success');
+            const sizeNote = result && result.bytes ? ` (${formatFileSize(result.bytes)})` : '';
+            showToast(`Documento ${format.toUpperCase()} descargado${sizeNote}`, 'success');
         } catch (err) {
             console.error('Error al exportar:', err);
             hideLoader();
@@ -4674,22 +5310,140 @@ async function generateAndDownload() {
     }, 120);
 }
 
-async function exportPDFDocument() {
+const EXPORT_MAX_BYTES = 1024 * 1024;
+
+function updateExportOptionsUI() {
+    const showDpi = STATE.exportFormat === 'pdf' && !STATE.exportLight;
+    if (DOM.exportDpiSelect) DOM.exportDpiSelect.disabled = !showDpi;
+    if (DOM.exportDpiWrap) DOM.exportDpiWrap.classList.toggle('hidden', !showDpi);
+    if (DOM.exportFields) {
+        DOM.exportFields.classList.toggle('grid-cols-2', showDpi);
+        DOM.exportFields.classList.toggle('grid-cols-1', !showDpi);
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = filename;
+    a.href = url;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function canvasToBlob(canvas, mimeType, quality) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (!blob) reject(new Error('blob'));
+            else resolve(blob);
+        }, mimeType, quality);
+    });
+}
+
+function scaleCanvas(src, factor) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(src.width * factor));
+    canvas.height = Math.max(1, Math.round(src.height * factor));
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    return canvas;
+}
+
+function renderSheetCanvas(dpi) {
+    const mmToPx = dpi / 25.4;
+    const widthPx = Math.round(STATE.paper.widthMm * mmToPx);
+    const heightPx = Math.round(STATE.paper.heightMm * mmToPx);
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = widthPx;
+    exportCanvas.height = heightPx;
+    const ctx = exportCanvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, widthPx, heightPx);
+    const instances = getCardInstances(mmToPx, widthPx, heightPx);
+    for (const inst of instances) {
+        drawCardInstance(ctx, inst, mmToPx);
+    }
+    return exportCanvas;
+}
+
+async function encodeImageUnderLimit(canvas, format, maxBytes) {
+    const mimeType = format === 'png' ? 'image/png' : (format === 'webp' ? 'image/webp' : 'image/jpeg');
+    let current = canvas;
+    let best = null;
+
+    if (format === 'png') {
+        for (let i = 0; i < 7; i++) {
+            const blob = await canvasToBlob(current, 'image/png');
+            best = blob;
+            if (blob.size <= maxBytes) return blob;
+            current = scaleCanvas(current, 0.82);
+        }
+        return best;
+    }
+
+    for (let pass = 0; pass < 4; pass++) {
+        let lo = 0.52;
+        let hi = 0.92;
+        for (let i = 0; i < 7; i++) {
+            const quality = (lo + hi) / 2;
+            const blob = await canvasToBlob(current, mimeType, quality);
+            if (blob.size <= maxBytes) {
+                best = blob;
+                lo = quality;
+            } else {
+                hi = quality;
+                if (!best || blob.size < best.size) best = blob;
+            }
+        }
+        if (best && best.size <= maxBytes) return best;
+        current = scaleCanvas(current, 0.85);
+    }
+    return best;
+}
+
+async function exportPDFDocument(options = {}) {
     const { jsPDF } = window.jspdf;
+    const light = !!options.light;
+    const dpiSteps = light ? [300, 260, 220, 190] : [options.dpi || STATE.exportDpi];
+    const qualities = light ? [0.88, 0.78, 0.68, 0.58] : [0.94];
+    let chosen = null;
+
+    for (const dpi of dpiSteps) {
+        for (const quality of qualities) {
+            const blob = await buildPdfBlob(jsPDF, dpi, quality);
+            chosen = blob;
+            if (!light || blob.size <= EXPORT_MAX_BYTES) break;
+        }
+        if (!light || (chosen && chosen.size <= EXPORT_MAX_BYTES)) break;
+    }
+
+    const timestamp = getFormattedTimestamp();
+    const filename = `Carnet_Cardify_${STATE.paper.size.toUpperCase()}_${timestamp}.pdf`;
+    downloadBlob(chosen, filename);
+    return { bytes: chosen.size };
+}
+
+async function buildPdfBlob(jsPDF, dpi, jpegQuality) {
     const orientation = STATE.paper.orientation === 'portrait' ? 'p' : 'l';
     const format = STATE.paper.size === 'letter' ? 'letter' : 'a4';
-
     const pdf = new jsPDF({
-        orientation: orientation,
+        orientation,
         unit: 'mm',
-        format: format,
+        format,
         compress: true
     });
 
-    const mmToPx = 300 / 25.4;
+    const mmToPx = dpi / 25.4;
     const highResCanvasWidth = STATE.paper.widthMm * mmToPx;
     const highResCanvasHeight = STATE.paper.heightMm * mmToPx;
-
     const instances = getCardInstances(mmToPx, highResCanvasWidth, highResCanvasHeight);
 
     for (const inst of instances) {
@@ -4697,63 +5451,45 @@ async function exportPDFDocument() {
         if (card.dirty || !card.cachedCanvas) {
             processCardImage(card);
         }
-
-        // Crear versión limpia de alta resolución
         const roundedCanvas = createRoundedExportCanvas(card, inst.wMm, inst.hMm, mmToPx);
-        const imgData = roundedCanvas.toDataURL('image/jpeg', 0.94);
-
+        const imgData = roundedCanvas.toDataURL('image/jpeg', jpegQuality);
         pdf.addImage(imgData, 'JPEG', inst.xMm, inst.yMm, inst.wMm, inst.hMm);
 
-        // Solo si el usuario explícitamente activó líneas de corte
         if (STATE.layout.showCutLines) {
             pdf.setDrawColor(190, 190, 190);
             pdf.setLineWidth(0.2);
             pdf.setLineDashPattern([1.5, 1.5], 0);
             pdf.rect(inst.xMm - 0.5, inst.yMm - 0.5, inst.wMm + 1.0, inst.hMm + 1.0);
-            pdf.setLineDashPattern([], 0); // Restaurar inmediatamente
+            pdf.setLineDashPattern([], 0);
         }
     }
 
-    const timestamp = getFormattedTimestamp();
-    const filename = `Carnet_Cardify_${STATE.paper.size.toUpperCase()}_${timestamp}.pdf`;
-    pdf.save(filename);
+    return pdf.output('blob');
 }
 
-async function exportImageDocument(format, dpi) {
-    const mmToPx = dpi / 25.4;
-    const widthPx = Math.round(STATE.paper.widthMm * mmToPx);
-    const heightPx = Math.round(STATE.paper.heightMm * mmToPx);
+async function exportImageDocument(format, dpi, options = {}) {
+    const light = !!(options && options.light);
+    const dpiSteps = light ? [300, 250, 210] : [dpi];
+    let blob = null;
+    let usedDpi = dpi;
 
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = widthPx;
-    exportCanvas.height = heightPx;
-    const ctx = exportCanvas.getContext('2d');
-
-    // Fondo blanco puro sin artefactos
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, widthPx, heightPx);
-
-    const instances = getCardInstances(mmToPx, widthPx, heightPx);
-
-    for (const inst of instances) {
-        drawCardInstance(ctx, inst, mmToPx);
+    for (const stepDpi of dpiSteps) {
+        usedDpi = stepDpi;
+        const canvas = renderSheetCanvas(stepDpi);
+        blob = light
+            ? await encodeImageUnderLimit(canvas, format, EXPORT_MAX_BYTES)
+            : await canvasToBlob(
+                canvas,
+                format === 'png' ? 'image/png' : (format === 'webp' ? 'image/webp' : 'image/jpeg'),
+                format === 'png' ? 1.0 : 0.94
+            );
+        if (!light || (blob && blob.size <= EXPORT_MAX_BYTES)) break;
     }
 
-    const mimeType = format === 'png' ? 'image/png' : (format === 'webp' ? 'image/webp' : 'image/jpeg');
-    const quality = format === 'png' ? 1.0 : 0.94;
-
-    return new Promise((resolve) => {
-        exportCanvas.toBlob((blob) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const timestamp = getFormattedTimestamp();
-            a.download = `Carnet_Cardify_${dpi}DPI_${timestamp}.${format}`;
-            a.href = url;
-            a.click();
-            URL.revokeObjectURL(url);
-            resolve();
-        }, mimeType, quality);
-    });
+    const timestamp = getFormattedTimestamp();
+    const filename = `Carnet_Cardify_${usedDpi}DPI_${timestamp}.${format}`;
+    downloadBlob(blob, filename);
+    return { bytes: blob.size };
 }
 
 function createRoundedExportCanvas(card, wMm, hMm, mmToPx) {

@@ -245,6 +245,30 @@
             box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12);
         }
 
+        .glass-bar {
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.05);
+            backdrop-filter: blur(48px) saturate(190%);
+            -webkit-backdrop-filter: blur(48px) saturate(190%);
+            transform: translateZ(0);
+        }
+        .dark .glass-bar {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.14);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+        }
+        @media (prefers-reduced-transparency: reduce) {
+            .glass-bar {
+                background: rgba(255, 255, 255, 0.88);
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+            }
+            .dark .glass-bar {
+                background: rgba(15, 23, 42, 0.92);
+            }
+        }
+
         /* Shell tipo app: celular abajo, escritorio riel derecho */
         .mobile-tab {
             display: flex;
@@ -298,18 +322,45 @@
                 box-shadow: none;
                 padding: 0;
                 backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                transform: none;
             }
             #canvas-toolbar > div {
-                background: rgb(255 255 255 / 0.92);
-                backdrop-filter: blur(16px);
+                background: rgba(255, 255, 255, 0.18);
+                backdrop-filter: blur(48px) saturate(190%);
+                -webkit-backdrop-filter: blur(48px) saturate(190%);
                 border-radius: 999px;
                 padding: 4px 6px;
-                border: 1px solid rgb(226 232 240 / 0.9);
-                box-shadow: 0 8px 24px rgb(15 23 42 / 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.32);
+                box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+                transform: translateZ(0);
             }
             .dark #canvas-toolbar > div {
-                background: rgb(30 41 59 / 0.92);
-                border-color: rgb(51 65 85 / 0.9);
+                background: rgba(255, 255, 255, 0.07);
+                border-color: rgba(255, 255, 255, 0.14);
+                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+            }
+            #btn-zoom-fit {
+                display: none;
+            }
+            #canvas-toolbar button {
+                width: 1.85rem;
+                height: 1.85rem;
+            }
+            #zoom-level-label {
+                width: 2rem;
+                font-size: 10px;
+            }
+            #canvas-footer {
+                left: 10px;
+                right: 10px;
+                bottom: 8px;
+            }
+            #sheet-info-badge {
+                max-width: 38vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             #toast-container {
                 bottom: calc(12px + 52px + env(safe-area-inset-bottom, 0px));
@@ -497,11 +548,11 @@
                                     </svg>
                                 </div>
                                 <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Subir frente</p>
-                                <p class="text-[10px] text-slate-400">Toca o arrastra</p>
+                                <p class="text-[10px] text-slate-400">JPG, PNG, HEIC y más</p>
                             </div>
 
-                            <input type="file" id="frente-input" class="hidden" accept="image/*,.heic,.heif,image/heic,image/heif">
-                            <input type="file" id="frente-camera-input" class="hidden" accept="image/*,.heic,.heif,image/heic,image/heif" capture="environment">
+                            <input type="file" id="frente-input" class="hidden" accept="image/*,.jpg,.jpeg,.jfif,.png,.webp,.gif,.bmp,.tif,.tiff,.avif,.heic,.heif,.heics,.hif,image/heic,image/heif">
+                            <input type="file" id="frente-camera-input" class="hidden" accept="image/*,.jpg,.jpeg,.jfif,.png,.webp,.gif,.bmp,.tif,.tiff,.avif,.heic,.heif,.heics,.hif,image/heic,image/heif" capture="environment">
                         </div>
                     </div>
 
@@ -546,11 +597,11 @@
                                     </svg>
                                 </div>
                                 <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Subir dorso</p>
-                                <p class="text-[10px] text-slate-400">Toca o arrastra</p>
+                                <p class="text-[10px] text-slate-400">JPG, PNG, HEIC y más</p>
                             </div>
 
-                            <input type="file" id="dorso-input" class="hidden" accept="image/*,.heic,.heif,image/heic,image/heif">
-                            <input type="file" id="dorso-camera-input" class="hidden" accept="image/*,.heic,.heif,image/heic,image/heif" capture="environment">
+                            <input type="file" id="dorso-input" class="hidden" accept="image/*,.jpg,.jpeg,.jfif,.png,.webp,.gif,.bmp,.tif,.tiff,.avif,.heic,.heif,.heics,.hif,image/heic,image/heif">
+                            <input type="file" id="dorso-camera-input" class="hidden" accept="image/*,.jpg,.jpeg,.jfif,.png,.webp,.gif,.bmp,.tif,.tiff,.avif,.heic,.heif,.heics,.hif,image/heic,image/heif" capture="environment">
                         </div>
                     </div>
 
@@ -859,8 +910,8 @@
         <!-- COLUMNA CENTRO: CANVAS Y MESA DE TRABAJO -->
         <!-- ========================================== -->
         <div id="panel-canvas" class="relative flex-1 w-full lg:h-full flex flex-col min-w-0 min-h-0 overflow-hidden">
-            
-            <div id="canvas-toolbar" class="absolute top-2 left-2 right-2 z-20 bg-white/90 dark:bg-dark-surface/90 backdrop-blur-md rounded-2xl p-1 px-1.5 sm:px-2 shadow-lg border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs w-auto pointer-events-auto">
+            <div id="viewport-container" class="sheet-container relative bg-slate-200/80 dark:bg-slate-900/80 rounded-none lg:rounded-2xl flex-1 min-h-0 border-0 lg:border border-slate-200/80 dark:border-slate-800 w-full overflow-hidden shadow-inner">
+            <div id="canvas-toolbar" class="glass-bar absolute top-2 left-2 right-2 z-20 rounded-2xl p-1 px-1.5 sm:px-2 flex items-center justify-between text-xs w-auto pointer-events-auto">
                 
                 <!-- Historial Undo / Redo -->
                 <div class="flex items-center gap-1 shrink-0">
@@ -921,9 +972,6 @@
                 </div>
             </div>
 
-            <!-- Contenedor de la Hoja (Mesa de Trabajo - Dinámico y Maximizado) -->
-            <div id="viewport-container" class="sheet-container relative bg-slate-200/80 dark:bg-slate-900/80 rounded-none lg:rounded-2xl flex-1 min-h-0 border-0 lg:border border-slate-200/80 dark:border-slate-800 w-full overflow-hidden shadow-inner">
-                
                 <!-- Barra Rápida Flotante (zonas separadas, táctil y espaciosa) -->
                 <div id="canvas-quick-bar" class="hidden absolute top-14 left-1/2 -translate-x-1/2 bg-white/97 dark:bg-dark-surface/97 backdrop-blur-md rounded-2xl shadow-xl border border-blue-500/30 px-2 py-1.5 sm:px-3 sm:py-2 flex items-center flex-wrap justify-center gap-1.5 sm:gap-2 z-20 transition-all pointer-events-auto max-w-[min(96vw,920px)]">
                     <span id="quick-card-badge" class="min-h-[36px] px-3 inline-flex items-center bg-blue-600 text-white font-bold text-xs rounded-xl shrink-0">Frente</span>
@@ -980,22 +1028,22 @@
                         <canvas id="preview-canvas" class="bg-white rounded cursor-default origin-center shadow-2xl ring-1 ring-slate-900/10"></canvas>
                     </div>
                 </div>
-            </div>
 
-            <div class="hidden lg:flex absolute bottom-2 left-2 right-2 z-10 items-center justify-between text-xs text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-xl bg-white/85 dark:bg-dark-surface/85 backdrop-blur-md border border-slate-200/70 dark:border-slate-800 pointer-events-auto">
-                <div class="flex items-center gap-2">
-                    <div class="flex items-center gap-1.5">
-                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span id="canvas-status-hint">Listo para imprimir</span>
+            <div id="canvas-footer" class="glass-bar flex absolute bottom-2 left-2 right-2 z-20 items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-xl pointer-events-auto">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                        <span id="canvas-status-hint" class="truncate">Listo para imprimir</span>
                     </div>
-                    <button id="btn-toggle-paper-theme" title="Alternar color de papel de vista previa (Oscuro / Blanco)" class="min-h-[26px] px-2 py-0.5 text-[11px] font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors">
+                    <button id="btn-toggle-paper-theme" title="Alternar color de papel de vista previa (Oscuro / Blanco)" class="min-h-[26px] px-2 py-0.5 text-[11px] font-semibold rounded-lg bg-white/25 dark:bg-white/10 hover:bg-white/40 dark:hover:bg-white/15 text-slate-700 dark:text-slate-300 border border-white/40 dark:border-white/10 flex items-center gap-1 transition-colors shrink-0">
                         <span id="paper-theme-icon" class="w-3.5 h-3.5 inline-flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15.2A8.2 8.2 0 018.8 4 8.4 8.4 0 0012 20.5 8.4 8.4 0 0020 15.2z"></path></svg>
                         </span>
-                        <span id="paper-theme-label">Papel Oscuro</span>
+                        <span id="paper-theme-label" class="hidden sm:inline">Papel Oscuro</span>
                     </button>
                 </div>
-                <span id="sheet-info-badge" class="font-mono text-xs">A4 • 210 × 297 mm</span>
+                <span id="sheet-info-badge" class="font-mono text-xs shrink-0">A4 • 210 × 297 mm</span>
+            </div>
             </div>
 
         </div>
@@ -1050,8 +1098,12 @@
 
             <div id="panel-export" class="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 pt-2 lg:px-3 lg:pt-3 pb-6 lg:pb-4">
                 <div class="px-0.5 pt-1 pb-0.5">
-                    <h1 class="text-[22px] lg:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">Salida</h1>
-                    <p class="text-[13px] lg:text-xs text-slate-500 dark:text-slate-400 mt-0.5">Descarga, imprime o copia la hoja.</p>
+                    <h1 class="text-[22px] lg:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">
+                        <span class="lg:hidden">Exportar</span>
+                        <span class="hidden lg:inline">Salida</span>
+                    </h1>
+                    <p class="text-[13px] lg:text-xs text-slate-500 dark:text-slate-400 mt-0.5 lg:hidden">Paso 3. Descarga, imprime o copia la hoja.</p>
+                    <p class="text-[13px] lg:text-xs text-slate-500 dark:text-slate-400 mt-0.5 hidden lg:block">Descarga, imprime o copia la hoja.</p>
                 </div>
 
                 <div class="bg-white dark:bg-dark-surface rounded-2xl px-4 py-3 shadow-sm border border-slate-200/80 dark:border-slate-800">
@@ -1060,26 +1112,37 @@
                 </div>
 
                 <div class="bg-white dark:bg-dark-surface rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
-                    <div class="grid grid-cols-2 gap-2.5 mb-3">
+                    <div id="export-fields" class="grid grid-cols-2 gap-2.5 mb-3">
                         <div>
                             <label class="block text-[11px] font-medium text-slate-500 mb-1">Formato</label>
                             <select id="export-format-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold outline-none">
-                                <option value="pdf" selected>PDF Listo para Imprimir</option>
-                                <option value="png">PNG (Sin Pérdida)</option>
-                                <option value="jpg">JPG (Imagen)</option>
+                                <option value="pdf" selected>PDF para imprimir</option>
+                                <option value="png">PNG</option>
+                                <option value="jpg">JPG</option>
                                 <option value="webp">WebP</option>
                             </select>
                         </div>
 
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-500 mb-1">Resolución</label>
+                        <div id="export-dpi-wrap">
+                            <label class="block text-[11px] font-medium text-slate-500 mb-1">DPI del PDF</label>
                             <select id="export-dpi-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold outline-none">
-                                <option value="300" selected>300 DPI (Impresión)</option>
-                                <option value="150">150 DPI (Rápido)</option>
-                                <option value="450">450 DPI (Ultra HD)</option>
+                                <option value="300" selected>300 (impresión)</option>
+                                <option value="150">150 (liviano)</option>
+                                <option value="450">450 (máximo)</option>
                             </select>
                         </div>
                     </div>
+
+                    <label class="flex items-center justify-between gap-3 mb-3 py-1 cursor-pointer">
+                        <span class="min-w-0">
+                            <span class="block text-[11px] font-semibold text-slate-700 dark:text-slate-200">Alta calidad, menos de 1 MB</span>
+                            <span class="block text-[10px] text-slate-500 dark:text-slate-400">Nitidez alta y archivo liviano en el formato elegido</span>
+                        </span>
+                        <span class="relative inline-flex items-center shrink-0">
+                            <input type="checkbox" id="check-export-light" class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </span>
+                    </label>
 
                     <div class="export-cta">
                         <button id="btn-generate-download"
@@ -1121,7 +1184,7 @@
 
     </main>
 
-    <nav id="app-tabbar" class="lg:hidden shrink-0 bg-white/92 dark:bg-dark-surface/92 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 z-30">
+    <nav id="app-tabbar" class="glass-bar lg:hidden shrink-0 z-30">
         <div class="grid grid-cols-3">
             <button id="mobile-tab-canvas" class="mobile-tab is-active" type="button">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
@@ -1133,7 +1196,7 @@
             </button>
             <button id="mobile-tab-export" class="mobile-tab" type="button">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                <span>Salida</span>
+                <span>Exportar</span>
             </button>
         </div>
     </nav>
