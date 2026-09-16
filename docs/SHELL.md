@@ -17,13 +17,14 @@ No metas Salida dentro de Ajustes. No metas Ajustes dentro de la Hoja. Un botón
 - Cero encabezado de marca. Cero chrome de sitio web.
 - Estructura: lienzo a pantalla + tab bar inferior `Hoja | Ajustes | Salida`.
 - Safe area (`viewport-fit=cover`). Controles de acción ≥ 44px.
-- Títulos grandes en Ajustes y Salida. Tema/reinicio viven en Ajustes.
+- Tema, reinicio, Simple/Avanzado e idioma (banderas EN/ES, inglés por defecto) van siempre visibles.
+- Modo **Simple**: sin Ajustes, valores de fábrica, pestañas `Hoja | Salida`. Modo **Avanzado**: el shell completo.
 - La hoja no comparte pantalla con paneles: una pestaña visible a la vez.
 
 ## Escritorio (app de escritorio)
 
 - Cero layout de página web. No hay header horizontal de sitio.
-- Tres columnas fijas: **Ajustes | Hoja | Salida**.
+- Tres columnas fijas: **Ajustes | Hoja | Salida**. En modo Simple se oculta Ajustes.
 - Salida va a la **derecha** (`#panel-output`), con el chrome de la app (marca, tema, reinicio) arriba de exportar.
 - Cada columna scrollea por dentro. El body no scrollea.
 - Espacio generoso. Sin pastilla dentro de pastilla.

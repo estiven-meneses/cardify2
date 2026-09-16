@@ -1,8 +1,9 @@
-const CACHE = 'cardpdf-v1';
+const CACHE = 'cardpdf-v2';
 const PRECACHE = [
     './',
     './index.html',
     './script.js',
+    './i18n.js',
     './icon.svg',
     './manifest.json',
     './icons/icon-192.png',

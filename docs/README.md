@@ -9,5 +9,6 @@ Guía para humanos e inteligencias artificiales que toquen este repo.
 | [AI.md](./AI.md) | Reglas, estilo y preguntas obligatorias antes de cambiar código |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Cómo está armado hoy y cómo debería crecer |
 | [LOGS.md](./LOGS.md) | Errores de prueba: leer pendientes, marcar resolved |
+| [TASKS.md](./TASKS.md) | Ideas y tareas pendientes (pending / done) |
 
 En la raíz: `AGENTS.md` (Cursor/Codex), `GEMINI.md` (Anti-Gravity), `CLAUDE.md` (Claude Desktop), `CODEX.md` (Codex).

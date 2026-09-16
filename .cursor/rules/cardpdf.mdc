@@ -11,7 +11,7 @@ Al **primer turno** de cada chat, antes de editar: lee `docs/START.md` y entra a
 - No toques `feature/antigravity`, `feature/claude` ni `feature/codex`.
 - No trabajes en `main`. Mezcla a `main` solo si Estiven lo pide. Tras mezclar, se borran las features de las IAs.
 - Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
-- CardPDF es **app**, no web. Celular tipo iPhone: tab bar Hoja / Ajustes / Salida, sin encabezado. Escritorio tipo app: Ajustes | Hoja | Salida (derecha). No metas export en Ajustes.
+- CardPDF es **app**, no web. Celular tipo iPhone: tab bar Hoja / Ajustes / Salida, sin encabezado. Simple oculta Ajustes. Escritorio: Ajustes | Hoja | Salida (derecha). Tema y reinicio siempre visibles. No metas export en Ajustes.
 - Al empezar: `logs/local/_pending.json`. Solo `pending` de tu zona. Resolved se ignoran.
 
 - Español, compacto.
