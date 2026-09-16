@@ -1,0 +1,18 @@
+---
+description: Reglas permanentes de Cardify (UI, bloques, IAs)
+alwaysApply: true
+---
+
+# Cardify
+
+Antes de editar, lee `docs/BRANCHING.md`, `docs/AI.md` y `docs/ARCHITECTURE.md`.
+
+- Una IA = una rama desde `origin/main`. Bloque 1 → `feature/bloque-1`. Bloque 2 → `feature/bloque-2`. Nadie trabaja en `main`.
+- Prohibido merge/rebase entre esas dos ramas. No resuelvas conflictos de la otra IA.
+- Responde en español, compacto.
+- Cero emojis en UI/toasts/tooltips. Solo SVG vectorial propio.
+- Cero redundancia: un botón = una acción por pantalla. Nada de pastilla dentro de pastilla.
+- No pises el otro bloque: carga/perspectiva/blueprint (Bloque 1) vs barra/deselección/zoom/iconos (Bloque 2).
+- No instales framework ni backend en un arreglo puntual. Migración Vite+React+TS en Vercel solo si Estiven la pide. Supabase solo si pide cuentas o plantillas en la nube.
+- No commitees ni hagas push sin que lo pida.
+- No subas fotos ni datos personales.
