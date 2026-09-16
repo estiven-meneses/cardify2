@@ -2,17 +2,36 @@
 
 App de escritorio/móvil para maquetar carnets CR80 sobre una hoja (A4/Carta), recortar con perspectiva y exportar PDF/PNG/JPG.
 
-## Hoy (vanilla)
+## Hoy (Vite + TypeScript)
 
 ```
 cardpdf/
-  index.html      # UI completa + CSS Tailwind CDN + estilos propios
-  script.js       # Estado, canvas, recorte, cámara, export (~4.5k líneas)
-  icon.svg
-  docs/           # estas reglas
+  index.html              # UI completa (solo markup; el CSS salio de aqui)
+  api/logs.js             # funcion de Vercel: errores del cliente en produccion
+  public/                 # manifest, sw.js, iconos (se copian tal cual a dist/)
+  src/
+    main.tsx              # entrada: estilos -> globales -> i18n -> legacy -> React
+    App.tsx               # superficie React (login + galeria); null sin backend
+    styles/app.css        # Tailwind por PostCSS + los estilos propios
+    legacy/
+      globals.ts          # expone jsPDF y confetti, que antes ponian los CDN
+      i18n.js             # textos EN/ES
+      app.js              # estado, lienzo, recorte, camara, export (~5.8k lineas)
+    lib/supabase.ts       # cliente; null si faltan las variables
+    features/auth/        # enlace magico por correo
+    features/gallery/     # fotos privadas (bucket + URLs firmadas)
+  supabase/migrations/    # bucket privado y policies de RLS
 ```
 
-No hay bundler ni `package.json`. Corre abriendo `index.html` o cualquier static host.
+`npm run dev` levanta Vite; `npm run build` compila a `dist/`, que es lo que
+sirve Vercel. Ya no se abre `index.html` a pelo: hay bundler y `package.json`.
+
+### Lo que sigue pendiente de migrar
+
+`src/legacy/app.js` e `i18n.js` todavia son JavaScript sin tipar y se comunican
+por el ambito global: cada uno expone al final las funciones que el otro usa
+(`t`, `initLang`, `updateUIFromState`, `scheduleRender`...). Ese puente se quita
+cuando ambos esten partidos en modulos y tipados.
 
 ### Estado
 
@@ -40,47 +59,45 @@ Persistencia: `localStorage` (`cardpdf-theme`, `cardpdf-custom-defaults`).
 
 Shell tipo app: `docs/SHELL.md`. Celular = Hoja / Ajustes / Salida. Escritorio = Ajustes | Hoja | Salida (derecha).
 
-Librerías CDN: Tailwind, jsPDF, canvas-confetti.
+Dependencias npm: Tailwind (PostCSS), jsPDF 4.x, canvas-confetti, React, supabase-js.
 
-## ¿Puede seguir en HTML plano?
+## Lo que falta por partir
 
-Sí para un prototipo. Ya duele para IAs y para ti:
+La migracion se hizo por etapas para no tocar el recorte. Criterio de corte que
+sigue vigente: **un cambio de migracion no altera el flujo de recorte ni las
+medidas CR80**; solo parte archivos y tipa.
 
-- Un solo `script.js` gigante = diffs frágiles y conflictos entre agentes.
-- Sin TypeScript = contratos invisibles (`selectedCardId` vs `activeCardId`).
-- Tailwind CDN + HTML monolítico = UI difícil de reusar.
-
-## Recomendación de migración (cuando Estiven lo pida)
-
-**Vite + TypeScript + React en Vercel.** No hace falta backend.
-
-Por qué este stack y no otro:
-
-- Las IAs editan React/TS mejor que un `script.js` de 4k líneas.
-- Vite es estático: `vercel` o incluso Netlify sirven el `dist/`. El bloqueo no es Netlify; es no tener módulos.
-- Vercel encaja con Vite sin config rara. Plan gratis alcanza.
-- Svelte es más liviano, pero hay menos contexto de entrenamiento y menos componentes listos.
-
-### Módulos objetivo (no implementar hasta que se pida)
+Modulos objetivo, sacando trozos de `src/legacy/app.js` de uno en uno:
 
 ```
 src/
-  main.tsx
   state/store.ts          # STATE + history
-  canvas/render.ts        # hoja, snap, selección
+  canvas/render.ts        # hoja, snap, seleccion
   canvas/interaction.ts   # drag, resize, pan, zoom
-  crop/                   # modal, homografía, lupa
-  cards/                  # carga, cámara, dropzone
+  crop/                   # modal, homografia, lupa
+  cards/                  # carga, camara, dropzone
   ui/                     # QuickBar, toasts, theme
   export/                 # PDF / PNG / print
 ```
 
-Criterio de corte: un PR de migración **no** cambia el flujo de recorte ni las medidas CR80. Solo parte archivos y tipa.
+Al mover algo fuera del legacy, quita tambien su linea del puente global.
 
-### ¿Supabase?
+### Supabase
 
-No todavía. CardPDF procesa imágenes en el cliente.
+El código ya está puesto, el proyecto todavía no. Es **opcional por diseño**:
+`src/lib/supabase.ts` exporta `null` si faltan `VITE_SUPABASE_URL` y
+`VITE_SUPABASE_ANON_KEY`, y entonces `App.tsx` no pinta nada. Sin variables,
+CardPDF corre 100% en el cliente igual que siempre.
 
-Úsalo el día que pida una de estas: login, plantillas en la nube, historial entre dispositivos, compartir un layout. Hasta entonces es costo y superficie de auth de más.
+Cuando el proyecto exista:
 
-Si llega: una tabla `profiles` + `templates` (json del STATE sin `rawImage`) y Storage solo si guarda fotos del usuario (con cuidado de privacidad).
+1. Aplicar `supabase/migrations/0001_fotos_privadas.sql`: crea el bucket
+   privado `cardpdf-photos` y las policies de RLS.
+2. Poner las dos variables en Vercel.
+3. Deshabilitar los signups en Supabase (Authentication → Sign Ups). Si no,
+   cualquiera con un correo puede crearse cuenta y la galería deja de ser
+   privada.
+
+Las policies se apoyan en que cada objeto viva en `${auth.uid()}/…`. El prefijo
+de carpeta no es cosmético: es lo que evalúan. El bucket es privado, así que la
+galería pide URLs firmadas de una hora en vez de enlaces permanentes.

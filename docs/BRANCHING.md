@@ -30,7 +30,7 @@ Worktrees: `.worktrees/cursor`, `.worktrees/antigravity`, `.worktrees/claude`, `
 ## Prohibido
 
 ```bash
-git checkout main                         # para editar, no. Solo para mezclar si Estiven lo pide.
+git checkout main                         # para editar, no. Solo para integrar tu rama ya probada.
 git checkout -b feature/cursor feature/claude
 git merge feature/antigravity             # si no eres quien Estiven nombró para mezclar
 git rebase feature/codex
@@ -49,9 +49,10 @@ git merge origin/feature/otra-ia   # no, nunca
 
 ## Cómo llega el trabajo a `main`
 
-0. Cada IA trae `main` a su rama a menudo (`git merge origin/main`).
-1. Cada IA commitea y pushea **su** rama (si Estiven lo pidió).
-2. Estiven dice “mezcla a main”.
-3. **Una** IA sigue el bloque de merge de `docs/START.md`.
-4. Se borran las features de las IAs.
-5. El siguiente chat las crea de nuevo desde `origin/main`.
+1. La IA trae `main` a su rama **antes** de empezar.
+2. Trabaja y commitea en su rama.
+3. Vuelve a traer `main` (pudo moverse) y resuelve ahí los conflictos,
+   entendiendo qué buscaba el otro lado. Detalle en `docs/START.md`.
+4. Verifica que compila **después** de mezclar.
+5. Integra su rama a `main` y la pushea. Su rama **no** se borra.
+6. Las features solo se borran cuando Estiven cierra la ronda.

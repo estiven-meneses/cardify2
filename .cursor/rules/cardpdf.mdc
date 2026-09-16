@@ -9,9 +9,9 @@ Al **primer turno** de cada chat, antes de editar: lee `docs/START.md` y entra a
 
 - Eres Cursor → rama `feature/cursor`, worktree `.worktrees/cursor`. Créala desde `origin/main` si no existe.
 - No toques `feature/antigravity`, `feature/claude` ni `feature/codex`.
-- No trabajes en `main`. Mezcla a `main` solo si Estiven lo pide. Tras mezclar, se borran las features de las IAs.
+- No edites `main` a mano. Integras ahí tu rama cuando compile y esté probada; tu rama no se borra al integrar.
 - Trae `main` a tu rama seguido: `git fetch origin && git merge origin/main`. Al empezar cada chat, antes de commitear y cuando otra IA haya mezclado. Mezclar `origin/main` a tu rama sí; la rama de otra IA nunca.
-- El bloque de limpieza de `docs/START.md` borra ramas y worktrees de **todas** las IAs, con su trabajo sin commitear dentro. Córrelo solo cuando Estiven diga "mezcla a main", nunca por iniciativa propia.
+- El bloque de cierre de ronda de `docs/START.md` borra ramas y worktrees de **todas** las IAs. Solo es seguro si ningún worktree tiene cambios sin commitear: el propio bloque lo comprueba y aborta. No le quites esa guarda ni uses `--force`.
 - Lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
 - CardPDF es **app**, no web. Celular tipo iPhone: tab bar Hoja / Ajustes / Salida, sin encabezado. Simple oculta Ajustes. Escritorio: Ajustes | Hoja | Salida (derecha). Tema y reinicio siempre visibles. No metas export en Ajustes.
 - Al empezar: `logs/local/_pending.json`. Solo `pending` de tu zona. Resolved se ignoran.
@@ -19,7 +19,7 @@ Al **primer turno** de cada chat, antes de editar: lee `docs/START.md` y entra a
 - Español, compacto.
 - Cero emojis en UI/toasts/tooltips. Solo SVG propio.
 - Cero redundancia: un botón = una acción por pantalla.
-- No pises carga/perspectiva/blueprint (Anti-Gravity). Tú: barra, deselección, zoom, iconos, logs, shell. Claude y Codex solo si Estiven les asigna tu zona.
-- No instales framework ni backend en un arreglo puntual. Vite+React+TS / Supabase solo si Estiven lo pide.
-- No commitees ni hagas push sin que lo pida. Nunca push a `main` salvo la mezcla pedida.
+- No pises carga/perspectiva/blueprint (Anti-Gravity). Tú: barra, deselección, zoom, iconos, logs, shell.
+- El stack ya es Vite + TypeScript con React para lo nuevo. No añadas otro framework en un arreglo puntual.
+- Commitea y pushea tu rama al terminar. A `main` se llega con merge, nunca editándola.
 - No subas fotos ni datos personales.

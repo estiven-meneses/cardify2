@@ -87,16 +87,27 @@ CardPDF 2.0 es una reconstrucción total del motor y la interfaz, diseñada para
 
 ## 🚀 Uso Rápido
 
-No requiere instalación, Node.js ni compilación en el servidor. Funciona 100% en el navegador:
+El procesado de imágenes sigue siendo 100% en tu navegador: ninguna foto sale
+de tu equipo. Pero el proyecto ya usa Vite, así que hay un paso de compilación.
 
-1. Clona el repositorio:
 ```bash
 git clone https://github.com/estiven-meneses/cardpdf.git
+cd cardpdf
+npm install
+npm run dev      # http://localhost:5173
 ```
 
-2. Abre `index.html` en tu navegador favorito (Chrome, Edge, Safari, Firefox).
+Para producción, `npm run build` genera `dist/`. El despliegue es **Vercel**,
+que corre ese build solo en cada push a `main`.
 
-¡Listo para usar! También puedes desplegarlo directamente en **GitHub Pages**, **Vercel** o **Netlify** con solo subir los archivos.
+Abrir `index.html` directamente ya no funciona: los módulos y los estilos los
+resuelve el bundler.
+
+### Backend (opcional)
+
+Copia `.env.example` a `.env` y rellena `VITE_SUPABASE_URL` y
+`VITE_SUPABASE_ANON_KEY` si quieres login y galería privada de fotos. Sin esas
+variables la app funciona igual, sin nube.
 
 ---
 

@@ -17,6 +17,21 @@
             --tabbar-pad-top: 6px;
             --tabbar-pad-bottom: max(8px, var(--safe-area-bottom));
             --tabbar-total: calc(var(--tabbar-tap) + var(--tabbar-pad-top) + var(--tabbar-pad-bottom));
+
+            /* Alto comun de los controles de arriba (modo, idioma, tema/reset).
+               Antes cada grupo traia el suyo -38px, 48px y 36px- y por eso no
+               alineaba ninguno. Ahora los tres salen de aqui. */
+            --ctl-h: 36px;
+            --ctl-pad: 3px;
+            --topbar-pad: 8px;
+            --topbar-h: calc(var(--ctl-h) + 2 * var(--ctl-pad));
+            --topbar-total: calc(var(--topbar-h) + 2 * var(--topbar-pad) + var(--safe-area-top));
+        }
+        @media screen and (max-width: 1023px) {
+            :root {
+                /* En el movil manda el dedo, no el raton. */
+                --ctl-h: 40px;
+            }
         }
 
         /* ========================================================= */
@@ -304,7 +319,7 @@
         .app-mode-switch {
             display: flex;
             align-items: center;
-            padding: 3px;
+            padding: var(--ctl-pad);
             border-radius: 999px;
             background: rgba(241, 245, 249, 0.92);
         }
@@ -312,7 +327,7 @@
             background: rgba(30, 41, 59, 0.92);
         }
         .app-mode-btn {
-            min-height: 32px;
+            min-height: var(--ctl-h);
             padding: 0 12px;
             font-size: 11px;
             font-weight: 700;
@@ -328,12 +343,12 @@
             display: flex;
             align-items: center;
             gap: 2px;
-            padding: 2px;
+            padding: var(--ctl-pad);
             border-radius: 999px;
         }
         .app-lang-btn {
-            width: 44px;
-            height: 44px;
+            width: var(--ctl-h);
+            height: var(--ctl-h);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -342,10 +357,37 @@
         }
         .app-lang-btn.is-on {
             opacity: 1;
-            box-shadow: 0 0 0 2px #2563eb;
+            box-shadow: inset 0 0 0 2px #2563eb;
         }
         .dark .app-lang-btn.is-on {
-            box-shadow: 0 0 0 2px #60a5fa;
+            box-shadow: inset 0 0 0 2px #60a5fa;
+        }
+        /* El encabezado vive en la columna derecha, que da ~294px. El bloque
+           izquierdo pide 187px y las acciones 160px: no caben en una fila.
+           Antes el switch de modo se comprimia de 143px a 82px y, con overflow
+           visible, "Advanced" se derramaba sobre las banderas. Mejor dos filas
+           que texto recortado encima de otro control. */
+        .app-chrome-inner {
+            flex-wrap: wrap;
+            row-gap: 8px;
+        }
+        .app-chrome .app-mode-switch {
+            flex-shrink: 0;
+        }
+        .app-chrome-actions {
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        /* Escritorio: los botones del encabezado traen w-9/h-9 desde el HTML y
+           el carril de idioma media 48px, asi que tema y reset quedaban 12px
+           mas bajos. Todos al mismo alto. */
+        .app-chrome-actions > button {
+            width: var(--ctl-h);
+            height: var(--ctl-h);
+        }
+        .app-chrome-actions {
+            align-items: center;
         }
         .app-flag {
             width: 22px;
@@ -373,7 +415,7 @@
                 justify-content: space-between;
                 gap: 8px;
                 position: fixed;
-                top: calc(8px + var(--safe-area-top));
+                top: calc(var(--topbar-pad) + var(--safe-area-top));
                 left: 10px;
                 right: 10px;
                 z-index: 50;
@@ -386,12 +428,18 @@
                 display: flex;
                 align-items: center;
                 gap: 2px;
-                padding: 2px;
+                padding: var(--ctl-pad);
                 border-radius: 999px;
                 background: rgba(255, 255, 255, 0.18);
                 border: 1px solid rgba(255, 255, 255, 0.32);
                 backdrop-filter: blur(48px) saturate(190%);
                 -webkit-backdrop-filter: blur(48px) saturate(190%);
+            }
+            /* Ganan a las utilidades w-11/h-11 del HTML, que fijaban 44px y
+               dejaban este grupo mas alto que los otros dos. */
+            #app-utils .app-utils-actions > button {
+                width: var(--ctl-h);
+                height: var(--ctl-h);
             }
             .dark #app-utils .app-utils-actions {
                 background: rgba(255, 255, 255, 0.07);
@@ -419,10 +467,10 @@
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
                 overscroll-behavior-y: contain;
-                padding-top: calc(56px + var(--safe-area-top));
+                padding-top: var(--topbar-total);
             }
             #canvas-toolbar {
-                top: calc(56px + var(--safe-area-top));
+                top: var(--topbar-total);
                 left: 10px;
                 right: 10px;
                 background: transparent;

@@ -5,9 +5,9 @@ Al **primer turno**, antes de editar: lee `docs/START.md` y entra a tu rama. No 
 Eres **Codex**. Rama `feature/codex`. Worktree `.worktrees/codex`. Créala desde `origin/main` si no existe.
 
 - No trabajes en `main` ni en `feature/cursor`, `feature/antigravity` o `feature/claude`.
-- Mezcla a `main` **solo** si Estiven lo pide. Después se borra tu feature.
+- Al terminar un cambio: trae `main` otra vez, resuelve conflictos entendiendo qué buscaba el otro lado, verifica que compila y **entonces** integra tu rama a `main`. Tu rama no se borra.
 - Trae `main` a tu rama seguido: `git fetch origin && git merge origin/main`. Al empezar, antes de commitear y cuando sepas que otra IA mezcló. Mezclar `origin/main` sí; la rama de otra IA nunca.
-- Zona: la que Estiven asigne. Si no la dice, pregunta solo la zona. No pises carga/recorte (Anti-Gravity) ni barra/zoom/iconos (Cursor) salvo que te las asigne.
+- Zona: la del encargo. Si no se dice, la que toque, sin rehacer de paso carga/recorte (Anti-Gravity) ni barra/zoom/iconos (Cursor).
 
 También lee `AGENTS.md`, `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md`, `docs/LOGS.md`.
 
@@ -16,5 +16,5 @@ CardPDF es **app**, no web. Celular tipo iPhone: Hoja / Ajustes / Salida, sin en
 - Español, compacto.
 - Cero emojis en UI. SVG propio. Cero botones duplicados.
 - Logs: `logs/local/_pending.json`. Solo `pending` de tu zona.
-- Commit/push solo si lo pide. Nunca push a `main` salvo la mezcla pedida.
-- Sin framework/backend extra. Sin fotos ni datos personales.
+- Commitea y pushea tu rama al terminar. A `main` se llega con merge, nunca editándola.
+- Stack: Vite + TypeScript, React para lo nuevo, Supabase opcional. Sin fotos ni datos personales en el repo.

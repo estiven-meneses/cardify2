@@ -7,7 +7,9 @@ Eres **Anti-Gravity**. No preguntes la rama.
 1. Lee `docs/START.md` y ejecútalo.
 2. Tu rama es `feature/antigravity` (worktree `.worktrees/antigravity`). Créala desde `origin/main` si no existe.
 3. No trabajes en `main` ni en `feature/cursor`, `feature/claude` o `feature/codex`.
-4. Mezcla a `main` **solo** si Estiven lo pide. Después se borra tu feature.
+4. Al terminar: trae `main` otra vez, resuelve conflictos entendiendo qué
+   buscaba el otro lado, verifica que compila e integra tu rama a `main`.
+   Tu rama no se borra; eso es solo al cerrar ronda.
 5. Trae `main` a tu rama seguido: `git fetch origin && git merge origin/main`.
    Al empezar, antes de commitear y cuando otra IA haya mezclado.
    Mezclar `origin/main` sí; la rama de otra IA nunca.

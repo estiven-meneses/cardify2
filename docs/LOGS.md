@@ -49,13 +49,32 @@ Los JSON del día **no se commitean** (pueden tener datos de prueba). Las IAs lo
 
 ## Producción
 
-Misma carpeta y formato en `logs/production/`. El cliente, fuera de localhost, envía a `/api/logs` (aún no hay función en Vercel). No inventes ese endpoint en un parche de UI.
+Fuera de localhost el cliente envía a **`/api/logs`**, que ya existe
+(`api/logs.js`). No escribe en disco: emite una línea JSON con el prefijo
+`[cardpdf-client]` que Vercel guarda como runtime log.
+
+Para leerlos, con el conector de Vercel:
+
+- `get_runtime_logs` filtrando por `[cardpdf-client]` — todo lo que reportó el
+  navegador: mensaje, stack, URL, user agent.
+- `get_runtime_errors` — además, lo que reviente dentro de la propia función.
+
+Así se arregla un fallo de producción: lees el log, reproduces con esa URL y
+ese user agent, y corriges. No hace falta base de datos ni panel.
 
 ## Servidor
 
+La app se levanta con Vite; `tools/dev-server.py` ya no la sirve (desde la
+migración, `index.html` carga módulos que resuelve el bundler). Sigue siendo el
+que **registra** los errores, y Vite le pasa `/__log__`, `/__logs__` y
+`/api/logs` por proxy. Son dos procesos:
+
 ```bash
-python3 tools/dev-server.py          # http://127.0.0.1:4173
-python3 tools/dev-server.py 4174     # otro puerto
+python3 tools/dev-server.py          # registro de errores, puerto 4173
+npm run dev                          # la app, http://localhost:5173
 ```
+
+Si no levantas el de Python no se rompe nada: la petición falla y el cliente la
+ignora. Solo te quedas sin registro local.
 
 Sirve el HTML y escribe logs. No abras esa URL esperando un dashboard: no lo hay.
