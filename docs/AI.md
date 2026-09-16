@@ -29,11 +29,13 @@ Contéstales en silencio (y al usuario solo si hay duda real):
 
 ## UI (regla de oro)
 
+- **App, no web.** Lee `docs/SHELL.md`. Celular = iPhone (Hoja / Ajustes / Salida, sin encabezado). Escritorio = Ajustes | Hoja | Salida a la derecha.
 - **Cero redundancia**: un botón = una acción por pantalla. Nada de “Ejemplo” dos veces, ni pastilla dentro de pastilla.
 - **Cero emojis** en HTML, toasts, tooltips, alertas o botones. Solo SVG vectorial propio, nítido, 24×24.
 - Táctil: controles de acción ≥ 44px. Escritorio: espacio generoso, jerarquía clara.
 - Copy mínimo. Si el icono o el contexto ya lo dicen, no pongas un título extra.
 - Al cambiar UI, verifica el flujo de punta a punta (no solo un screenshot). Si no hay browser, dilo.
+- Salida (`#panel-output`) no se mezcla con Ajustes (`#panel-controls`). Exportar no vuelve al panel izquierdo.
 
 ## Dominios que no se pisan
 

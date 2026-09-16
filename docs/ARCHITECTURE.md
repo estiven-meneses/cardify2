@@ -35,7 +35,11 @@ Persistencia: `localStorage` (`cardify-theme`, `cardify-custom-defaults`).
 | `#preview-canvas` | Hoja A4 renderizada |
 | `#canvas-quick-bar` | Barra flotante del carnet seleccionado |
 | `#crop-modal` | Recorte + perspectiva + lupa |
+| `#panel-sidebar` / `#panel-controls` | Ajustes (entrada) |
+| `#panel-output` / `#panel-export` | Salida (exportar) |
 | `#empty-state` | Guía inicial (Bloque 1 puede sustituirla por blueprint) |
+
+Shell tipo app: `docs/SHELL.md`. Celular = Hoja / Ajustes / Salida. Escritorio = Ajustes | Hoja | Salida (derecha).
 
 Librerías CDN: Tailwind, jsPDF, canvas-confetti.
 

@@ -14,7 +14,9 @@ Identifícate por el producto (Cursor vs Codex). Claude lee `CLAUDE.md`. Anti-Gr
 - `main` no se edita. Mezcla **solo** si Estiven lo pide. Después se borran esas features.
 - Claude/Codex: zona la que Estiven asigne. Cursor no toca carga/perspectiva. Anti-Gravity no toca barra/zoom/iconos.
 
-También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md` y `docs/LOGS.md`.
+También lee `docs/BRANCHING.md`, `docs/AI.md`, `docs/ARCHITECTURE.md`, `docs/SHELL.md` y `docs/LOGS.md`.
+
+Cardify es **app**, no web. Celular = iPhone (Hoja / Ajustes / Salida). Escritorio = tres columnas (Ajustes | Hoja | Salida a la derecha). Detalle: `docs/SHELL.md`.
 
 ## Logs (al empezar)
 
