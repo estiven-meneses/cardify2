@@ -229,6 +229,8 @@ const DOM = {
     zoomLevelLabel: document.getElementById('zoom-level-label'),
     panelCanvas: document.getElementById('panel-canvas'),
     canvasQuickBar: document.getElementById('canvas-quick-bar'),
+    hojaPickFrente: document.getElementById('hoja-pick-frente'),
+    hojaPickDorso: document.getElementById('hoja-pick-dorso'),
     quickCardBadge: document.getElementById('quick-card-badge'),
     btnQuickSelectBoth: document.getElementById('btn-quick-select-both'),
     quickSelectBothLabel: document.getElementById('quick-select-both-label'),
@@ -782,7 +784,45 @@ function setupPaperDimensions() {
 
 function openCardFilePicker(cardId) {
     const input = cardId === 'dorso' ? DOM.dorsoInput : DOM.frenteInput;
-    if (input) input.click();
+    if (!input) return;
+    input.value = '';
+    input.click();
+}
+
+function syncHojaPickHits() {
+    const canvas = DOM.previewCanvas;
+    const host = DOM.viewportContainer;
+    if (!canvas || !host) return;
+    const hits = [
+        [DOM.hojaPickFrente, 'frente'],
+        [DOM.hojaPickDorso, 'dorso']
+    ];
+    const rect = canvas.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 8) {
+        hits.forEach(([el]) => { if (el) el.classList.add('is-off'); });
+        return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const canvasW = canvas.width / dpr;
+    const canvasH = canvas.height / dpr;
+    const scale = rect.width / Math.max(1, canvasW);
+    const mmToPx = canvasW / STATE.paper.widthMm;
+    const placeholders = getBlueprintPlaceholders(mmToPx, canvasW, canvasH);
+
+    for (const [el, cardId] of hits) {
+        if (!el) continue;
+        const bp = placeholders.find((p) => p.cardId === cardId);
+        if (!bp) {
+            el.classList.add('is-off');
+            continue;
+        }
+        el.classList.remove('is-off');
+        el.style.left = `${rect.left - hostRect.left + bp.pxX * scale}px`;
+        el.style.top = `${rect.top - hostRect.top + bp.pxY * scale}px`;
+        el.style.width = `${bp.pxW * scale}px`;
+        el.style.height = `${bp.pxH * scale}px`;
+    }
 }
 
 function handleCameraTrigger(cardId) {
@@ -2309,7 +2349,10 @@ function resizeCanvasViewport() {
     DOM.previewCanvas.style.width = `${Math.round(displayWidth * STATE.zoom)}px`;
     DOM.previewCanvas.style.height = `${Math.round(displayHeight * STATE.zoom)}px`;
     updateViewportScrollMode();
-    requestAnimationFrame(updateViewportScrollMode);
+    requestAnimationFrame(() => {
+        updateViewportScrollMode();
+        syncHojaPickHits();
+    });
 }
 
 function renderLoop() {
@@ -2357,6 +2400,7 @@ function renderLoop() {
     }
 
     ctx.restore();
+    syncHojaPickHits();
 }
 
 function getCardInstances(mmToPx, canvasWidth, canvasHeight) {
@@ -2881,8 +2925,6 @@ function setupCanvasPointerEvents() {
             canvas.setPointerCapture(e.pointerId);
             syncControlsFromActiveCard();
             scheduleRender();
-        } else if (STATE.zoom > 1.0) {
-            beginViewportPan(e);
         } else {
             const placeholders = getBlueprintPlaceholders(mmToPx, canvasW, canvasH);
             const clickedBp = placeholders.find(bp =>
@@ -2891,6 +2933,10 @@ function setupCanvasPointerEvents() {
             );
             if (clickedBp) {
                 openCardFilePicker(clickedBp.cardId);
+                return;
+            }
+            if (STATE.zoom > 1.0) {
+                beginViewportPan(e);
                 return;
             }
             deselectCards();
@@ -3146,6 +3192,7 @@ function setupViewportEmptyDeselect() {
 
     const onEmptyPointerDown = (e) => {
         if (e.target.closest('#canvas-quick-bar')) return;
+        if (e.target.closest('.hoja-pick-hit')) return;
         if (e.target.closest('#empty-state')) return;
         if (e.target === DOM.previewCanvas) return;
 
